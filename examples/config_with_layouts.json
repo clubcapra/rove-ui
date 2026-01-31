@@ -1,0 +1,151 @@
+{
+    "general": {
+        "auto_connect": false,
+        "language": "fr_CA",
+        "refresh_rate": 30
+    },
+    "map": {
+        "latitude": 45.5017,
+        "longitude": -73.5673,
+        "type": "satellite",
+        "zoom": 13
+    },
+    "panels": [
+        {
+            "enabled": true,
+            "title": "Vue Principale - Grille 2x2",
+            "type": "layout",
+            "layout_type": "grid",
+            "rows": 2,
+            "columns": 2,
+            "children": [
+                {
+                    "enabled": true,
+                    "title": "Nuage de Points 3D",
+                    "type": "pointcloud",
+                    "properties": {
+                        "mock_mode": true
+                    }
+                },
+                {
+                    "enabled": true,
+                    "title": "Carte",
+                    "type": "map"
+                },
+                {
+                    "enabled": true,
+                    "title": "Caméra Avant",
+                    "type": "rtsp",
+                    "properties": {
+                        "stream_index": 0
+                    }
+                },
+                {
+                    "enabled": true,
+                    "title": "Caméra Arrière",
+                    "type": "rtsp",
+                    "properties": {
+                        "stream_index": 1
+                    }
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "title": "Vue Horizontale - Caméras",
+            "type": "layout",
+            "layout_type": "horizontal",
+            "rows": 1,
+            "columns": 3,
+            "children": [
+                {
+                    "enabled": true,
+                    "title": "Caméra 1",
+                    "type": "rtsp",
+                    "properties": {
+                        "stream_index": 0
+                    }
+                },
+                {
+                    "enabled": true,
+                    "title": "Caméra 2",
+                    "type": "rtsp",
+                    "properties": {
+                        "stream_index": 1
+                    }
+                },
+                {
+                    "enabled": true,
+                    "title": "Nuage Points",
+                    "type": "pointcloud",
+                    "properties": {
+                        "mock_mode": true
+                    }
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "title": "Vue Mixte - Layout Imbriqué",
+            "type": "layout",
+            "layout_type": "vertical",
+            "rows": 2,
+            "columns": 1,
+            "children": [
+                {
+                    "enabled": true,
+                    "title": "Carte Plein Écran",
+                    "type": "map"
+                },
+                {
+                    "enabled": true,
+                    "title": "Sous-grille 1x2",
+                    "type": "layout",
+                    "layout_type": "grid",
+                    "rows": 1,
+                    "columns": 2,
+                    "children": [
+                        {
+                            "enabled": true,
+                            "title": "Points 3D",
+                            "type": "pointcloud",
+                            "properties": {
+                                "mock_mode": true
+                            }
+                        },
+                        {
+                            "enabled": true,
+                            "title": "RTSP",
+                            "type": "rtsp",
+                            "properties": {
+                                "stream_index": 0
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "ros_topics": {
+        "image": "/camera/image_raw",
+        "pointcloud": "/pointcloud",
+        "pose": "/robot_pose"
+    },
+    "rtsp_streams": [
+        {
+            "enabled": true,
+            "name": "Caméra Avant",
+            "url": "rtsp://192.168.168.22:554/stream1"
+        },
+        {
+            "enabled": true,
+            "name": "Caméra Arrière",
+            "url": "rtsp://192.168.168.22:554/stream1"
+        },
+        {
+            "enabled": false,
+            "name": "Caméra Latérale",
+            "url": "rtsp://192.168.168.22:554/stream1"
+        }
+    ]
+}
