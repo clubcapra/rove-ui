@@ -8,11 +8,11 @@
 
 CAPRA_UI est une application Qt6 pour le contrôle et la visualisation de robots autonomes. Elle intègre :
 
-- 🗺️ **Cartes satellites interactives** (Leaflet.js)
-- 📹 **Flux vidéo RTSP** (caméras multiples)
-- ☁️ **Visualisation de nuages de points 3D** (PCL + VTK)
-- 🤖 **Intégration ROS 2** (rclcpp, sensor_msgs, geometry_msgs)
-- ⚙️ **Configuration JSON** complète et flexible
+-  **Cartes satellites interactives** (Leaflet.js)
+-  **Flux vidéo RTSP** (caméras multiples)
+-  **Visualisation de nuages de points 3D** (PCL + VTK) à valider
+-  **Intégration ROS 2** (rclcpp, sensor_msgs, geometry_msgs)
+-  **Configuration JSON** complète et flexible
 
 ## 📁 Structure du projet
 
@@ -35,16 +35,9 @@ CAPRA_UI/
 │   └── main.cpp
 ├── tests/
 │   ├── unit/              # Tests unitaires
-│   │   ├── test_config_manager.cpp
-│   │   ├── test_rtsp_viewer.cpp
-│   │   └── test_map_viewer.cpp
 │   ├── integration/       # Tests d'intégration
 │   └── CMakeLists.txt
 ├── docs/                  # Documentation
-│   ├── README.md
-│   ├── CONFIGURATION_GUIDE.md
-│   ├── QUICKSTART.md
-│   └── ...
 ├── examples/              # Exemples de configuration
 │   └── config.json
 ├── build/                 # Build ROS 2
@@ -57,90 +50,171 @@ CAPRA_UI/
 ### Mode Standalone (sans ROS 2)
 
 ```bash
-# Installer manuellement les dépendances requises (Qt6, OpenCV, CMake)
-# Exemple (Debian/Ubuntu) :
-# sudo apt install build-essential cmake libqt6* libopencv-dev
-
-# Compilation avec CMake :
-mkdir -p build_standalone && cd build_standalone
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j$(nproc)
-
-# Exécution
-QT_QPA_PLATFORM=xcb ./CAPRA_UI
+chmod +x ./launch.sh
+./launch.sh
 ```
 
-### Mode ROS 2
 
-```bash
-# Installation des dépendances
-./install_dependencies.sh
-
-# Compilation avec colcon
-cd ~/CAPRA_UI
-colcon build --packages-select CAPRA_UI
-
-# Sourcer et exécuter
-source install/setup.bash
-ros2 run CAPRA_UI CAPRA_UI
-```
-
-## 🧪 Tests
-
-```bash
-# Compiler avec les tests
-cd build_standalone
-cmake .. -DBUILD_WITH_ROS2=OFF
-make
-
-# Exécuter tous les tests
-make run_tests
-
-# Ou exécuter individuellement
-./tests/test_config_manager
-./tests/test_rtsp_viewer
-./tests/test_map_viewer
-```
 
 ## ⚙️ Configuration
 
 La configuration se fait via un fichier JSON situé à :
-`~/.config/CAPRA_UI/capra_ui_config.json`
-
-Exemple :
-
 ```json
 {
     "general": {
-        "auto_connect": true,
+        "auto_connect": false,
         "language": "fr_CA",
         "refresh_rate": 30
     },
-    "rtsp_streams": [
-        {
-            "name": "Caméra Principale",
-            "url": "rtsp://admin:123456@192.168.168.115:554/stream1",
-            "enabled": true
-        }
-    ],
     "map": {
         "latitude": 45.5017,
         "longitude": -73.5673,
-        "zoom": 13,
-        "type": "satellite"
-    }
+        "type": "satellite",
+        "zoom": 13
+    },
+    "panels": [
+        {
+            "enabled": true,
+            "title": "Vue Principale - Grille 2x2",
+            "type": "layout",
+            "layout_type": "grid",
+            "rows": 2,
+            "columns": 2,
+            "children": [
+                {
+                    "enabled": true,
+                    "title": "Nuage de Points 3D",
+                    "type": "pointcloud",
+                    "properties": {
+                        "mock_mode": true
+                    }
+                },
+                {
+                    "enabled": true,
+                    "title": "Carte",
+                    "type": "map"
+                },
+                {
+                    "enabled": true,
+                    "title": "Caméra Avant",
+                    "type": "rtsp",
+                    "properties": {
+                        "stream_index": 0
+                    }
+                },
+                {
+                    "enabled": true,
+                    "title": "Caméra Arrière",
+                    "type": "rtsp",
+                    "properties": {
+                        "stream_index": 1
+                    }
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "title": "Vue Horizontale - Caméras",
+            "type": "layout",
+            "layout_type": "horizontal",
+            "rows": 1,
+            "columns": 3,
+            "children": [
+                {
+                    "enabled": true,
+                    "title": "Caméra 1",
+                    "type": "rtsp",
+                    "properties": {
+                        "stream_index": 0
+                    }
+                },
+                {
+                    "enabled": true,
+                    "title": "Caméra 2",
+                    "type": "rtsp",
+                    "properties": {
+                        "stream_index": 1
+                    }
+                },
+                {
+                    "enabled": true,
+                    "title": "Nuage Points",
+                    "type": "pointcloud",
+                    "properties": {
+                        "mock_mode": true
+                    }
+                }
+            ]
+        },
+        {
+            "enabled": true,
+            "title": "Vue Mixte - Layout Imbriqué",
+            "type": "layout",
+            "layout_type": "vertical",
+            "rows": 2,
+            "columns": 1,
+            "children": [
+                {
+                    "enabled": true,
+                    "title": "Carte Plein Écran",
+                    "type": "map"
+                },
+                {
+                    "enabled": true,
+                    "title": "Sous-grille 1x2",
+                    "type": "layout",
+                    "layout_type": "grid",
+                    "rows": 1,
+                    "columns": 2,
+                    "children": [
+                        {
+                            "enabled": true,
+                            "title": "Points 3D",
+                            "type": "pointcloud",
+                            "properties": {
+                                "mock_mode": true
+                            }
+                        },
+                        {
+                            "enabled": true,
+                            "title": "RTSP",
+                            "type": "rtsp",
+                            "properties": {
+                                "stream_index": 0
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "ros_topics": {
+        "image": "/camera/image_raw",
+        "pointcloud": "/pointcloud",
+        "pose": "/robot_pose"
+    },
+    "rtsp_streams": [
+        {
+            "enabled": true,
+            "name": "Caméra Avant",
+            "url": "rtsp://192.168.168.22:554/stream1"
+        },
+        {
+            "enabled": true,
+            "name": "Caméra Arrière",
+            "url": "rtsp://192.168.168.22:554/stream1"
+        },
+        {
+            "enabled": false,
+            "name": "Caméra Latérale",
+            "url": "rtsp://192.168.168.22:554/stream1"
+        }
+    ]
 }
+
 ```
-
-Voir [CONFIGURATION_GUIDE.md](docs/CONFIGURATION_GUIDE.md) pour plus de détails.
-
 ## 📦 Dépendances
 
-### Obligatoires (mode standalone)
-- Qt6 (≥ 6.4) : Widgets, WebEngineWidgets
-- OpenCV (≥ 4.6) : Streaming RTSP
-- CMake (≥ 3.16)
-- Google Test : Tests unitaires
 
 ### Optionnelles (mode ROS 2)
 - ROS 2 Humble/Iron
@@ -164,52 +238,5 @@ Voir [CONFIGURATION_GUIDE.md](docs/CONFIGURATION_GUIDE.md) pour plus de détails
 ### UI
 - **CapraUI** : Fenêtre principale avec layout dynamique
 - **ConfigDialog** : Interface de configuration à 5 onglets
-
-## 📚 Documentation
-
-- [Guide de démarrage rapide](docs/QUICKSTART.md)
-- [Guide de configuration](docs/CONFIGURATION_GUIDE.md)
-- [Voir l'interface sans ROS 2](docs/VOIR_INTERFACE.md)
-- [Migration vers JSON](docs/MIGRATION_GUIDE.md)
-- [Résumé de la config](docs/CONFIG_SUMMARY.md)
-
-## 🐛 Dépannage
-
-### Erreur WebEngine GPU
-Si vous voyez `ContextResult::kTransientFailure`, c'est un avertissement bénin lié au GPU. L'application fonctionne normalement.
-
-### Caméra RTSP ne se connecte pas
-1. Testez avec VLC : `vlc rtsp://user:pass@ip:port/stream`
-2. Vérifiez le chemin du stream (`/stream1`, `/h264`, `/live`, etc.)
-3. Consultez les logs dans la console Qt
-
-### Note sur le transport RTSP
-Le viewer RTSP utilise désormais exclusivement le transport TCP (fiabilité). Le support UDP/UDP Multicast a été retiré du code car instable sur plusieurs environnements. Aucune configuration supplémentaire n'est nécessaire pour forcer TCP : l'application applique les options nécessaires au démarrage du flux.
-
-### Tests échouent
-```bash
-# Mode verbose
-cd build_standalone
-ctest --output-on-failure
-```
-
-## 🤝 Contribution
-
-Les contributions sont les bienvenues ! Veuillez :
-
-1. Créer une branche pour votre fonctionnalité
-2. Écrire des tests pour le nouveau code
-3. Vérifier que tous les tests passent
-4. Soumettre une pull request
-
-## 📝 License
-
-Ce projet est sous licence MIT. Voir le fichier LICENSE pour plus de détails.
-
-## 📧 Contact
-
-Pour toute question ou suggestion, ouvrez une issue sur le dépôt.
-
----
 
 **Note** : Ce projet est en développement actif. L'API peut changer entre les versions.
