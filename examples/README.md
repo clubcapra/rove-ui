@@ -14,7 +14,6 @@ Puis modifiez selon vos besoins.
 
 ## Exemples de configurations
 
-### Configuration minimaliste (mode standalone)
 ```json
 {
     "general": {
@@ -33,7 +32,6 @@ Puis modifiez selon vos besoins.
             "enabled": true
         }
     ],
-    "rtsp_streams": []
 }
 ```
 
@@ -43,13 +41,7 @@ Puis modifiez selon vos besoins.
     "general": {
         "auto_connect": true
     },
-    "rtsp_streams": [
-        {
-            "name": "Caméra Principale",
-            "url": "rtsp://admin:123456@192.168.168.115:554/stream1",
-            "enabled": true
-        }
-    ],
+
     "panels": [
         {
             "type": "map",

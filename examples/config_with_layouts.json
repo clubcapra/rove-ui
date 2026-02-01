@@ -130,22 +130,5 @@
         "image": "/camera/image_raw",
         "pointcloud": "/pointcloud",
         "pose": "/robot_pose"
-    },
-    "rtsp_streams": [
-        {
-            "enabled": true,
-            "name": "Caméra Avant",
-            "url": "rtsp://192.168.168.22:554/stream1"
-        },
-        {
-            "enabled": true,
-            "name": "Caméra Arrière",
-            "url": "rtsp://192.168.168.22:554/stream1"
-        },
-        {
-            "enabled": false,
-            "name": "Caméra Latérale",
-            "url": "rtsp://192.168.168.22:554/stream1"
-        }
-    ]
+    }
 }

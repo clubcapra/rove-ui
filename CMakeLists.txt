@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Option to build without ROS 2
-option(BUILD_WITH_ROS2 "Build with ROS 2 support" OFF)
+option(BUILD_WITH_ROS2 "Build with ROS 2 support" ON)
 option(BUILD_PCL_VIS "Enable PCL/VTK visualization features" OFF)
 
 # Find Qt packages - Use Qt6
@@ -37,8 +37,6 @@ set(PROJECT_SOURCES
         src/views/layout_panel.h
         src/views/web_page.cpp
         src/views/web_page.h
-        src/views/rtsp_viewer.cpp
-        src/views/rtsp_viewer.h
         src/core/config_manager.cpp
         src/core/config_manager.h
 )

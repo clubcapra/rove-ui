@@ -4,10 +4,6 @@
 #include <QLocale>
 #include <QTranslator>
 
-#if defined(WITH_ROS2) && defined(WITH_PCL_VIS)
-#include <QVTKOpenGLNativeWidget>
-#endif
-
 int main(int argc, char *argv[])
 {
     // Initialize ROS 2 first (before QApplication)
@@ -15,10 +11,11 @@ int main(int argc, char *argv[])
     
     QApplication a(argc, argv);
     
-#if defined(WITH_ROS2) && defined(WITH_PCL_VIS)
-    // Needed for VTK rendering in Qt
+    // Needed for VTK rendering in Qt (only when PCL/VTK visualization enabled)
+#if defined(WITH_PCL_VIS)
     QSurfaceFormat::setDefaultFormat(QVTKOpenGLNativeWidget::defaultFormat());
 #endif
+
 
     QTranslator translator;
     const QStringList uiLanguages = QLocale::system().uiLanguages();
@@ -32,10 +29,5 @@ int main(int argc, char *argv[])
     
     CAPRA_UI w;
     w.show();
-    
-    // Initialize ROS 2 in the main window's context
-    // You can call this from a menu action instead if preferred
-    // w.getRosNode()->init(argc, argv);
-    
     return a.exec();
 }

@@ -10,9 +10,7 @@
 CAPRA_UI::CAPRA_UI(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::CAPRA_UI)
-#ifdef WITH_ROS2
     , ros_node_(new RosNode(this))
-#endif
     , pointcloud_viewer_(nullptr)
     , map_viewer_(nullptr)
     , tab_widget_(new QTabWidget(this))
@@ -21,11 +19,8 @@ CAPRA_UI::CAPRA_UI(QWidget *parent)
 {
     ui->setupUi(this);
     
-#ifdef WITH_ROS2
-    setWindowTitle("CAPRA UI - Interface de Contrôle Robot (avec ROS 2)");
-#else
-    setWindowTitle("CAPRA UI - Interface de Contrôle Robot (Mode Standalone)");
-#endif
+
+    setWindowTitle("CAPRA UI - Interface de Contrôle Rove");
     resize(1280, 800);
     
     setupUI();
@@ -36,11 +31,7 @@ CAPRA_UI::CAPRA_UI(QWidget *parent)
     applyConfiguration();
     
     logMessage("Application démarrée");
-#ifdef WITH_ROS2
     logMessage("Mode: ROS 2 activé");
-#else
-    logMessage("Mode: Standalone (ROS 2 désactivé)");
-#endif
     logMessage("Configuration: " + ConfigManager::instance().getConfigFilePath());
 }
 
@@ -78,7 +69,7 @@ void CAPRA_UI::setupMenuBar()
     exit_action->setShortcut(QKeySequence::Quit);
     connect(exit_action, &QAction::triggered, this, &QMainWindow::close);
     
-#ifdef WITH_ROS2
+
     // ROS menu
     QMenu* ros_menu = menuBar()->addMenu("&ROS");
     
@@ -95,8 +86,7 @@ void CAPRA_UI::setupMenuBar()
         ros_node_->subscribeToPose(topic.toStdString());
         logMessage("Abonné au topic: " + topic);
     });
-#endif
-    
+
     // View menu
     QMenu* view_menu = menuBar()->addMenu("&Vue");
     
@@ -116,21 +106,19 @@ void CAPRA_UI::setupMenuBar()
             "Fonctionnalités:\n"
             "- Visualisation de nuages de points (PCL)\n"
             "- Carte satellite interactive\n"
-            "- Flux vidéo RTSP\n"
             "- Intégration ROS 2");
     });
 }
 
 void CAPRA_UI::setupConnections()
 {
-#ifdef WITH_ROS2
     // Connect ROS signals to viewer slots
     connect(ros_node_, &RosNode::pointCloudReceived,
             this, &CAPRA_UI::onPointCloudReceived);
     
     connect(ros_node_, &RosNode::poseReceived,
             this, &CAPRA_UI::onPoseReceived);
-#endif
+
     
     // Connect config manager signals
     connect(&ConfigManager::instance(), &ConfigManager::configChanged,
@@ -140,7 +128,6 @@ void CAPRA_UI::setupConnections()
 QWidget* CAPRA_UI::createWidgetFromPanel(const ConfigManager::PanelConfig& panel)
 {
     ConfigManager& config = ConfigManager::instance();
-    QList<ConfigManager::RtspConfig> rtsp_streams = config.getRtspStreams();
     
     if (panel.type == "layout") {
         // Créer un layout panel
@@ -174,8 +161,6 @@ QWidget* CAPRA_UI::createWidgetFromPanel(const ConfigManager::PanelConfig& panel
         
     } else if (panel.type == "pointcloud") {
         bool use_mock = panel.properties.value("mock_mode", false).toBool();
-        
-#ifdef WITH_ROS2
         pointcloud_viewer_ = new PointCloudViewer(this, use_mock);
         if (use_mock) {
             logMessage("Nuage de points créé en mode MOCK");
@@ -183,16 +168,6 @@ QWidget* CAPRA_UI::createWidgetFromPanel(const ConfigManager::PanelConfig& panel
             logMessage("Nuage de points créé en mode ROS 2");
         }
         return pointcloud_viewer_;
-#else
-        if (use_mock) {
-            pointcloud_viewer_ = new PointCloudViewer(this, true);
-            logMessage("Nuage de points créé en mode MOCK (standalone)");
-            return pointcloud_viewer_;
-        } else {
-            logMessage("Type 'pointcloud' sans mock_mode ignoré (ROS 2 non disponible)");
-            return nullptr;
-        }
-#endif
         
     } else if (panel.type == "map") {
         map_viewer_ = new MapViewer(this);
@@ -216,39 +191,13 @@ QWidget* CAPRA_UI::createWidgetFromPanel(const ConfigManager::PanelConfig& panel
         
         return map_viewer_;
         
-    } else if (panel.type == "rtsp") {
-        int stream_index = panel.properties.value("stream_index", 0).toInt();
-        
-        if (stream_index < rtsp_streams.size()) {
-            RtspViewer* rtsp_viewer = new RtspViewer(this);
-            rtsp_viewers_.append(rtsp_viewer);
-            
-            if (config.getAutoConnect() && rtsp_streams[stream_index].enabled) {
-                rtsp_viewer->connectToStream(rtsp_streams[stream_index].url);
-            }
-            
-            return rtsp_viewer;
-        }
-    } else if (panel.type == "webview" || panel.type == "webpage") {
+    }else if (panel.type == "webview" || panel.type == "webpage") {
         // Web view panel — if this is a camera (json property "camera": true)
         // create a WebPage that can auto-supply auth and auto-fetch elements.
-        bool is_camera = panel.properties.value("camera", false).toBool();
         QString url = panel.properties.value("url", "").toString();
         QString elementId = panel.properties.value("element_id", "").toString();
-        QString username = panel.properties.value("username", "").toString();
-        QString password = panel.properties.value("password", "").toString();
-
-        // If panel doesn't specify credentials, fall back to global config
-        if (username.isEmpty()) username = ConfigManager::instance().getCameraUsername();
-        if (password.isEmpty()) password = ConfigManager::instance().getCameraPassword();
-
         WebPage* page = nullptr;
-        if (is_camera) {
-            // Specialized camera page removed; use generic WebPage instead
-            page = new WebPage(this);
-        } else {
-            page = new WebPage(this);
-        }
+        page = new WebPage(this);
 
         if (!url.isEmpty()) {
             page->setUrl(url);
@@ -293,10 +242,6 @@ void CAPRA_UI::buildPanelsFromConfig()
         map_viewer_->deleteLater();
         map_viewer_ = nullptr;
     }
-    for (RtspViewer* viewer : rtsp_viewers_) {
-        viewer->deleteLater();
-    }
-    rtsp_viewers_.clear();
     
     for (LayoutPanel* layout : layout_panels_) {
         layout->deleteLater();
@@ -322,8 +267,7 @@ void CAPRA_UI::buildPanelsFromConfig()
 void CAPRA_UI::applyConfiguration()
 {
     buildPanelsFromConfig();
-    
-#ifdef WITH_ROS2
+
     // Auto-subscribe to ROS topics if enabled
     ConfigManager& config = ConfigManager::instance();
     if (config.getAutoConnect()) {
@@ -331,10 +275,8 @@ void CAPRA_UI::applyConfiguration()
         ros_node_->subscribeToPose(config.getPoseTopic().toStdString());
         logMessage("Auto-connexion aux topics ROS activée");
     }
-#endif
 }
 
-#ifdef WITH_ROS2
 void CAPRA_UI::onPointCloudReceived(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
     if (pointcloud_viewer_) {
@@ -346,8 +288,6 @@ void CAPRA_UI::onPointCloudReceived(const sensor_msgs::msg::PointCloud2::SharedP
 void CAPRA_UI::onPoseReceived(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
     if (map_viewer_) {
-        // Assuming pose contains GPS coordinates (latitude/longitude)
-        // You may need to convert from pose to GPS coordinates depending on your setup
         double lat = msg->pose.position.x;  // Adjust according to your coordinate system
         double lon = msg->pose.position.y;  // Adjust according to your coordinate system
         
@@ -362,7 +302,7 @@ void CAPRA_UI::onPoseReceived(const geometry_msgs::msg::PoseStamped::SharedPtr m
     statusBar()->showMessage(pose_msg, 2000);
     logMessage(pose_msg);
 }
-#endif
+
 
 void CAPRA_UI::onConfigChanged()
 {

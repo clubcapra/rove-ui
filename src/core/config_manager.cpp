@@ -89,31 +89,9 @@ void ConfigManager::createDefaultConfig()
     QJsonObject ros_topics;
     ros_topics["pointcloud"] = "/pointcloud";
     ros_topics["pose"] = "/robot_pose";
-    ros_topics["image"] = "/camera/image_raw";
     config["ros_topics"] = ros_topics;
     
-    // RTSP Streams
-    QJsonArray rtsp_streams;
-    
-    QJsonObject stream1;
-    stream1["name"] = "Caméra Avant";
-    stream1["url"] = "rtsp://192.168.1.100:554/stream1";
-    stream1["enabled"] = true;
-    rtsp_streams.append(stream1);
-    
-    QJsonObject stream2;
-    stream2["name"] = "Caméra Arrière";
-    stream2["url"] = "rtsp://192.168.1.101:554/stream1";
-    stream2["enabled"] = true;
-    rtsp_streams.append(stream2);
-    
-    QJsonObject stream3;
-    stream3["name"] = "Caméra Latérale";
-    stream3["url"] = "rtsp://192.168.1.102:554/stream1";
-    stream3["enabled"] = false;
-    rtsp_streams.append(stream3);
-    
-    config["rtsp_streams"] = rtsp_streams;
+
     
     // Map Settings
     QJsonObject map_settings;
@@ -138,23 +116,8 @@ void ConfigManager::createDefaultConfig()
     panel2["enabled"] = true;
     panels.append(panel2);
     
-    QJsonObject panel3;
-    panel3["type"] = "rtsp";
-    panel3["title"] = "Caméra 1";
-    panel3["enabled"] = true;
-    QJsonObject props3;
-    props3["stream_index"] = 0;
-    panel3["properties"] = props3;
-    panels.append(panel3);
-    
-    QJsonObject panel4;
-    panel4["type"] = "rtsp";
-    panel4["title"] = "Caméra 2";
-    panel4["enabled"] = true;
-    QJsonObject props4;
-    props4["stream_index"] = 1;
-    panel4["properties"] = props4;
-    panels.append(panel4);
+
+
     
     config["panels"] = panels;
     
@@ -163,9 +126,6 @@ void ConfigManager::createDefaultConfig()
     general["refresh_rate"] = 30;
     general["auto_connect"] = false;
     general["language"] = "fr_CA";
-    // Optional global camera credentials (not stored securely by default)
-    general["camera_username"] = "";
-    general["camera_password"] = "";
     config["general"] = general;
     
     config_ = config;
@@ -208,38 +168,6 @@ void ConfigManager::setImageTopic(const QString& topic)
     config_["ros_topics"] = ros_topics;
 }
 
-// RTSP Streams
-QList<ConfigManager::RtspConfig> ConfigManager::getRtspStreams() const
-{
-    QList<RtspConfig> streams;
-    QJsonArray array = config_["rtsp_streams"].toArray();
-    
-    for (const QJsonValue& value : array) {
-        QJsonObject obj = value.toObject();
-        RtspConfig config;
-        config.name = obj["name"].toString();
-        config.url = obj["url"].toString();
-        config.enabled = obj["enabled"].toBool(true);
-        streams.append(config);
-    }
-    
-    return streams;
-}
-
-void ConfigManager::setRtspStreams(const QList<RtspConfig>& streams)
-{
-    QJsonArray array;
-    
-    for (const RtspConfig& stream : streams) {
-        QJsonObject obj;
-        obj["name"] = stream.name;
-        obj["url"] = stream.url;
-        obj["enabled"] = stream.enabled;
-        array.append(obj);
-    }
-    
-    config_["rtsp_streams"] = array;
-}
 
 // Map Settings
 double ConfigManager::getMapLatitude() const
@@ -360,24 +288,6 @@ bool ConfigManager::getAutoConnect() const
     return config_["general"].toObject()["auto_connect"].toBool(false);
 }
 
-QString ConfigManager::getCameraUsername() const
-{
-    return config_["general"].toObject()["camera_username"].toString("");
-}
-
-QString ConfigManager::getCameraPassword() const
-{
-    return config_["general"].toObject()["camera_password"].toString("");
-}
-
-void ConfigManager::setCameraCredentials(const QString& username, const QString& password)
-{
-    QJsonObject general = config_["general"].toObject();
-    general["camera_username"] = username;
-    general["camera_password"] = password;
-    config_["general"] = general;
-    emit configChanged();
-}
 
 void ConfigManager::setRefreshRate(int hz)
 {

@@ -19,14 +19,8 @@
 #include <memory>
 #endif
 
-#if defined(WITH_PCL_VIS)
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-#include <pcl/visualization/pcl_visualizer.h>
-#include <vtkRenderWindow.h>
-#include <QVTKOpenGLNativeWidget.h>
-#endif
+
+#include <QWebEngineView>
 
 class PointCloudViewer : public QWidget
 {
@@ -76,12 +70,11 @@ private:
     std::vector<float> point_colors_;
     
     
-#if defined(WITH_PCL_VIS)
-    QVTKOpenGLNativeWidget* vtk_widget_;
-    pcl::visualization::PCLVisualizer::Ptr viewer_;
+    QWebEngineView* web_view_;
+    bool page_loaded_ = false;
+
     bool cloud_added_;
     std::string cloud_id_;
-#endif
 
 #if defined(WITH_ROS2)
 signals:

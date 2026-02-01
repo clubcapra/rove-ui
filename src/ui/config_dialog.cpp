@@ -43,32 +43,7 @@ void ConfigDialog::setupUI()
     
     tab_widget_->addTab(ros_tab_, "Topics ROS");
     
-    // ===== RTSP Streams Tab =====
-    rtsp_tab_ = new QWidget();
-    QVBoxLayout* rtsp_layout = new QVBoxLayout(rtsp_tab_);
-    
-    rtsp_table_ = new QTableWidget();
-    rtsp_table_->setColumnCount(3);
-    rtsp_table_->setHorizontalHeaderLabels({"Nom", "URL RTSP", "Activé"});
-    rtsp_table_->horizontalHeader()->setStretchLastSection(false);
-    rtsp_table_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Interactive);
-    rtsp_table_->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
-    rtsp_table_->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
-    
-    QHBoxLayout* rtsp_buttons = new QHBoxLayout();
-    add_rtsp_btn_ = new QPushButton("Ajouter");
-    remove_rtsp_btn_ = new QPushButton("Supprimer");
-    rtsp_buttons->addWidget(add_rtsp_btn_);
-    rtsp_buttons->addWidget(remove_rtsp_btn_);
-    rtsp_buttons->addStretch();
-    
-    rtsp_layout->addWidget(rtsp_table_);
-    rtsp_layout->addLayout(rtsp_buttons);
-    
-    connect(add_rtsp_btn_, &QPushButton::clicked, this, &ConfigDialog::onAddRtspStream);
-    connect(remove_rtsp_btn_, &QPushButton::clicked, this, &ConfigDialog::onRemoveRtspStream);
-    
-    tab_widget_->addTab(rtsp_tab_, "Flux RTSP");
+
     
     // ===== Map Tab =====
     map_tab_ = new QWidget();
@@ -115,7 +90,7 @@ void ConfigDialog::setupUI()
     panels_layout->addLayout(panel_buttons);
     
     QLabel* panel_note = new QLabel(
-        "<i>Types disponibles: pointcloud, map, rtsp<br>"
+        "<i>Types disponibles: pointcloud, map<br>"
         "L'ordre des panels définit l'ordre des onglets</i>");
     panel_note->setWordWrap(true);
     panels_layout->addWidget(panel_note);
@@ -196,19 +171,7 @@ void ConfigDialog::loadFromConfig()
     pose_topic_->setText(config.getPoseTopic());
     image_topic_->setText(config.getImageTopic());
     
-    // RTSP Streams
-    rtsp_table_->setRowCount(0);
-    QList<ConfigManager::RtspConfig> streams = config.getRtspStreams();
-    for (const auto& stream : streams) {
-        int row = rtsp_table_->rowCount();
-        rtsp_table_->insertRow(row);
-        rtsp_table_->setItem(row, 0, new QTableWidgetItem(stream.name));
-        rtsp_table_->setItem(row, 1, new QTableWidgetItem(stream.url));
-        
-        QCheckBox* checkbox = new QCheckBox();
-        checkbox->setChecked(stream.enabled);
-        rtsp_table_->setCellWidget(row, 2, checkbox);
-    }
+
     
     // Map
     map_lat_->setValue(config.getMapLatitude());
@@ -244,20 +207,7 @@ void ConfigDialog::saveToConfig()
     config.setPointCloudTopic(pointcloud_topic_->text());
     config.setPoseTopic(pose_topic_->text());
     config.setImageTopic(image_topic_->text());
-    
-    // RTSP Streams
-    QList<ConfigManager::RtspConfig> streams;
-    for (int row = 0; row < rtsp_table_->rowCount(); ++row) {
-        ConfigManager::RtspConfig stream;
-        stream.name = rtsp_table_->item(row, 0)->text();
-        stream.url = rtsp_table_->item(row, 1)->text();
-        
-        QCheckBox* checkbox = qobject_cast<QCheckBox*>(rtsp_table_->cellWidget(row, 2));
-        stream.enabled = checkbox ? checkbox->isChecked() : true;
-        
-        streams.append(stream);
-    }
-    config.setRtspStreams(streams);
+
     
     // Map
     config.setMapCenter(map_lat_->value(), map_lon_->value(), map_zoom_->value());
@@ -294,31 +244,13 @@ void ConfigDialog::onRejected()
     reject();
 }
 
-void ConfigDialog::onAddRtspStream()
-{
-    int row = rtsp_table_->rowCount();
-    rtsp_table_->insertRow(row);
-    rtsp_table_->setItem(row, 0, new QTableWidgetItem("Nouvelle Caméra"));
-    rtsp_table_->setItem(row, 1, new QTableWidgetItem("rtsp://"));
-    
-    QCheckBox* checkbox = new QCheckBox();
-    checkbox->setChecked(true);
-    rtsp_table_->setCellWidget(row, 2, checkbox);
-}
 
-void ConfigDialog::onRemoveRtspStream()
-{
-    int row = rtsp_table_->currentRow();
-    if (row >= 0) {
-        rtsp_table_->removeRow(row);
-    }
-}
 
 void ConfigDialog::onAddPanel()
 {
     int row = panels_table_->rowCount();
     panels_table_->insertRow(row);
-    panels_table_->setItem(row, 0, new QTableWidgetItem("rtsp"));
+    panels_table_->setItem(row, 0, new QTableWidgetItem("pointcloud"));
     panels_table_->setItem(row, 1, new QTableWidgetItem("Nouveau Panel"));
     
     QCheckBox* checkbox = new QCheckBox();
@@ -391,3 +323,4 @@ void ConfigDialog::onResetToDefaults()
         loadFromConfig();
     }
 }
+

@@ -29,15 +29,8 @@ public:
     void setPoseTopic(const QString& topic);
     void setImageTopic(const QString& topic);
     
-    // RTSP Streams
-    struct RtspConfig {
-        QString name;
-        QString url;
-        bool enabled;
-    };
     
-    QList<RtspConfig> getRtspStreams() const;
-    void setRtspStreams(const QList<RtspConfig>& streams);
+   
     
     // Map Settings
     double getMapLatitude() const;
@@ -70,11 +63,6 @@ public:
     int getRefreshRate() const;
     bool getAutoConnect() const;
 
-    // Global camera credentials (optional)
-    QString getCameraUsername() const;
-    QString getCameraPassword() const;
-
-    void setCameraCredentials(const QString& username, const QString& password);
     
     void setRefreshRate(int hz);
     void setAutoConnect(bool autoConnect);

@@ -27,8 +27,6 @@ public:
 private slots:
     void onAccepted();
     void onRejected();
-    void onAddRtspStream();
-    void onRemoveRtspStream();
     void onAddPanel();
     void onRemovePanel();
     void onLoadConfig();
@@ -48,12 +46,6 @@ private:
     QLineEdit* pointcloud_topic_;
     QLineEdit* pose_topic_;
     QLineEdit* image_topic_;
-    
-    // RTSP Streams Tab
-    QWidget* rtsp_tab_;
-    QTableWidget* rtsp_table_;
-    QPushButton* add_rtsp_btn_;
-    QPushButton* remove_rtsp_btn_;
     
     // Map Tab
     QWidget* map_tab_;

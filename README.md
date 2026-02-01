@@ -10,7 +10,7 @@ CAPRA_UI est une application Qt6 pour le contrôle et la visualisation de robots
 
 -  **Cartes satellites interactives** (Leaflet.js)
 -  **Flux vidéo RTSP** (caméras multiples)
--  **Visualisation de nuages de points 3D** (PCL + VTK) à valider
+-  **Visualisation de nuages de points 3D** (WebGL / Web-based) à valider
 -  **Intégration ROS 2** (rclcpp, sensor_msgs, geometry_msgs)
 -  **Configuration JSON** complète et flexible
 
@@ -219,7 +219,6 @@ La configuration se fait via un fichier JSON situé à :
 ### Optionnelles (mode ROS 2)
 - ROS 2 Humble/Iron
 - PCL (Point Cloud Library) ≥ 1.12
-- VTK (Visualization Toolkit) ≥ 9.0
 - sensor_msgs, geometry_msgs, pcl_conversions
 
 ## 🏗️ Architecture

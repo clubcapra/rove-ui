@@ -10,7 +10,6 @@
 #include <QMenu>
 #include <QAction>
 #include "views/map_viewer.h"
-#include "views/rtsp_viewer.h"
 #include "views/pointcloud_viewer.h"
 #include "core/config_manager.h"
 #include "config_dialog.h"
@@ -54,7 +53,6 @@ private:
     // Viewers (dynamic based on config)
     PointCloudViewer* pointcloud_viewer_;  // Disponible aussi en mode standalone (mock)
     MapViewer* map_viewer_;
-    QList<RtspViewer*> rtsp_viewers_;
     QList<class LayoutPanel*> layout_panels_;
     
     // UI Components
