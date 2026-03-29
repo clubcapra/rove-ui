@@ -29,7 +29,6 @@ sudo apt install -y \
 Depuis le dossier du projet:
 
 ```bash
-cd /home/william/capraui/capraui
 python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -r requirements.txt
@@ -47,7 +46,6 @@ python3 -m venv --system-site-packages .venv
 Utiliser le script fourni:
 
 ```bash
-cd /home/william/capraui/capraui
 ./run.sh
 ```
 
@@ -61,7 +59,6 @@ Le script:
 ### Option Wayland (WSLg)
 
 ```bash
-cd /home/william/capraui/capraui
 env -u QT_PLUGIN_PATH -u QT_QPA_PLATFORM_PLUGIN_PATH -u LD_LIBRARY_PATH \
   XDG_RUNTIME_DIR=/mnt/wslg/runtime-dir \
   WAYLAND_DISPLAY=wayland-0 \
@@ -72,7 +69,6 @@ env -u QT_PLUGIN_PATH -u QT_QPA_PLATFORM_PLUGIN_PATH -u LD_LIBRARY_PATH \
 ### Option xcb (fallback)
 
 ```bash
-cd /home/william/capraui/capraui
 env -u QT_PLUGIN_PATH -u QT_QPA_PLATFORM_PLUGIN_PATH -u LD_LIBRARY_PATH \
   DISPLAY=:0 \
   QT_QPA_PLATFORM=xcb \
