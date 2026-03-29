@@ -1,242 +1,130 @@
-# CAPRA_UI - Interface de contrôle robotique
+# CapraUI
 
-![Version](https://img.shields.io/badge/version-0.1.0-blue)
-![Qt](https://img.shields.io/badge/Qt-6.4.2-green)
-![ROS2](https://img.shields.io/badge/ROS2-Humble-orange)
+Application Qt (PySide6) avec un point d'entree simple dans `widget.py`.
 
-## 📋 Description
+## Prerequis
 
-CAPRA_UI est une application Qt6 pour le contrôle et la visualisation de robots autonomes. Elle intègre :
-
--  **Cartes satellites interactives** (Leaflet.js)
--  **Flux vidéo RTSP** (caméras multiples)
--  **Visualisation de nuages de points 3D** (PCL + VTK) à valider
--  **Intégration ROS 2** (rclcpp, sensor_msgs, geometry_msgs)
--  **Configuration JSON** complète et flexible
-
-## 📁 Structure du projet
-
-```
-CAPRA_UI/
-├── src/
-│   ├── core/              # Logique métier et configuration
-│   │   ├── config_manager.cpp
-│   │   └── config_manager.h
-│   ├── adapters/          # Intégrations externes (ROS 2, etc.)
-│   │   ├── ros_node.cpp
-│   │   └── ros_node.h
-│   ├── views/             # Widgets de visualisation
-│   │   ├── map_viewer.cpp/h
-│   │   ├── rtsp_viewer.cpp/h
-│   │   └── pointcloud_viewer.cpp/h
-│   ├── ui/                # Interface utilisateur
-│   │   ├── capra_ui.cpp/h/ui
-│   │   └── config_dialog.cpp/h
-│   └── main.cpp
-├── tests/
-│   ├── unit/              # Tests unitaires
-│   ├── integration/       # Tests d'intégration
-│   └── CMakeLists.txt
-├── docs/                  # Documentation
-├── examples/              # Exemples de configuration
-│   └── config.json
-├── build/                 # Build ROS 2
-├── build_standalone/      # Build standalone
-└── CMakeLists.txt
-```
-
-## 🚀 Démarrage rapide
-
-### Mode Standalone (sans ROS 2)
+- Ubuntu/WSL
+- Python 3.12+
+- pip
+- Dependance systeme Qt (xcb):
 
 ```bash
-chmod +x ./launch.sh
-./launch.sh
+sudo apt update
+sudo apt install -y libxcb-cursor0
 ```
 
+- Dependance systeme GStreamer (necessaire pour `RTSPView` / RTSP):
 
-
-## ⚙️ Configuration
-
-La configuration se fait via un fichier JSON situé à :
-```json
-{
-    "general": {
-        "auto_connect": false,
-        "language": "fr_CA",
-        "refresh_rate": 30
-    },
-    "map": {
-        "latitude": 45.5017,
-        "longitude": -73.5673,
-        "type": "satellite",
-        "zoom": 13
-    },
-    "panels": [
-        {
-            "enabled": true,
-            "title": "Vue Principale - Grille 2x2",
-            "type": "layout",
-            "layout_type": "grid",
-            "rows": 2,
-            "columns": 2,
-            "children": [
-                {
-                    "enabled": true,
-                    "title": "Nuage de Points 3D",
-                    "type": "pointcloud",
-                    "properties": {
-                        "mock_mode": true
-                    }
-                },
-                {
-                    "enabled": true,
-                    "title": "Carte",
-                    "type": "map"
-                },
-                {
-                    "enabled": true,
-                    "title": "Caméra Avant",
-                    "type": "rtsp",
-                    "properties": {
-                        "stream_index": 0
-                    }
-                },
-                {
-                    "enabled": true,
-                    "title": "Caméra Arrière",
-                    "type": "rtsp",
-                    "properties": {
-                        "stream_index": 1
-                    }
-                }
-            ]
-        },
-        {
-            "enabled": true,
-            "title": "Vue Horizontale - Caméras",
-            "type": "layout",
-            "layout_type": "horizontal",
-            "rows": 1,
-            "columns": 3,
-            "children": [
-                {
-                    "enabled": true,
-                    "title": "Caméra 1",
-                    "type": "rtsp",
-                    "properties": {
-                        "stream_index": 0
-                    }
-                },
-                {
-                    "enabled": true,
-                    "title": "Caméra 2",
-                    "type": "rtsp",
-                    "properties": {
-                        "stream_index": 1
-                    }
-                },
-                {
-                    "enabled": true,
-                    "title": "Nuage Points",
-                    "type": "pointcloud",
-                    "properties": {
-                        "mock_mode": true
-                    }
-                }
-            ]
-        },
-        {
-            "enabled": true,
-            "title": "Vue Mixte - Layout Imbriqué",
-            "type": "layout",
-            "layout_type": "vertical",
-            "rows": 2,
-            "columns": 1,
-            "children": [
-                {
-                    "enabled": true,
-                    "title": "Carte Plein Écran",
-                    "type": "map"
-                },
-                {
-                    "enabled": true,
-                    "title": "Sous-grille 1x2",
-                    "type": "layout",
-                    "layout_type": "grid",
-                    "rows": 1,
-                    "columns": 2,
-                    "children": [
-                        {
-                            "enabled": true,
-                            "title": "Points 3D",
-                            "type": "pointcloud",
-                            "properties": {
-                                "mock_mode": true
-                            }
-                        },
-                        {
-                            "enabled": true,
-                            "title": "RTSP",
-                            "type": "rtsp",
-                            "properties": {
-                                "stream_index": 0
-                            }
-                        }
-                    ]
-                }
-            ]
-        }
-    ],
-    "ros_topics": {
-        "image": "/camera/image_raw",
-        "pointcloud": "/pointcloud",
-        "pose": "/robot_pose"
-    },
-    "rtsp_streams": [
-        {
-            "enabled": true,
-            "name": "Caméra Avant",
-            "url": "rtsp://192.168.168.22:554/stream1"
-        },
-        {
-            "enabled": true,
-            "name": "Caméra Arrière",
-            "url": "rtsp://192.168.168.22:554/stream1"
-        },
-        {
-            "enabled": false,
-            "name": "Caméra Latérale",
-            "url": "rtsp://192.168.168.22:554/stream1"
-        }
-    ]
-}
-
+```bash
+sudo apt update
+sudo apt install -y \
+  python3-gi gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 \
+  gstreamer1.0-tools gstreamer1.0-gl gstreamer1.0-libav \
+  gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
 ```
-## 📦 Dépendances
 
+## Installation
 
-### Optionnelles (mode ROS 2)
-- ROS 2 Humble/Iron
-- PCL (Point Cloud Library) ≥ 1.12
-- VTK (Visualization Toolkit) ≥ 9.0
-- sensor_msgs, geometry_msgs, pcl_conversions
+Depuis le dossier du projet:
 
-## 🏗️ Architecture
+```bash
+cd /home/william/capraui/capraui
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements.txt
+```
 
-### Core
-- **ConfigManager** : Singleton de gestion de la configuration JSON
+Note: si tu utilises `python3-gi` installe via `apt`, un `venv` standard ne le voit pas.
+Dans ce cas, recree le venv avec:
 
-### Adapters
-- **RosNode** : Pont entre ROS 2 et Qt (messages, topics)
+```bash
+python3 -m venv --system-site-packages .venv
+```
 
-### Views
-- **MapViewer** : Carte Leaflet.js interactive
-- **RtspViewer** : Affichage de flux RTSP avec OpenCV
-- **PointCloudViewer** : Rendu 3D de nuages de points (PCL/VTK)
+## Lancement (WSL recommande)
 
-### UI
-- **CapraUI** : Fenêtre principale avec layout dynamique
-- **ConfigDialog** : Interface de configuration à 5 onglets
+Utiliser le script fourni:
 
-**Note** : Ce projet est en développement actif. L'API peut changer entre les versions.
+```bash
+cd /home/william/capraui/capraui
+./run.sh
+```
+
+Le script:
+- nettoie les variables Qt qui peuvent casser le chargement des plugins,
+- utilise Wayland via WSLg si disponible,
+- retombe sur xcb/X11 sinon.
+
+## Lancement manuel
+
+### Option Wayland (WSLg)
+
+```bash
+cd /home/william/capraui/capraui
+env -u QT_PLUGIN_PATH -u QT_QPA_PLATFORM_PLUGIN_PATH -u LD_LIBRARY_PATH \
+  XDG_RUNTIME_DIR=/mnt/wslg/runtime-dir \
+  WAYLAND_DISPLAY=wayland-0 \
+  QT_QPA_PLATFORM=wayland \
+  .venv/bin/python widget.py
+```
+
+### Option xcb (fallback)
+
+```bash
+cd /home/william/capraui/capraui
+env -u QT_PLUGIN_PATH -u QT_QPA_PLATFORM_PLUGIN_PATH -u LD_LIBRARY_PATH \
+  DISPLAY=:0 \
+  QT_QPA_PLATFORM=xcb \
+  .venv/bin/python widget.py
+```
+
+## Depannage rapide
+
+- Verifier l'affichage WSLg:
+
+```bash
+echo $WAYLAND_DISPLAY
+echo $DISPLAY
+```
+
+- Verifier le socket Wayland WSLg:
+
+```bash
+ls -la /mnt/wslg/runtime-dir/wayland-0
+```
+
+- Si besoin, redemarrer WSL depuis Windows PowerShell:
+
+```powershell
+wsl --shutdown
+wsl
+```
+
+## Build Windows (pour tester la webcam facilement)
+
+La webcam est souvent plus simple à tester en natif Windows (WSL ne voit pas toujours `/dev/video*`).
+
+### Prérequis
+
+- Python 3.12+ sur Windows
+
+### Build avec PyInstaller
+
+Dans un PowerShell (dans le dossier `capraui` qui contient `widget.py`) :
+
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+./build_windows.ps1 -Mode onedir
+```
+
+Le binaire est dans `dist\capraui\`.
+
+Alternative CMD:
+
+```bat
+python -m venv .venv
+.venv\Scripts\activate
+build_windows.cmd
+```
