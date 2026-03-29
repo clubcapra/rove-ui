@@ -15,7 +15,7 @@ qrc_*.cpp
 ui_*.h
 *.qm
 .qmake.stash
-
+.venv/*
 # CMake
 CMakeCache.txt
 CMakeFiles/
@@ -56,7 +56,7 @@ __pycache__/
 
 # Configuration (ne pas versionner les configs utilisateur)
 # Garder seulement les exemples
-*.json
+
 !examples/*.json
 
 # Test results
