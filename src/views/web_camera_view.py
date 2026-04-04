@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 GST_AVAILABLE = False
 GST_IMPORT_ERROR: Exception | None = None
@@ -30,6 +30,11 @@ class WebCameraView:
     - device_index: int  used to build /dev/videoN when device_path absent
     - sink: str  GStreamer sink element (default: ximagesink)
     - autoplay: bool (default True)
+        - responsive: dict
+                - min_width: int  minimum rendered video width before clipping starts
+                - freeze_below_min_width: bool  keep video width at min_width when the
+                    layout gets smaller, clipping the overflow instead of shrinking more
+                - overflow_anchor: str  one of left, center, right
     """
 
     _gst_initialized = False
@@ -43,6 +48,7 @@ class WebCameraView:
             WebCameraView._gst_initialized = True
 
         self._widget: Optional[QWidget] = None
+        self._viewport: Optional[_ResponsiveVideoViewport] = None
         self._video_widget: Optional[QWidget] = None
         self._pipeline = None
         self._bus = None
@@ -66,10 +72,14 @@ class WebCameraView:
 
         device = self._resolve_device()
 
-        self._video_widget = QWidget(self._widget)
+        responsive_cfg = self.config.get("responsive", {})
+        self._viewport = _ResponsiveVideoViewport(responsive_cfg, self._widget)
+        layout.addWidget(self._viewport)
+
+        self._video_widget = QWidget(self._viewport)
         self._video_widget.setStyleSheet("background: black;")
         self._video_widget.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
-        layout.addWidget(self._video_widget)
+        self._viewport.set_video_widget(self._video_widget)
 
         sink_type = str(self.config.get("sink", "ximagesink")).strip() or "ximagesink"
         pipeline_str = (
@@ -136,6 +146,7 @@ class WebCameraView:
         if self._bus is not None:
             self._bus.remove_signal_watch()
             self._bus = None
+        self._viewport = None
         self._video_widget = None
         self._widget = None
 
@@ -143,3 +154,49 @@ class WebCameraView:
         if self._widget is None:
             self.build()
         return self._widget  # type: ignore[return-value]
+
+
+class _ResponsiveVideoViewport(QWidget):
+    def __init__(self, config: dict | None = None, parent: QWidget | None = None):
+        super().__init__(parent)
+        config = config or {}
+
+        self._video_widget: QWidget | None = None
+        self._min_width = max(1, int(config.get("min_width", 480)))
+        self._freeze_below_min_width = bool(config.get("freeze_below_min_width", True))
+        self._overflow_anchor = str(config.get("overflow_anchor", "center")).strip().lower()
+
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setContentsMargins(0, 0, 0, 0)
+
+    def set_video_widget(self, widget: QWidget) -> None:
+        self._video_widget = widget
+        self._video_widget.setParent(self)
+        self._video_widget.show()
+        self._update_video_geometry()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._update_video_geometry()
+
+    def _update_video_geometry(self) -> None:
+        if self._video_widget is None:
+            return
+
+        viewport_width = max(0, self.width())
+        viewport_height = max(0, self.height())
+
+        if self._freeze_below_min_width and viewport_width < self._min_width:
+            video_width = self._min_width
+        else:
+            video_width = viewport_width
+
+        x = self._compute_offset(viewport_width, video_width)
+        self._video_widget.setGeometry(x, 0, video_width, viewport_height)
+
+    def _compute_offset(self, viewport_width: int, video_width: int) -> int:
+        if self._overflow_anchor == "left":
+            return 0
+        if self._overflow_anchor == "right":
+            return viewport_width - video_width
+        return (viewport_width - video_width) // 2

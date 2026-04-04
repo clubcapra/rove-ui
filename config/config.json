@@ -5,6 +5,16 @@
       {"name": "Microhard", "db": -72}
     ]
   },
+  "udp_clients": [
+    {
+      "name": "telemetry_udp",
+      "source": "udp://0.0.0.0:9999",
+      "topic": "telemetry.raw",
+      "parse_json": false,
+      "buffer_size": 4096,
+      "enabled": false
+    }
+  ],
   "console": true,
   "views": {
     "dashboard": {
@@ -20,7 +30,12 @@
           "type": "webcamera",
           "name": "webcamera",
           "data": {
-              "device_path": "/dev/video0"
+              "device_path": "/dev/video0",
+              "responsive": {
+                "min_width": 520,
+                "freeze_below_min_width": true,
+                "overflow_anchor": "center"
+              }
           },
           "grid": {
             "row": 0,
@@ -30,22 +45,19 @@
           }
         },
         {
-          "type": "table",
+          "type": "chart",
           "name": "Temperature",
           "data": {
-              "header": ["Parameter", "Value"],
+              "chart_type": "band",
+              "title": "Temperatures",
+              "series_name": "Temperature",
+              "label_key": "Parameter",
+              "value_key": "Value",
               "data": [
-                {"Parameter": "Odrive 1", "Value": 35, "unit": "°C"
-                },
-                {
-                  "Parameter": "Odrive 2", "Value": 45, "unit": "°C"
-                },
-                {
-                  "Parameter": "Odrive 3", "Value": 45, "unit": "°C"
-                }  ,
-                {
-                  "Parameter": "Odrive 4", "Value": 45, "unit": "°C"
-                }        
+                {"Parameter": "Odrive 1", "Value": 35, "unit": "°C"},
+                {"Parameter": "Odrive 2", "Value": 45, "unit": "°C"},
+                {"Parameter": "Odrive 3", "Value": 45, "unit": "°C"},
+                {"Parameter": "Odrive 4", "Value": 45, "unit": "°C"}
               ]
           },
           "grid": {

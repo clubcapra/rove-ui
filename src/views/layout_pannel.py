@@ -102,6 +102,10 @@ class LayoutPanel:
             table.build()
             return table
 
+        if vtype == "chart":
+            from .components.chart import ChartWidget
+            return ChartWidget(child_cfg.get("data", {}))
+
         if vtype == "bitmap":
             bitmap = BitmapPlaceholder(name, child_cfg.get("data", {}))
             bitmap.build()

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QSizePolicy
+from PySide6.QtCore import QTimer
+from datetime import datetime
 
 
 class Header(QWidget):
@@ -92,10 +94,15 @@ class Header(QWidget):
         root.addWidget(self._center_time, 0)
         root.addWidget(right_w, 1)
 
+        #Event subscriptions for dynamic updates
+        #create a timer to update the time every second
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(lambda: self.update_time(self.getCurrentTime()))
+        self._timer.start(1000)  # update every second
+
     # ── Public API ────────────────────────────────────────────────────────
     def getCurrentTime(self) -> str:
         """Return current time as HH:MM:SS string."""
-        from datetime import datetime
         return datetime.now().strftime("%H:%M:%S")
     
     def update_time(self, time_str: str) -> None:

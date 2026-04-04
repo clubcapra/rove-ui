@@ -24,6 +24,7 @@ from src.views.rtsp_view import RTSPView
 from src.views.layout_pannel import LayoutPanel
 from src.controller.event_bus import EventBus
 from src.views.components.header import Header
+from src.clients.udp_client import UDPClient
 
 
 class Widget(QWidget):
@@ -52,6 +53,7 @@ class Widget(QWidget):
 
         self._views: list[Any] = []
         self._pages: dict[str, int] = {}
+        self._udp_clients: list[UDPClient] = []
 
 
         # Application-wide EventBus (can be shared or passed to orchestrator)
@@ -76,6 +78,8 @@ class Widget(QWidget):
         self._header.deleteLater()
         self._header = Header(settings=header_settings, parent=self)
         self.layout().insertWidget(header_index, self._header)
+
+        self._restart_udp_clients(config.get("udp_clients", []))
 
         views_root = config.get("views", {})
 
@@ -114,6 +118,22 @@ class Widget(QWidget):
 
     def update_header_battery(self, battery_level: int):
         self._header.update_battery(battery_level)
+
+    def _restart_udp_clients(self, client_configs: list[dict[str, Any]]) -> None:
+        for client in self._udp_clients:
+            client.stop()
+        self._udp_clients = []
+
+        for client_config in client_configs:
+            client = UDPClient(client_config, self.event_bus)
+            client.start()
+            self._udp_clients.append(client)
+
+    def closeEvent(self, event):
+        for client in self._udp_clients:
+            client.stop()
+        self._udp_clients = []
+        super().closeEvent(event)
 
 
 
