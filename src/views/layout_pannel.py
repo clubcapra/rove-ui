@@ -2,10 +2,10 @@ from PySide6.QtWidgets import QWidget, QHBoxLayout, QGridLayout, QVBoxLayout, QL
 from typing import List
 
 from .web_camera_view import WebCameraView
+from .components.bitmap_placeholder import BitmapPlaceholder
 
 # Import known view wrappers for high-level composition
 from .rtsp_view import RTSPView
-from .camera_view import CameraView
 from .console_view import DebugConsole
 
 
@@ -38,22 +38,34 @@ class LayoutPanel:
                 rows = int(grid_cfg.get("rows", 1))
                 cols = int(grid_cfg.get("columns", 1))
                 layout = QGridLayout()
+                layout.setContentsMargins(0, 0, 0, 0)
+                layout.setSpacing(int(grid_cfg.get("spacing", 8)))
+
+                for row in range(rows):
+                    layout.setRowStretch(row, 1)
+                for col in range(cols):
+                    layout.setColumnStretch(col, 1)
 
                 content = self.config.get("content", [])
                 for idx, child_cfg in enumerate(content):
-                    r = idx // cols
-                    c = idx % cols
+                    grid_item = child_cfg.get("grid", {})
+                    r = int(grid_item.get("row", idx // cols))
+                    c = int(grid_item.get("column", idx % cols))
+                    row_span = int(grid_item.get("row_span", 1))
+                    col_span = int(grid_item.get("column_span", 1))
                     w = self._make_child_widget(child_cfg)
-                    layout.addWidget(w, r, c)
+                    layout.addWidget(w, r, c, row_span, col_span)
 
             elif pos == "vertical":
                 layout = QVBoxLayout()
+                layout.setContentsMargins(0, 0, 0, 0)
                 for child_cfg in self.config.get("content", []):
                     layout.addWidget(self._make_child_widget(child_cfg))
 
             else:
                 # default to horizontal
                 layout = QHBoxLayout()
+                layout.setContentsMargins(0, 0, 0, 0)
                 for child_cfg in self.config.get("content", []):
                     layout.addWidget(self._make_child_widget(child_cfg))
 
@@ -75,10 +87,6 @@ class LayoutPanel:
             rtsp.build()
             return rtsp.get_widget()
 
-        if vtype == "camera":
-            camera = CameraView(name, child_cfg.get("data", {}))
-            camera.build()
-            return camera.get_widget()
         if vtype == "webcamera":
             camera = WebCameraView(name, child_cfg.get("data", {}))
             camera.build()
@@ -87,7 +95,18 @@ class LayoutPanel:
             console = DebugConsole()
             # Console can be attached later to the global EventBus
             return console
+        if vtype == "table":
+            from .components.table import Table
+            data = child_cfg.get("data", {})
+            table = Table(data.get("header", []), data.get("data", []))
+            table.build()
+            return table
 
+        if vtype == "bitmap":
+            bitmap = BitmapPlaceholder(name, child_cfg.get("data", {}))
+            bitmap.build()
+            return bitmap.get_widget()
+        
         # Placeholder for other view types (table, map, point_cloud, etc.)
         lbl = QLabel(f"Placeholder {vtype}: {name}")
         return lbl

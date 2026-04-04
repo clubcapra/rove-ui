@@ -23,6 +23,7 @@ from src.views.console_view import DebugConsole
 from src.views.rtsp_view import RTSPView
 from src.views.layout_pannel import LayoutPanel
 from src.controller.event_bus import EventBus
+from src.views.components.header import Header
 
 
 class Widget(QWidget):
@@ -30,9 +31,11 @@ class Widget(QWidget):
         super().__init__(parent)
         self.setWindowTitle("Capraui - Dashboard")
 
+        self._header = Header(parent=self)
         self._menu = QMenuBar(self)
         self._central = QWidget(self)
         self._central_layout = QVBoxLayout(self._central)
+        self._central_layout.setContentsMargins(0, 0, 0, 0)
         # stacked widget for top-level pages (dashboard, logs, ...)
         self._stack = QStackedWidget(self._central)
         self._central_layout.addWidget(self._stack)
@@ -41,6 +44,8 @@ class Widget(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(self._header)
         layout.addWidget(self._menu)
         layout.addWidget(self._central)
         #layout.addWidget(self._console)
@@ -64,6 +69,13 @@ class Widget(QWidget):
         """Construct the main interface from the config."""
 
         config = self.load_config(config)
+
+        header_settings = config.get("header_settings", {})
+        header_index = self.layout().indexOf(self._header)
+        self.layout().removeWidget(self._header)
+        self._header.deleteLater()
+        self._header = Header(settings=header_settings, parent=self)
+        self.layout().insertWidget(header_index, self._header)
 
         views_root = config.get("views", {})
 
@@ -97,6 +109,12 @@ class Widget(QWidget):
         if self._stack.count() > 0:
             self._stack.setCurrentIndex(0)
 
+    def update_header_time(self, time_value: str):
+        self._header.update_time(time_value)
+
+    def update_header_battery(self, battery_level: int):
+        self._header.update_battery(battery_level)
+
 
 
 
@@ -104,7 +122,7 @@ if __name__ == "__main__":
     app = QApplication([])
     window = Widget()
     window.buildInterface("./config/config.json")
-    window.show()
+    window.showMaximized()
     try:
         asyncio.run(window.event_bus.publish("log", "Window : Application has started."))
     except Exception:
