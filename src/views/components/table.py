@@ -43,10 +43,3 @@ class Table(QWidget):
         self.data = data or self.data
         self.build()
 
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    w = Table(["ODrive", "Température", "Voltage"], [("ODrive 1", "75°C", "20V"), ("ODrive 2", "45°C", "18V"), ("ODrive 3", "15°C", "22V"), ("ODrive 4", "90°C", "19V")])
-    w.build()
-    w.show()
-    sys.exit(app.exec())
