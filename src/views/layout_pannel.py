@@ -97,6 +97,11 @@ class LayoutPanel:
             console = DebugConsole()
             # Console can be attached later to the global EventBus
             return console
+        if vtype == "threejsviewer":
+            from .components.threejsViewer import ThreejsViewer
+            viewer = ThreejsViewer()
+            viewer.build()
+            return viewer
         if vtype == "table":
             from .components.table import Table
             data = child_cfg.get("data", {})

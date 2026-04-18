@@ -94,6 +94,7 @@
             "column_span": 1
           }
         },
+
         {
           "type": "chart",
           "name": "Temp. Drivers",
@@ -112,6 +113,18 @@
           },
           "grid": {
             "row": 1,
+            "column": 0,
+            "row_span": 1,
+            "column_span": 1
+          }
+        },
+        {
+          "type": "threejsViewer",
+          "name": "URDF Preview",
+          "data": {
+          },
+          "grid": {
+            "row": 2,
             "column": 0,
             "row_span": 1,
             "column_span": 1
