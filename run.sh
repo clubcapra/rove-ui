@@ -22,10 +22,18 @@ fi
 
 cd "$SCRIPT_DIR"
 
+# Source ROS 2 Humble if available (needed for rclpy / shared libs).
+if [[ -f /opt/ros/humble/setup.bash ]]; then
+  # ROS 2 setup scripts use unset variables; temporarily relax strict mode.
+  set +u
+  # shellcheck disable=SC1091
+  source /opt/ros/humble/setup.bash
+  set -u
+fi
+
 ENV_ARGS=(
   -u QT_PLUGIN_PATH
   -u QT_QPA_PLATFORM_PLUGIN_PATH
-  -u LD_LIBRARY_PATH
 )
 
 # Prefer WSLg Wayland socket when available; fallback to X11.

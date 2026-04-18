@@ -3,6 +3,7 @@ from typing import List
 
 from .web_camera_view import WebCameraView
 from .components.bitmap_placeholder import BitmapPlaceholder
+from src.controller.event_bus import EventBus
 
 # Import known view wrappers for high-level composition
 from .rtsp_view import RTSPView
@@ -20,11 +21,12 @@ class LayoutPanel:
     Concrete UI population is intentionally left to the child view classes.
     """
 
-    def __init__(self, name: str, config: dict, children: List[object]):
+    def __init__(self, name: str, config: dict, children: List[object], event_bus: EventBus | None = None):
         self.name = name
         self.config = config
         self.children = children
         self._widget = None
+        self.event_bus = event_bus or EventBus()
 
     def build(self):
         """High-level build: interpret layout config and place child widgets."""
@@ -79,7 +81,7 @@ class LayoutPanel:
 
     def _make_child_widget(self, child_cfg: dict) -> QWidget:
         """Create a lightweight widget for a child view config."""
-        vtype = child_cfg.get("type")
+        vtype = str(child_cfg.get("type", "")).strip().lower()
         name = child_cfg.get("name", "unnamed")
 
         if vtype == "rtsp":
@@ -104,7 +106,7 @@ class LayoutPanel:
 
         if vtype == "chart":
             from .components.chart import ChartWidget
-            return ChartWidget(child_cfg.get("data", {}))
+            return ChartWidget(child_cfg.get("data", {}), event_bus=self.event_bus)
 
         if vtype == "bitmap":
             bitmap = BitmapPlaceholder(name, child_cfg.get("data", {}))

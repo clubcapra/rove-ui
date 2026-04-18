@@ -38,7 +38,7 @@ class Header(QWidget):
         }
         QLabel {
             color: #e0e0e0;
-            font-size: 11px;
+            font-size: 16px;
             padding: 0px;
         }
     """
@@ -76,7 +76,7 @@ class Header(QWidget):
         # ── CENTER : clock ────────────────────────────────────────────────
         self._center_time = QLabel(self.getCurrentTime())
         self._center_time.setAlignment(Qt.AlignCenter)
-        self._center_time.setStyleSheet("font-size: 13px; font-weight: 600; color: #000;")
+        self._center_time.setStyleSheet("font-size: 16px; font-weight: 600; color: #000;")
 
         # ── RIGHT : clock + battery ───────────────────────────────────────
         right = QHBoxLayout()
