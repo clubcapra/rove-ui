@@ -43,7 +43,7 @@
       "type": "layout",
       "diaposition": "grid",
       "grid": {
-        "rows": 4,
+        "rows": 3,
         "columns": 2,
         "spacing": 8
       },
@@ -139,7 +139,7 @@
           "grid": {
             "row": 1,
             "column": 1,
-            "row_span": 1,
+            "row_span": 2,
             "column_span": 1
           }
         }
