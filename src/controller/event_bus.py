@@ -1,8 +1,9 @@
-from asyncio import create_task
+from asyncio import create_task, get_running_loop
 from collections import defaultdict
+from inspect import isawaitable
 from typing import Any, Callable, Coroutine, TypeAlias, Optional
 
-Callback: TypeAlias = Callable[..., Coroutine[Any, Any, None]]
+Callback: TypeAlias = Callable[..., Any]
 
 
 class EventBus:
@@ -23,6 +24,23 @@ class EventBus:
         self._subscribers[event_type].append(handler)
 
     async def publish(self, event_type: str, *args: Any) -> None:
+        if event_type != "log":
+            self.publish_sync("log", f"Event published: {event_type} with args: {args}")
         if handlers := self._subscribers.get(event_type, []):
             for handler in handlers:
-                create_task(handler(*args))
+                result = handler(*args)
+                if isawaitable(result):
+                    create_task(result)
+
+    def publish_sync(self, event_type: str, *args: Any) -> None:
+        if event_type != "log":  # Avoid infinite loop of logging log events
+            self.publish_sync("log", f"Event published: {event_type} with args: {args}")
+        if handlers := self._subscribers.get(event_type, []):
+            for handler in handlers:
+                result = handler(*args)
+                if isawaitable(result):
+                    try:
+                        loop = get_running_loop()
+                    except RuntimeError:
+                        continue
+                    loop.create_task(result)

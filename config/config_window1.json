@@ -1,0 +1,224 @@
+{
+  "header_settings": {
+    "signals": [
+      {"name": "VTX", "db": -65},
+      {"name": "Microhard", "db": -72}
+    ],
+    "E-Stop": {
+      "active_color": "#ff0000",
+      "inactive_color": "#00ff00",
+      "topic": "estop_status"
+    }
+  },
+  "udp_clients": [
+    {
+      "type": "odrive_http",
+      "name": "odrive_telemetry",
+      "source": "http://192.168.168.37:8080",
+      "base_url": "http://192.168.168.37:8080",
+      "topic": "telemetry.odrive",
+      "topic_prefix": "odrive",
+      "poll_interval_ms": 250,
+      "max_data_age_ms": 2000,
+      "publish_node_data": true,
+      "publish_field_topics": true,
+      "enabled": false
+    }
+  ],
+  "ros2_clients": [
+    {
+      "name": "joint_states_bridge",
+      "node_name": "capraui_ros2_bridge",
+      "enabled": true,
+      "event_prefix": "ros2",
+      "topics": [
+        {
+          "name": "/dynamic_joint_states",
+          "msg_type": "control_msgs/msg/DynamicJointState",
+          "qos_depth": 10,
+          "event_topic": "joints",
+          "transform": "dynamic_joint_states"
+        }
+      ]
+    }
+  ],
+  "console": true,
+  "views": {
+    "dashboard": {
+      "type": "layout",
+      "diaposition": "grid",
+      "grid": {
+        "rows": 3,
+        "columns": 2,
+        "spacing": 8
+      },
+      "content": [
+        {
+          "type": "chart",
+          "name": "Vitesse Moteurs",
+          "data": {
+              "chart_type": "lines",
+              "title": "Vitesse Moteurs",
+              "series_name": "Velocity",
+              "label_key": "Parameter",
+              "value_key": "Value",
+              "data": [
+                {"Parameter": "FL", "Value": 0, "unit": "rad/s", "topic": "joints.track_fl_j.velocity"},
+                {"Parameter": "RL", "Value": 0, "unit": "rad/s", "topic": "joints.track_rl_j.velocity"},
+                {"Parameter": "FR", "Value": 0, "unit": "rad/s", "topic": "joints.track_fr_j.velocity"},
+                {"Parameter": "RR", "Value": 0, "unit": "rad/s", "topic": "joints.track_rr_j.velocity"}
+              ]
+          },
+          "grid": {
+            "row": 0,
+            "column": 0,
+            "row_span": 1,
+            "column_span": 1
+          }
+        },
+        {
+          "type": "chart",
+          "name": "Temp. Moteurs",
+          "data": {
+              "chart_type": "band",
+              "title": "Températures Moteurs",
+              "series_name": "Temperature",
+              "label_key": "Parameter",
+              "value_key": "Value",
+              "data": [
+                {"Parameter": "FL", "Value": 0, "unit": "°C", "topic": "joints.track_fl_j.motor_temperature"},
+                {"Parameter": "RL", "Value": 0, "unit": "°C", "topic": "joints.track_rl_j.motor_temperature"},
+                {"Parameter": "FR", "Value": 0, "unit": "°C", "topic": "joints.track_fr_j.motor_temperature"},
+                {"Parameter": "RR", "Value": 0, "unit": "°C", "topic": "joints.track_rr_j.motor_temperature"}
+              ]
+          },
+          "grid": {
+            "row": 0,
+            "column": 1,
+            "row_span": 1,
+            "column_span": 1
+          }
+        },
+        {
+          "type": "chart",
+          "name": "Temp. Drivers",
+          "data": {
+              "chart_type": "band",
+              "title": "Températures Drivers",
+              "series_name": "Temperature",
+              "label_key": "Parameter",
+              "value_key": "Value",
+              "data": [
+                {"Parameter": "FL", "Value": 0, "unit": "°C", "topic": "joints.track_fl_j.fet_temperature"},
+                {"Parameter": "RL", "Value": 0, "unit": "°C", "topic": "joints.track_rl_j.fet_temperature"},
+                {"Parameter": "FR", "Value": 0, "unit": "°C", "topic": "joints.track_fr_j.fet_temperature"},
+                {"Parameter": "RR", "Value": 0, "unit": "°C", "topic": "joints.track_rr_j.fet_temperature"}
+              ]
+          },
+          "grid": {
+            "row": 1,
+            "column": 0,
+            "row_span": 1,
+            "column_span": 1
+          }
+        },
+        {
+          "type": "threejsViewer",
+          "name": "URDF Preview",
+          "data": {
+            "object_sources": [
+                {
+                    "name": "RoveCore",
+                    "source": "media/RoveCore.obj",
+                    "position": [0, 0.15, 0],
+                    "rotation": [0, 0, 0],
+                    "rotation_unit": "degrees",
+                    "scale": [0.3, 0.3, 0.3],
+                    "center": true,
+                    "base_on_ground": true,
+                    "color": "#e2d4d4"
+                },
+                {
+                    "name": "Flipper FL",
+                    "source": "media/RoveFlipper.obj",
+                    "position": [-1.0, 0, 0.6],
+                    "rotation": [0, 90, 0],
+                    "scale": [0.3, 0.6, 0.6],
+                    "rotation_unit": "degrees",
+                    "center": true,
+                    "base_on_ground": true,
+                    "color": "#72c572"
+                },
+                {
+                    "name": "Flipper RL",
+                    "source": "media/RoveFlipper.obj",
+                    "position": [1.0, 0, 0.6],
+                    "rotation": [0, -90, 0],
+                    "rotation_unit": "degrees",
+                    "scale": [0.3, 0.6, 0.6],
+                    "center": true,
+                    "base_on_ground": true,
+                    "color": "#6b6bc4"
+                },
+                {
+                    "name": "Flipper FR",
+                    "source": "media/RoveFlipper.obj",
+                    "position": [-1.0, 0, -0.6],
+                    "rotation": [0, 90, 0],
+                    "rotation_unit": "degrees",
+                    "scale": [0.3, 0.6, 0.6],
+                    "center": true,
+                    "base_on_ground": true,
+                    "color": "#d56868"
+                },
+                {
+                    "name": "Flipper RR",
+                    "source": "media/RoveFlipper.obj",
+                    "position": [1.0, 0, -0.6],
+                    "rotation": [0, -90, 0],
+                    "rotation_unit": "degrees",
+                    "scale": [0.3, 0.6, 0.6],
+                    "center": true,
+                    "base_on_ground": true,
+                    "color": "#e1e17c"
+                }
+            ]
+          },
+          "grid": {
+            "row": 2,
+            "column": 0,
+            "row_span": 1,
+            "column_span": 1
+          }
+        },
+        {
+          "type": "bitmap",
+          "name": "Bitmap Preview",
+          "data": {
+              "source": "http://{{robot-ip}}/map_feed"
+          },
+          "grid": {
+            "row": 1,
+            "column": 1,
+            "row_span": 2,
+            "column_span": 1
+          }
+        }
+      ]
+    },
+    "logs": {
+      "type": "layout",
+      "diaposition": "vertical",
+      "content": [
+        {
+          "type": "console",
+          "name": "event_log",
+          "data": {
+            "source": "wss://{{robot-ip}}/event_log_feed"
+          }
+        }
+      ]
+    }
+  },
+  "controls": {}
+}

@@ -2,6 +2,7 @@
 from __future__ import annotations
 import asyncio
 
+import os
 import sys
 from json import load
 from typing import Any
@@ -23,6 +24,9 @@ from src.views.console_view import DebugConsole
 from src.views.rtsp_view import RTSPView
 from src.views.layout_pannel import LayoutPanel
 from src.controller.event_bus import EventBus
+from src.views.components.header import Header
+from src.clients.udp_client import UDPClient
+from src.clients.ros2_client import ROS2Client
 
 
 class Widget(QWidget):
@@ -30,9 +34,11 @@ class Widget(QWidget):
         super().__init__(parent)
         self.setWindowTitle("Capraui - Dashboard")
 
+        self._header = Header(parent=self)
         self._menu = QMenuBar(self)
         self._central = QWidget(self)
         self._central_layout = QVBoxLayout(self._central)
+        self._central_layout.setContentsMargins(0, 0, 0, 0)
         # stacked widget for top-level pages (dashboard, logs, ...)
         self._stack = QStackedWidget(self._central)
         self._central_layout.addWidget(self._stack)
@@ -41,12 +47,16 @@ class Widget(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(self._header)
         layout.addWidget(self._menu)
         layout.addWidget(self._central)
         #layout.addWidget(self._console)
 
         self._views: list[Any] = []
         self._pages: dict[str, int] = {}
+        self._udp_clients: list[UDPClient] = []
+        self._ros2_clients: list[ROS2Client] = []
 
 
         # Application-wide EventBus (can be shared or passed to orchestrator)
@@ -65,6 +75,13 @@ class Widget(QWidget):
 
         config = self.load_config(config)
 
+        header_settings = config.get("header_settings", {})
+        header_index = self.layout().indexOf(self._header)
+        self.layout().removeWidget(self._header)
+        self._header.deleteLater()
+        self._header = Header(settings=header_settings, parent=self)
+        self.layout().insertWidget(header_index, self._header)
+
         views_root = config.get("views", {})
 
         # Clear previous stack pages
@@ -80,7 +97,7 @@ class Widget(QWidget):
         for view_name, view_cfg in views_root.items():
             vtype = view_cfg.get("type")
             if vtype == "layout":
-                panel = LayoutPanel(view_name, view_cfg, children=[])
+                panel = LayoutPanel(view_name, view_cfg, children=[], event_bus=self.event_bus)
                 panel.build()
                 page_widget = panel.get_widget()
                 self._views.append(panel)
@@ -97,14 +114,67 @@ class Widget(QWidget):
         if self._stack.count() > 0:
             self._stack.setCurrentIndex(0)
 
+        self._restart_udp_clients(config.get("udp_clients", []))
+        self._restart_ros2_clients(config.get("ros2_clients", []))
+
+    def update_header_time(self, time_value: str):
+        self._header.update_time(time_value)
+
+    def update_header_battery(self, battery_level: int):
+        self._header.update_battery(battery_level)
+
+    def _restart_udp_clients(self, client_configs: list[dict[str, Any]]) -> None:
+        for client in self._udp_clients:
+            client.stop()
+        self._udp_clients = []
+
+        for client_config in client_configs:
+            client = UDPClient(client_config, self.event_bus)
+            client.start()
+            self._udp_clients.append(client)
+
+    def _restart_ros2_clients(self, client_configs: list[dict[str, Any]]) -> None:
+        for client in self._ros2_clients:
+            client.stop()
+        self._ros2_clients = []
+
+        for client_config in client_configs:
+            client = ROS2Client(client_config, self.event_bus)
+            client.start()
+            self._ros2_clients.append(client)
+
+    def closeEvent(self, event):
+        for client in self._udp_clients:
+            client.stop()
+        self._udp_clients = []
+        for client in self._ros2_clients:
+            client.stop()
+        self._ros2_clients = []
+        super().closeEvent(event)
+
 
 
 
 if __name__ == "__main__":
     app = QApplication([])
     window = Widget()
-    window.buildInterface("./config/config.json")
-    window.show()
+    window.buildInterface("./config/config_window1.json")
+    window.showMaximized()
+
+    # Si il  y a un config window 2 existe, on affiche un autre window pour le second écran
+    # (ex: config_window2.json)
+    if os.path.exists("./config/config_window2.json"):
+        window2 = Widget()
+        window2.buildInterface("./config/config_window2.json")
+        screens = app.screens()
+        #Si il y a un autre écran, 
+        if len(screens) > 1:
+            window2.move(screens[1].geometry().topLeft())
+            asyncio.run(window.event_bus.publish("log", "Window : Application has started on the second screen."))
+
+        window2.showMaximized()
+
+        
     try:
         asyncio.run(window.event_bus.publish("log", "Window : Application has started."))
     except Exception:

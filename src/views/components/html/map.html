@@ -1,0 +1,56 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Carte avec tracé</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+    </script>
+
+    <style>
+        html, body, #map {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+<div id="map"></div>
+
+<script>
+    const map = L.map('map').setView([48.8566, 2.3522], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const positions = [
+        [48.8566, 2.3522],
+        [48.8572, 2.3540],
+        [48.8580, 2.3560],
+        [48.8590, 2.3585]
+    ];
+
+    // Marqueurs
+    positions.forEach((pos, index) => {
+        L.marker(pos).addTo(map).bindPopup("Point " + (index + 1));
+    });
+
+    // Tracé
+    const line = L.polyline(positions, {
+        weight: 4
+    }).addTo(map);
+
+    map.fitBounds(line.getBounds(), { padding: [20, 20] });
+</script>
+</body>
+</html>
