@@ -135,7 +135,8 @@
                     "rotation_unit": "degrees",
                     "scale": [0.3, 0.3, 0.3],
                     "center": true,
-                    "base_on_ground": true
+                    "base_on_ground": true,
+                    "color": "#aaaaaa"
                 },
                 {
                     "name": "Flipper FL",
@@ -145,27 +146,30 @@
                     "scale": [0.3, 0.6, 0.6],
                     "rotation_unit": "degrees",
                     "center": true,
-                    "base_on_ground": true
+                    "base_on_ground": true,
+                    "color": "#00ff00"
                 },
                 {
-                    "name": "Flipper FR",
+                    "name": "Flipper RL",
                     "source": "media/RoveFlipper.obj",
                     "position": [1.0, 0, 0.6],
                     "rotation": [0, -90, 0],
                     "rotation_unit": "degrees",
                     "scale": [0.3, 0.6, 0.6],
                     "center": true,
-                    "base_on_ground": true
+                    "base_on_ground": true,
+                    "color": "#0000ff"
                 },
                 {
-                    "name": "Flipper RL",
+                    "name": "Flipper FR",
                     "source": "media/RoveFlipper.obj",
                     "position": [-1.0, 0, -0.6],
                     "rotation": [0, 90, 0],
                     "rotation_unit": "degrees",
                     "scale": [0.3, 0.6, 0.6],
                     "center": true,
-                    "base_on_ground": true
+                    "base_on_ground": true,
+                    "color": "#ff0000"
                 },
                 {
                     "name": "Flipper RR",
@@ -175,7 +179,8 @@
                     "rotation_unit": "degrees",
                     "scale": [0.3, 0.6, 0.6],
                     "center": true,
-                    "base_on_ground": true
+                    "base_on_ground": true,
+                    "color": "#f2f200"
                 }
             ]
           },

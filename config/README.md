@@ -151,6 +151,77 @@
 
 ```
 
+## Viewer URDF
+```JSON
+        {
+          "type": "threejsViewer",
+          "name": "URDF Preview",
+          "data": {
+            "object_sources": [
+                {
+                    "name": "RoveCore",
+                    "source": "media/RoveCore.obj",
+                    "position": [0, 0.15, 0],
+                    "rotation": [0, 0, 0],
+                    "rotation_unit": "degrees",
+                    "scale": [0.3, 0.3, 0.3],
+                    "center": true,
+                    "base_on_ground": true
+                },
+                {
+                    "name": "Flipper FR",
+                    "source": "media/RoveFlipper.obj",
+                    "position": [-1.0, 0, 0.6],
+                    "rotation": [0, 90, 0],
+                    "scale": [0.3, 0.6, 0.6],
+                    "rotation_unit": "degrees",
+                    "center": true,
+                    "base_on_ground": true,
+                    "color": "#00ff00"
+                },
+                {
+                    "name": "Flipper RL",
+                    "source": "media/RoveFlipper.obj",
+                    "position": [1.0, 0, 0.6],
+                    "rotation": [0, -90, 0],
+                    "rotation_unit": "degrees",
+                    "scale": [0.3, 0.6, 0.6],
+                    "center": true,
+                    "base_on_ground": true,
+                    "color": "#0000ff"
+                },
+                {
+                    "name": "Flipper FL",
+                    "source": "media/RoveFlipper.obj",
+                    "position": [-1.0, 0, -0.6],
+                    "rotation": [0, 90, 0],
+                    "rotation_unit": "degrees",
+                    "scale": [0.3, 0.6, 0.6],
+                    "center": true,
+                    "base_on_ground": true,
+                    "color": "#ff0000"
+                },
+                {
+                    "name": "Flipper RR",
+                    "source": "media/RoveFlipper.obj",
+                    "position": [1.0, 0, -0.6],
+                    "rotation": [0, -90, 0],
+                    "rotation_unit": "degrees",
+                    "scale": [0.3, 0.6, 0.6],
+                    "center": true,
+                    "base_on_ground": true,
+                    "color": "#f2f200"
+                }
+            ]
+          },
+          "grid": {
+            "row": 2,
+            "column": 0,
+            "row_span": 1,
+            "column_span": 1
+          }
+        },
+```
 ##
 
 

@@ -26,11 +26,44 @@ HTML = """
         #canvas-container {
             width: 100%;
             height: 100%;
+            position: relative;
+        }
+        #legend {
+            position: absolute;
+            left: 8px;
+            right: 8px;
+            bottom: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 8px;
+            border-radius: 8px;
+            background: rgba(8, 12, 28, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            color: #f4f7ff;
+            font: 12px/1.2 "Segoe UI", sans-serif;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 6px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.06);
+        }
+        .legend-swatch {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.7);
         }
     </style>
 </head>
 <body>
 <div id="canvas-container"></div>
+<div id="legend"></div>
 
 <script type="importmap">
 {
@@ -49,6 +82,7 @@ HTML = """
     import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
     const container = document.getElementById('canvas-container');
+    const legendContainer = document.getElementById('legend');
 
     // Scene
     const scene = new THREE.Scene();
@@ -202,6 +236,38 @@ HTML = """
         robotRoot.add(wrapper);
     }
 
+    function normalizeLegendColor(color) {
+        if (typeof color === 'number') {
+            return `#${color.toString(16).padStart(6, '0')}`;
+        }
+        if (typeof color === 'string' && color.trim()) {
+            return color;
+        }
+        return '#4a90d9';
+    }
+
+    function setLegendItems(items = []) {
+        if (!legendContainer) {
+            return;
+        }
+        legendContainer.innerHTML = '';
+        items.forEach((item) => {
+            const row = document.createElement('div');
+            row.className = 'legend-item';
+
+            const swatch = document.createElement('span');
+            swatch.className = 'legend-swatch';
+            swatch.style.backgroundColor = normalizeLegendColor(item.color);
+
+            const label = document.createElement('span');
+            label.textContent = item.name ?? 'Unnamed';
+
+            row.appendChild(swatch);
+            row.appendChild(label);
+            legendContainer.appendChild(row);
+        });
+    }
+
     function loadModel(name, url, options = {}) {
         const normalizedUrl = String(url).split('?')[0].split('#')[0].toLowerCase();
 
@@ -283,6 +349,10 @@ HTML = """
         loadModel(name, url, options);
     };
 
+    window.setLegendItems = function(items = []) {
+        setLegendItems(items);
+    };
+
     window.setObjectTransform = function(name, transform = {}, rotationUnit = 'degrees') {
         const object3d = robotRoot.getObjectByName(name);
         if (!object3d) {
@@ -353,6 +423,7 @@ class ThreejsViewer(QWidget):
             self._view.page().runJavaScript(script)
 
         object_sources = self._config.get("object_sources", [])
+        self.set_legend_items_from_objects(object_sources)
         if object_sources:
             self.load_objects(object_sources, clear_existing=True)
 
@@ -392,6 +463,30 @@ class ThreejsViewer(QWidget):
     def clear_scene(self):
         self.run_js("window.clearScene();")
 
+    def set_legend_items(self, items):
+        payload = []
+        for item in items:
+            payload.append({
+                "name": str(item.get("name", "Unnamed")),
+                "color": item.get("color", "#4a90d9"),
+            })
+        self.run_js(f"window.setLegendItems({json.dumps(payload)});")
+
+    def set_legend_items_from_objects(self, objects):
+        legend_items = []
+        for object_cfg in objects:
+            if not isinstance(object_cfg, dict):
+                continue
+            if not object_cfg.get("name"):
+                continue
+            legend_items.append(
+                {
+                    "name": object_cfg.get("name"),
+                    "color": object_cfg.get("color", "#4a90d9"),
+                }
+            )
+        self.set_legend_items(legend_items)
+
     def load_object(
         self,
         name,
@@ -423,6 +518,8 @@ class ThreejsViewer(QWidget):
     def load_objects(self, objects, clear_existing=False):
         if clear_existing:
             self.clear_scene()
+
+        self.set_legend_items_from_objects(objects)
 
         for object_cfg in objects:
             name = object_cfg.get("name")
@@ -482,7 +579,9 @@ class ThreejsViewer(QWidget):
         if data is None:
             return
         self._config = data
-        self.load_objects(data.get("object_sources", []), clear_existing=True)
+        object_sources = data.get("object_sources", [])
+        self.set_legend_items_from_objects(object_sources)
+        self.load_objects(object_sources, clear_existing=True)
 
 
 if __name__ == "__main__":
