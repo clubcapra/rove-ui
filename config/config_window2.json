@@ -23,10 +23,17 @@
       },
       "content": [
           {
-            "type": "webcamera",
-            "name": "RTSP Camera",
+          "type": "camera",
+          "name": "Camera",
             "data": {
-                "device_path": "/dev/video0"
+            "mode": "webcamera",
+            "rtsp": {
+              "source": "rtsp://192.168.2.34:554/",
+              "source_type": "rtsp"
+            },
+            "webcamera": {
+              "device_path": "/dev/video0"
+            }
             },
             "grid": {
             "row": 0,

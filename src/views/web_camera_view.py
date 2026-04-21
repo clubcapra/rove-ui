@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import subprocess
 from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget
+
+from src.controller.event_bus import EventBus
 
 GST_AVAILABLE = False
 GST_IMPORT_ERROR: Exception | None = None
@@ -39,9 +42,10 @@ class WebCameraView:
 
     _gst_initialized = False
 
-    def __init__(self, name: str, config: dict):
+    def __init__(self, name: str, config: dict, event_bus: EventBus | None = None):
         self.name = name
         self.config = config or {}
+        self.event_bus = event_bus or EventBus()
 
         if GST_AVAILABLE and not WebCameraView._gst_initialized:
             Gst.init(None)  # type: ignore[misc]
@@ -57,6 +61,8 @@ class WebCameraView:
         if self._widget is not None:
             return
 
+        self.event_bus.publish_sync("log", f"WebCameraView[{self.name}] build started")
+
         self._widget = QWidget()
         layout = QVBoxLayout(self._widget)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -68,6 +74,7 @@ class WebCameraView:
             )
             label.setWordWrap(True)
             layout.addWidget(label)
+            self.event_bus.publish_sync("log", f"WebCameraView[{self.name}] GStreamer not available")
             return
 
         device = self._resolve_device()
@@ -81,35 +88,16 @@ class WebCameraView:
         self._video_widget.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
         self._viewport.set_video_widget(self._video_widget)
 
-        sink_type = str(self.config.get("sink", "ximagesink")).strip() or "ximagesink"
-        pipeline_str = (
-            f"v4l2src device={device} ! "
-            f"queue max-size-buffers=1 leaky=downstream ! "
-            f"videoconvert ! "
-            f"{sink_type} name=video_sink sync=false qos=false"
-        )
-        print(f"[GStreamer][WebCam] Pipeline: {pipeline_str}")
 
-        try:
-            self._pipeline = Gst.parse_launch(pipeline_str)  # type: ignore[misc]
-        except Exception as e:
-            layout.addWidget(QLabel(f"Erreur pipeline: {e}"))
+        btn = QPushButton("Send '2' UDP")
+        btn.setFixedHeight(32)
+        btn.clicked.connect(self._send_udp_command)
+        layout.addWidget(btn)
+
+        if not self._rebuild_pipeline(device):
+            layout.addWidget(QLabel("Erreur: impossible de créer le pipeline webcam"))
+            self.event_bus.publish_sync("log", f"WebCameraView[{self.name}] pipeline build failed")
             return
-
-        sink = self._pipeline.get_by_name("video_sink")
-        if sink is None:
-            layout.addWidget(QLabel("Erreur: video_sink introuvable"))
-            return
-
-        win_id = int(self._video_widget.winId())
-        if hasattr(sink, "set_window_handle"):
-            sink.set_window_handle(win_id)
-        else:
-            GstVideo.VideoOverlay.set_window_handle(sink, win_id)  # type: ignore[misc]
-
-        self._bus = self._pipeline.get_bus()
-        self._bus.add_signal_watch()
-        self._bus.connect("message", self._on_bus_message)
 
         if bool(self.config.get("autoplay", True)):
             self.start()
@@ -123,32 +111,106 @@ class WebCameraView:
         except Exception:
             idx = 0
         return f"/dev/video{idx}"
+    
+    def _send_udp_command(self):
+        try:
+            subprocess.Popen(
+                "echo '2' | nc -u 192.168.2.2 5540",
+                shell=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            self.event_bus.publish_sync("log", "[CMD] echo '2' | nc -u 192.168.2.2 5540")
+        except Exception as e:
+            self.event_bus.publish_sync("log", f"[CMD][ERROR] {e}")
 
     def _on_bus_message(self, bus, message):
         if message.type == Gst.MessageType.ERROR:  # type: ignore[misc]
             err, debug = message.parse_error()
-            print(f"[GStreamer][WebCam][ERROR] {err}")
+            self.event_bus.publish_sync("log", f"[GStreamer][WebCam][ERROR] {err}")
             if debug:
-                print(f"[DEBUG] {debug}")
+                self.event_bus.publish_sync("log", f"[DEBUG] {debug}")
         elif message.type == Gst.MessageType.EOS:  # type: ignore[misc]
-            print("[GStreamer][WebCam] End of stream")
+            self.event_bus.publish_sync("log", "[GStreamer][WebCam] End of stream")
 
     def start(self) -> None:
         if self._pipeline is None:
-            self.build()
+            self.restart_pipeline()
         if self._pipeline is not None:
+            sink = self._pipeline.get_by_name("video_sink")
+            if sink is not None and self._video_widget is not None:
+                win_id = int(self._video_widget.winId())
+                if hasattr(sink, "set_window_handle"):
+                    sink.set_window_handle(win_id)
+                else:
+                    GstVideo.VideoOverlay.set_window_handle(sink, win_id)  # type: ignore[misc]
             self._pipeline.set_state(Gst.State.PLAYING)  # type: ignore[misc]
+            self.event_bus.publish_sync("log", f"WebCameraView[{self.name}] PLAYING")
+
+    def pause(self) -> None:
+        if self._pipeline is not None:
+            self._pipeline.set_state(Gst.State.PAUSED)  # type: ignore[misc]
+            self.event_bus.publish_sync("log", f"WebCameraView[{self.name}] PAUSED")
 
     def stop(self) -> None:
+        self.pause()
+        self._teardown_pipeline()
+        self._viewport = None
+        self._video_widget = None
+        self._widget = None
+        self.event_bus.publish_sync("log", f"WebCameraView[{self.name}] stopped")
+
+    def restart_pipeline(self) -> bool:
+        device = self._resolve_device()
+        self.event_bus.publish_sync("log", f"WebCameraView[{self.name}] restart requested ({device})")
+        ok = self._rebuild_pipeline(device)
+        if ok:
+            self.start()
+        return ok
+
+    def _teardown_pipeline(self) -> None:
         if self._pipeline is not None:
             self._pipeline.set_state(Gst.State.NULL)  # type: ignore[misc]
             self._pipeline = None
         if self._bus is not None:
             self._bus.remove_signal_watch()
             self._bus = None
-        self._viewport = None
-        self._video_widget = None
-        self._widget = None
+
+    def _rebuild_pipeline(self, device: str) -> bool:
+        self._teardown_pipeline()
+
+        sink_type = str(self.config.get("sink", "ximagesink")).strip() or "ximagesink"
+        pipeline_str = (
+            f"v4l2src device={device} ! "
+            f"queue max-size-buffers=1 leaky=downstream ! "
+            f"videoconvert ! "
+            f"{sink_type} name=video_sink sync=false qos=false"
+        )
+        print(f"[GStreamer][WebCam] Pipeline: {pipeline_str}")
+
+        try:
+            self._pipeline = Gst.parse_launch(pipeline_str)  # type: ignore[misc]
+        except Exception as e:
+            self.event_bus.publish_sync("log", f"[GStreamer][WebCam][ERROR] {e}")
+            return False
+
+        sink = self._pipeline.get_by_name("video_sink")
+        if sink is None:
+            self.event_bus.publish_sync("log", "[GStreamer][WebCam][ERROR] video_sink introuvable")
+            self._teardown_pipeline()
+            return False
+
+        if self._video_widget is not None:
+            win_id = int(self._video_widget.winId())
+            if hasattr(sink, "set_window_handle"):
+                sink.set_window_handle(win_id)
+            else:
+                GstVideo.VideoOverlay.set_window_handle(sink, win_id)  # type: ignore[misc]
+
+        self._bus = self._pipeline.get_bus()
+        self._bus.add_signal_watch()
+        self._bus.connect("message", self._on_bus_message)
+        return True
 
     def get_widget(self) -> QWidget:
         if self._widget is None:

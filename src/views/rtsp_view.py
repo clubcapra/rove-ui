@@ -3,7 +3,8 @@ from __future__ import annotations
 import subprocess
 
 from PySide6.QtCore import QObject, Qt
-from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
+from src.controller.event_bus import EventBus
 
 GST_AVAILABLE = False
 GST_IMPORT_ERROR: Exception | None = None
@@ -36,11 +37,12 @@ class RTSPView(QObject):
         RTSP = "rtsp"
         USB_VTX = "usb_vtx"
 
-    def __init__(self, name: str, config: dict, parent=None):
+    def __init__(self, name: str, config: dict, event_bus: EventBus | None = None, parent=None):
         super().__init__(parent)
 
         self.name = name
         self.config = config or {}
+        self.event_bus = event_bus or EventBus()
 
         if GST_AVAILABLE and not RTSPView._gst_initialized:
             Gst.init(None)  # type: ignore[misc]
@@ -50,11 +52,14 @@ class RTSPView(QObject):
         self.video_widget = None
         self.pipeline = None
         self.bus = None
+        self.urlField = None
 
 
     def build(self, source_type: str | None = None, source: str | None = None) -> QWidget:
         if self.root_widget is not None:
             return self.root_widget
+
+        self.event_bus.publish_sync("log", f"RTSPView[{self.name}] build started")
 
         if not GST_AVAILABLE:
             self.root_widget = QWidget()
@@ -75,6 +80,7 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
             label = QLabel(msg)
             label.setWordWrap(True)
             layout.addWidget(label)
+            self.event_bus.publish_sync("log", f"RTSPView[{self.name}] GStreamer not available")
             return self.root_widget
 
         self.root_widget = QWidget()
@@ -84,43 +90,41 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
+        resolved_source_type, resolved_source = self._resolve_source(source_type, source)
 
+        url_row = QWidget(self.root_widget)
+        url_row_layout = QHBoxLayout(url_row)
+        url_row_layout.setContentsMargins(4, 4, 4, 4)
+        url_row_layout.setSpacing(6)
+
+        url_label = QLabel("URL:")
+        url_row_layout.addWidget(url_label)
+
+        self.urlField = QLineEdit(resolved_source or "")
+        self.urlField.setPlaceholderText("rtsp://...")
+        self.urlField.returnPressed.connect(self._apply_url_change)
+        url_row_layout.addWidget(self.urlField, 1)
+
+        apply_btn = QPushButton("Apply")
+        apply_btn.clicked.connect(self._apply_url_change)
+        url_row_layout.addWidget(apply_btn)
+
+        layout.addWidget(url_row)
 
         self.video_widget = QWidget(self.root_widget)
         self.video_widget.setStyleSheet("background: black;")
         self.video_widget.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
         layout.addWidget(self.video_widget)
 
-        btn = QPushButton("Send '2' UDP")
-        btn.setFixedHeight(32)
-        btn.clicked.connect(self._send_udp_command)
-        layout.addWidget(btn)
-
-        resolved_source_type, resolved_source = self._resolve_source(source_type, source)
         if resolved_source_type is None or resolved_source is None:
             layout.addWidget(QLabel("RTSPView: configuration invalide (source manquante)."))
+            self.event_bus.publish_sync("log", f"RTSPView[{self.name}] invalid source configuration")
             return self.root_widget
 
-        self.pipeline = self._create_pipeline(resolved_source_type, resolved_source)
-        if self.pipeline is None:
+        if not self._rebuild_pipeline(resolved_source_type, resolved_source):
+            self.event_bus.publish_sync("log", f"RTSPView[{self.name}] pipeline build failed")
             return self.root_widget
-
-        sink = self.pipeline.get_by_name("video_sink")
-        if sink is None:
-            print("Erreur: impossible de récupérer video_sink")
-            return self.root_widget
-
-        win_id = int(self.video_widget.winId())
-        if hasattr(sink, "set_window_handle"):
-            sink.set_window_handle(win_id)
-        else:
-            GstVideo.VideoOverlay.set_window_handle(sink, win_id)  # type: ignore[misc]
-
-        self.bus = self.pipeline.get_bus()
-        self.bus.add_signal_watch()
-        self.bus.connect("message", self._on_bus_message)
-
-        self.start()
+        self.event_bus.publish_sync("log", f"RTSPView[{self.name}] pipeline ready ({resolved_source_type}: {resolved_source})")
         return self.root_widget
 
     def get_widget(self) -> QWidget:
@@ -130,9 +134,30 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
 
     def start(self):
         if self.pipeline is not None:
+            sink = self.pipeline.get_by_name("video_sink")
+            if sink is not None and self.video_widget is not None:
+                win_id = int(self.video_widget.winId())
+                if hasattr(sink, "set_window_handle"):
+                    sink.set_window_handle(win_id)
+                else:
+                    GstVideo.VideoOverlay.set_window_handle(sink, win_id)  # type: ignore[misc]
             self.pipeline.set_state(Gst.State.PLAYING)  # type: ignore[misc]
+            self.event_bus.publish_sync("log", f"RTSPView[{self.name}] PLAYING")
+
+    def pause(self):
+        if self.pipeline is not None:
+            self.pipeline.set_state(Gst.State.PAUSED)  # type: ignore[misc]
+            self.event_bus.publish_sync("log", f"RTSPView[{self.name}] PAUSED")
 
     def stop(self):
+        self._teardown_pipeline()
+        self.event_bus.publish_sync("log", f"RTSPView[{self.name}] stopped")
+
+        self.video_widget = None
+        self.urlField = None
+        self.root_widget = None
+
+    def _teardown_pipeline(self):
         if self.pipeline is not None:
             self.pipeline.set_state(Gst.State.NULL)  # type: ignore[misc]
             self.pipeline = None
@@ -141,8 +166,64 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
             self.bus.remove_signal_watch()
             self.bus = None
 
-        self.video_widget = None
-        self.root_widget = None
+    def _bind_video_sink(self):
+        if self.pipeline is None or self.video_widget is None:
+            return False
+
+        sink = self.pipeline.get_by_name("video_sink")
+        if sink is None:
+            print("Erreur: impossible de récupérer video_sink")
+            return False
+
+        win_id = int(self.video_widget.winId())
+        if hasattr(sink, "set_window_handle"):
+            sink.set_window_handle(win_id)
+        else:
+            GstVideo.VideoOverlay.set_window_handle(sink, win_id)  # type: ignore[misc]
+        return True
+
+    def _rebuild_pipeline(self, source_type: str, source: str) -> bool:
+        self.event_bus.publish_sync("log", f"RTSPView[{self.name}] rebuilding pipeline ({source_type}: {source})")
+        self._teardown_pipeline()
+
+        self.pipeline = self._create_pipeline(source_type, source)
+        if self.pipeline is None:
+            return False
+
+        if not self._bind_video_sink():
+            self._teardown_pipeline()
+            return False
+
+        self.bus = self.pipeline.get_bus()
+        self.bus.add_signal_watch()
+        self.bus.connect("message", self._on_bus_message)
+
+        self.start()
+        return True
+
+    def _apply_url_change(self):
+        if self.urlField is None:
+            return
+
+        new_source = self.urlField.text().strip()
+        if not new_source:
+            return
+
+        resolved_source_type, resolved_source = self._resolve_source(None, new_source)
+        if resolved_source_type is None or resolved_source is None:
+            return
+
+        self.config["source"] = resolved_source
+        self.config["source_type"] = resolved_source_type
+        self.event_bus.publish_sync("log", f"RTSPView[{self.name}] URL changed to {resolved_source}")
+        self._rebuild_pipeline(resolved_source_type, resolved_source)
+
+    def restart_pipeline(self):
+        resolved_source_type, resolved_source = self._resolve_source(None, None)
+        if resolved_source_type is None or resolved_source is None:
+            return False
+        self.event_bus.publish_sync("log", f"RTSPView[{self.name}] restart requested")
+        return self._rebuild_pipeline(resolved_source_type, resolved_source)
 
     def _on_bus_message(self, bus, message):
         msg_type = message.type
@@ -150,23 +231,16 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
         if msg_type == Gst.MessageType.ERROR:  # type: ignore[misc]
             err, debug = message.parse_error()
             print(f"[GStreamer][ERROR] {err}")
+            self.event_bus.publish_sync("log", f"RTSPView[{self.name}][ERROR] {err}")
             if debug:
                 print(f"[DEBUG] {debug}")
+                self.event_bus.publish_sync("log", f"RTSPView[{self.name}][DEBUG] {debug}")
 
         elif msg_type == Gst.MessageType.EOS:  # type: ignore[misc]
             print("[GStreamer] End of stream")
+            self.event_bus.publish_sync("log", f"RTSPView[{self.name}] End of stream")
 
-    def _send_udp_command(self):
-        try:
-            subprocess.Popen(
-                "echo '2' | nc -u 192.168.2.2 5540",
-                shell=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            print("[CMD] echo '2' | nc -u 192.168.2.2 5540")
-        except Exception as e:
-            print(f"[CMD][ERROR] {e}")
+
 
     def _resolve_source(self, source_type: str | None, source: str | None) -> tuple[str | None, str | None]:
         resolved_source = source or self.config.get("source") or self.config.get("url")

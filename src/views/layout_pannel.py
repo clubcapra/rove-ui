@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QWidget, QHBoxLayout, QGridLayout, QVBoxLayout, QL
 from typing import List
 
 from .web_camera_view import WebCameraView
+from .camera_widget import CameraWidget
 from .components.bitmap_placeholder import BitmapPlaceholder
 from src.controller.event_bus import EventBus
 
@@ -87,19 +88,43 @@ class LayoutPanel:
         self.children.append(child)
         self._children_by_name[name] = child
 
+    def _merge_dicts(self, parent_data: dict, child_data: dict) -> dict:
+        merged = dict(parent_data)
+        for key, value in child_data.items():
+            if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                merged[key] = self._merge_dicts(merged[key], value)
+            else:
+                merged[key] = value
+        return merged
+
+    def _resolve_child_data(self, child_cfg: dict) -> dict:
+        parent_data = self.config.get("data", {})
+        child_data = child_cfg.get("data", {})
+        if not isinstance(parent_data, dict):
+            parent_data = {}
+        if not isinstance(child_data, dict):
+            child_data = {}
+        return self._merge_dicts(parent_data, child_data)
+
     def _make_child_widget(self, child_cfg: dict) -> QWidget:
         """Create a lightweight widget for a child view config."""
         vtype = str(child_cfg.get("type", "")).strip().lower()
         name = child_cfg.get("name", "unnamed")
+        data = self._resolve_child_data(child_cfg)
 
         if vtype == "rtsp":
-            rtsp = RTSPView(name, child_cfg.get("data", {}))
+            rtsp = RTSPView(name, data, event_bus=self.event_bus)
             rtsp.build()
             self._register_child(name, rtsp)
             return rtsp.get_widget()
 
         if vtype == "webcamera":
-            camera = WebCameraView(name, child_cfg.get("data", {}))
+            camera = WebCameraView(name, data, event_bus=self.event_bus)
+            camera.build()
+            self._register_child(name, camera)
+            return camera.get_widget()
+        if vtype == "camera":
+            camera = CameraWidget(name, data, event_bus=self.event_bus)
             camera.build()
             self._register_child(name, camera)
             return camera.get_widget()
@@ -110,13 +135,12 @@ class LayoutPanel:
             return console
         if vtype == "threejsviewer":
             from .components.threejsViewer import ThreejsViewer
-            viewer = ThreejsViewer(child_cfg.get("data", {}))
+            viewer = ThreejsViewer(data, event_bus=self.event_bus)
             viewer.build()
             self._register_child(name, viewer)
             return viewer
         if vtype == "table":
             from .components.table import Table
-            data = child_cfg.get("data", {})
             table = Table(data.get("header", []), data.get("data", []))
             table.build()
             self._register_child(name, table)
@@ -124,12 +148,12 @@ class LayoutPanel:
 
         if vtype == "chart":
             from .components.chart import ChartWidget
-            chart = ChartWidget(child_cfg.get("data", {}), event_bus=self.event_bus)
+            chart = ChartWidget(data, event_bus=self.event_bus)
             self._register_child(name, chart)
             return chart
 
         if vtype == "bitmap":
-            bitmap = BitmapPlaceholder(name, child_cfg.get("data", {}))
+            bitmap = BitmapPlaceholder(name, data)
             bitmap.build()
             self._register_child(name, bitmap)
             return bitmap.get_widget()
