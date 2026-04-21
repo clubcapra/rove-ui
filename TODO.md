@@ -2,7 +2,7 @@
 
 * [X] Créé le bimodal (2 écrans)
 * [X] Créé le lowpoly du robot
-* [ ] Intégré le lowpoly du robot
+* [X] Intégré le lowpoly du robot
 * [ ] Ajuster les Camera viewers
   * [ ] dropdown dans le web camera
   * [ ] agrégation dans un widget permettant de switch entre rtsp et webcam

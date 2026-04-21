@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Three.js Viewer</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #1a1a2e;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+<div id="canvas-container"></div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+}
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+
+    const container = document.getElementById('canvas-container');
+
+    // Scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+
+    // Camera
+    const camera = new THREE.PerspectiveCamera(
+        60, container.clientWidth / container.clientHeight, 0.1, 1000
+    );
+    camera.position.set(3, 3, 3);
+    camera.lookAt(0, 0, 0);
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    container.appendChild(renderer.domElement);
+
+    // Controls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(5, 10, 7);
+    scene.add(directionalLight);
+
+    // Grid helper
+    const grid = new THREE.GridHelper(10, 10, 0x444466, 0x333355);
+    scene.add(grid);
+
+    // Axes helper
+    const axes = new THREE.AxesHelper(2);
+    scene.add(axes);
+
+    // Robot core: flattened cylinder (disk-like body)
+    const coreRadius = 1.15;
+    const coreHeight = 0.5;
+    const coreGeometry = new THREE.CylinderGeometry(
+        coreRadius,
+        coreRadius,
+        coreHeight,
+        18,
+        1
+    );
+    const material = new THREE.MeshStandardMaterial({ color: 0x4a90d9, flatShading: true });
+    const core = new THREE.Mesh(coreGeometry, material);
+    core.position.y = coreHeight / 2;
+    scene.add(core);
+
+
+
+    // Resize handling
+    window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+
+    // Animation loop
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    // Expose API for Python calls via runJavaScript
+    window.clearScene = function() {
+        const toRemove = [];
+        scene.traverse((obj) => {
+            if (obj.isMesh) toRemove.push(obj);
+        });
+        toRemove.forEach((obj) => {
+            obj.geometry.dispose();
+            obj.material.dispose();
+            scene.remove(obj);
+        });
+    };
+
+    window.addBox = function(x, y, z, w, h, d, color) {
+        const geo = new THREE.BoxGeometry(w || 1, h || 1, d || 1);
+        const mat = new THREE.MeshStandardMaterial({ color: color || 0x4a90d9 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x || 0, y || 0, z || 0);
+        scene.add(mesh);
+    };
+
+    window.loadGLTF = function(url) {
+        const loader = new GLTFLoader();
+        loader.load(url, (gltf) => {
+            scene.add(gltf.scene);
+        });
+    };
+
+    window.loadSTL = function(url, color) {
+        const loader = new STLLoader();
+        loader.load(url, (geometry) => {
+            const mat = new THREE.MeshStandardMaterial({ color: color || 0x4a90d9 });
+            const mesh = new THREE.Mesh(geometry, mat);
+            scene.add(mesh);
+        });
+    };
+</script>
+</body>
+</html>
