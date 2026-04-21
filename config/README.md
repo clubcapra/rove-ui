@@ -166,10 +166,11 @@
                     "rotation_unit": "degrees",
                     "scale": [0.3, 0.3, 0.3],
                     "center": true,
-                    "base_on_ground": true
+                    "base_on_ground": true,
+                    "color": "#e2d4d4"
                 },
                 {
-                    "name": "Flipper FR",
+                    "name": "Flipper FL",
                     "source": "media/RoveFlipper.obj",
                     "position": [-1.0, 0, 0.6],
                     "rotation": [0, 90, 0],
@@ -177,7 +178,7 @@
                     "rotation_unit": "degrees",
                     "center": true,
                     "base_on_ground": true,
-                    "color": "#00ff00"
+                    "color": "#72c572"
                 },
                 {
                     "name": "Flipper RL",
@@ -188,10 +189,10 @@
                     "scale": [0.3, 0.6, 0.6],
                     "center": true,
                     "base_on_ground": true,
-                    "color": "#0000ff"
+                    "color": "#6b6bc4"
                 },
                 {
-                    "name": "Flipper FL",
+                    "name": "Flipper FR",
                     "source": "media/RoveFlipper.obj",
                     "position": [-1.0, 0, -0.6],
                     "rotation": [0, 90, 0],
@@ -199,7 +200,7 @@
                     "scale": [0.3, 0.6, 0.6],
                     "center": true,
                     "base_on_ground": true,
-                    "color": "#ff0000"
+                    "color": "#d56868"
                 },
                 {
                     "name": "Flipper RR",
@@ -210,7 +211,7 @@
                     "scale": [0.3, 0.6, 0.6],
                     "center": true,
                     "base_on_ground": true,
-                    "color": "#f2f200"
+                    "color": "#e1e17c"
                 }
             ]
           },
