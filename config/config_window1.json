@@ -3,7 +3,12 @@
     "signals": [
       {"name": "VTX", "db": -65},
       {"name": "Microhard", "db": -72}
-    ]
+    ],
+    "E-Stop": {
+      "active_color": "#ff0000",
+      "inactive_color": "#00ff00",
+      "topic": "estop_status"
+    }
   },
   "udp_clients": [
     {
@@ -94,13 +99,12 @@
             "column_span": 1
           }
         },
-
         {
           "type": "chart",
           "name": "Temp. Drivers",
           "data": {
               "chart_type": "band",
-              "title": "Températures Drivers (FET)",
+              "title": "Températures Drivers",
               "series_name": "Temperature",
               "label_key": "Parameter",
               "value_key": "Value",
@@ -122,6 +126,58 @@
           "type": "threejsViewer",
           "name": "URDF Preview",
           "data": {
+            "object_sources": [
+                {
+                    "name": "RoveCore",
+                    "source": "media/RoveCore.obj",
+                    "position": [0, 0.15, 0],
+                    "rotation": [0, 0, 0],
+                    "rotation_unit": "degrees",
+                    "scale": [0.3, 0.3, 0.3],
+                    "center": true,
+                    "base_on_ground": true
+                },
+                {
+                    "name": "Flipper FL",
+                    "source": "media/RoveFlipper.obj",
+                    "position": [-1.0, 0, 0.6],
+                    "rotation": [0, 90, 0],
+                    "scale": [0.3, 0.6, 0.6],
+                    "rotation_unit": "degrees",
+                    "center": true,
+                    "base_on_ground": true
+                },
+                {
+                    "name": "Flipper FR",
+                    "source": "media/RoveFlipper.obj",
+                    "position": [1.0, 0, 0.6],
+                    "rotation": [0, -90, 0],
+                    "rotation_unit": "degrees",
+                    "scale": [0.3, 0.6, 0.6],
+                    "center": true,
+                    "base_on_ground": true
+                },
+                {
+                    "name": "Flipper RL",
+                    "source": "media/RoveFlipper.obj",
+                    "position": [-1.0, 0, -0.6],
+                    "rotation": [0, 90, 0],
+                    "rotation_unit": "degrees",
+                    "scale": [0.3, 0.6, 0.6],
+                    "center": true,
+                    "base_on_ground": true
+                },
+                {
+                    "name": "Flipper RR",
+                    "source": "media/RoveFlipper.obj",
+                    "position": [1.0, 0, -0.6],
+                    "rotation": [0, -90, 0],
+                    "rotation_unit": "degrees",
+                    "scale": [0.3, 0.6, 0.6],
+                    "center": true,
+                    "base_on_ground": true
+                }
+            ]
           },
           "grid": {
             "row": 2,

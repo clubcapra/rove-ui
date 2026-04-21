@@ -68,10 +68,26 @@ class Header(QWidget):
             lbl.setStyleSheet("color: #000;")
             left.addWidget(lbl)
             self._signal_labels.append(lbl)
+
+        # Ajout de l'indicateur d'E-Stop
+        settings_estop = settings.get("E-Stop", {})
+        self._estop_active_color = settings_estop.get("active_color", "#ff0000")
+        self._estop_inactive_color = settings_estop.get("inactive_color", "#00ff00")
+        self._estop_label = QLabel("Estop")
+        self._estop_label.setStyleSheet(f"color: {self._estop_inactive_color};")
+        left.addWidget(self._estop_label)
+
+        event_bus = getattr(parent, "event_bus", None)
+        if event_bus:
+            event_bus.subscribe(settings_estop.get("topic", settings_estop.get("topic", "estop_status")), self.update_estop)
+
         left.addStretch()
         left_w = QWidget()
         left_w.setLayout(left)
         left_w.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+
+
 
         # ── CENTER : clock ────────────────────────────────────────────────
         self._center_time = QLabel(self.getCurrentTime())
@@ -116,3 +132,8 @@ class Header(QWidget):
         self._battery_label.setText(f"{icon} {value}%")
         color = "#e05555" if value <= 20 else "#fbbf24" if value <= 50 else "#7ec87e"
         self._battery_label.setStyleSheet(f"color: {color};")
+
+    def update_estop(self, active: bool) -> None:
+        """Update E-Stop status indicator."""
+        color = self._estop_active_color if active else self._estop_inactive_color
+        self._estop_label.setStyleSheet(f"color: {color};")

@@ -27,6 +27,7 @@ class LayoutPanel:
         self.children = children
         self._widget = None
         self.event_bus = event_bus or EventBus()
+        self._children_by_name: dict[str, object] = {}
 
     def build(self):
         """High-level build: interpret layout config and place child widgets."""
@@ -79,6 +80,13 @@ class LayoutPanel:
             self.build()
         return self._widget
 
+    def get_child_view(self, name: str):
+        return self._children_by_name.get(name)
+
+    def _register_child(self, name: str, child: object) -> None:
+        self.children.append(child)
+        self._children_by_name[name] = child
+
     def _make_child_widget(self, child_cfg: dict) -> QWidget:
         """Create a lightweight widget for a child view config."""
         vtype = str(child_cfg.get("type", "")).strip().lower()
@@ -87,35 +95,43 @@ class LayoutPanel:
         if vtype == "rtsp":
             rtsp = RTSPView(name, child_cfg.get("data", {}))
             rtsp.build()
+            self._register_child(name, rtsp)
             return rtsp.get_widget()
 
         if vtype == "webcamera":
             camera = WebCameraView(name, child_cfg.get("data", {}))
             camera.build()
+            self._register_child(name, camera)
             return camera.get_widget()
         if vtype == "console":
             console = DebugConsole()
             # Console can be attached later to the global EventBus
+            self._register_child(name, console)
             return console
         if vtype == "threejsviewer":
             from .components.threejsViewer import ThreejsViewer
-            viewer = ThreejsViewer()
+            viewer = ThreejsViewer(child_cfg.get("data", {}))
             viewer.build()
+            self._register_child(name, viewer)
             return viewer
         if vtype == "table":
             from .components.table import Table
             data = child_cfg.get("data", {})
             table = Table(data.get("header", []), data.get("data", []))
             table.build()
+            self._register_child(name, table)
             return table
 
         if vtype == "chart":
             from .components.chart import ChartWidget
-            return ChartWidget(child_cfg.get("data", {}), event_bus=self.event_bus)
+            chart = ChartWidget(child_cfg.get("data", {}), event_bus=self.event_bus)
+            self._register_child(name, chart)
+            return chart
 
         if vtype == "bitmap":
             bitmap = BitmapPlaceholder(name, child_cfg.get("data", {}))
             bitmap.build()
+            self._register_child(name, bitmap)
             return bitmap.get_widget()
         
         # Placeholder for other view types (table, map, point_cloud, etc.)

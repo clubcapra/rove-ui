@@ -2,6 +2,7 @@
 from __future__ import annotations
 import asyncio
 
+import os
 import sys
 from json import load
 from typing import Any
@@ -157,8 +158,23 @@ class Widget(QWidget):
 if __name__ == "__main__":
     app = QApplication([])
     window = Widget()
-    window.buildInterface("./config/config.json")
+    window.buildInterface("./config/config_window1.json")
     window.showMaximized()
+
+    # Si il  y a un config window 2 existe, on affiche un autre window pour le second écran
+    # (ex: config_window2.json)
+    if os.path.exists("./config/config_window2.json"):
+        window2 = Widget()
+        window2.buildInterface("./config/config_window2.json")
+        screens = app.screens()
+        #Si il y a un autre écran, 
+        if len(screens) > 1:
+            window2.move(screens[1].geometry().topLeft())
+            asyncio.run(window.event_bus.publish("log", "Window : Application has started on the second screen."))
+
+        window2.showMaximized()
+
+        
     try:
         asyncio.run(window.event_bus.publish("log", "Window : Application has started."))
     except Exception:

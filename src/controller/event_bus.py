@@ -24,6 +24,8 @@ class EventBus:
         self._subscribers[event_type].append(handler)
 
     async def publish(self, event_type: str, *args: Any) -> None:
+        if event_type != "log":
+            self.publish_sync("log", f"Event published: {event_type} with args: {args}")
         if handlers := self._subscribers.get(event_type, []):
             for handler in handlers:
                 result = handler(*args)
@@ -31,6 +33,8 @@ class EventBus:
                     create_task(result)
 
     def publish_sync(self, event_type: str, *args: Any) -> None:
+        if event_type != "log":  # Avoid infinite loop of logging log events
+            self.publish_sync("log", f"Event published: {event_type} with args: {args}")
         if handlers := self._subscribers.get(event_type, []):
             for handler in handlers:
                 result = handler(*args)

@@ -1,0 +1,55 @@
+{
+  "header_settings": {
+    "signals": [
+      {"name": "VTX", "db": -65},
+      {"name": "Microhard", "db": -72}
+    ],
+    "E-Stop": {
+      "active_color": "#ff0000",
+      "inactive_color": "#00ff00",
+      "topic": "estop_status"
+    }
+  },
+
+  "console": true,
+  "views": {
+    "Cameras": {
+      "type": "layout",
+      "diaposition": "grid",
+      "grid": {
+        "rows": 1,
+        "columns": 1,
+        "spacing": 8
+      },
+      "content": [
+          {
+            "type": "webcamera",
+            "name": "RTSP Camera",
+            "data": {
+                "device_path": "/dev/video0"
+            },
+            "grid": {
+            "row": 0,
+            "column": 0,
+            "row_span": 1,
+            "column_span": 1
+            }
+        }
+      ]
+    },
+    "logs": {
+      "type": "layout",
+      "diaposition": "vertical",
+      "content": [
+        {
+          "type": "console",
+          "name": "event_log",
+          "data": {
+            "source": "wss://{{robot-ip}}/event_log_feed"
+          }
+        }
+      ]
+    }
+  },
+  "controls": {}
+}
