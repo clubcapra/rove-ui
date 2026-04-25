@@ -47,11 +47,56 @@
             border-radius: 50%;
             border: 1px solid rgba(255, 255, 255, 0.7);
         }
+        #edit-panel {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 260px;
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(8, 12, 28, 0.82);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #f4f7ff;
+            font: 12px/1.4 "Segoe UI", sans-serif;
+            z-index: 20;
+            user-select: none;
+            pointer-events: auto;
+        }
+        #edit-panel.hidden {
+            display: none;
+        }
+        .edit-title {
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .edit-sub {
+            opacity: 0.85;
+            margin-bottom: 8px;
+        }
+        #save-pivot-btn {
+            appearance: none;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            padding: 6px 10px;
+            background: #1f8f6b;
+            color: #ffffff;
+            font: inherit;
+            cursor: pointer;
+        }
+        #save-pivot-btn:hover {
+            background: #25a37b;
+        }
     </style>
 </head>
 <body>
 <div id="canvas-container"></div>
 <div id="legend"></div>
+<div id="edit-panel" class="hidden">
+    <div class="edit-title">URDF Edit Mode</div>
+    <div class="edit-sub" id="edit-selected">Selected: none</div>
+    <div class="edit-sub">Controls: J/L (X), U/O (Y), I/K (Z), Shift for fine step</div>
+    <button id="save-pivot-btn" type="button">Save</button>
+</div>
 
 <script type="importmap">
 {
@@ -71,6 +116,9 @@
 
     const container = document.getElementById('canvas-container');
     const legendContainer = document.getElementById('legend');
+    const editPanel = document.getElementById('edit-panel');
+    const editSelected = document.getElementById('edit-selected');
+    const savePivotButton = document.getElementById('save-pivot-btn');
 
     // Scene
     const scene = new THREE.Scene();
@@ -87,6 +135,7 @@
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.domElement.tabIndex = 0;
     container.appendChild(renderer.domElement);
 
     // Controls
@@ -105,6 +154,26 @@
     const robotRoot = new THREE.Group();
     robotRoot.name = 'robot-root';
     scene.add(robotRoot);
+
+    const anchorMarker = new THREE.Group();
+    anchorMarker.visible = false;
+
+    const anchorSphere = new THREE.Mesh(
+        new THREE.SphereGeometry(0.035, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0xffcf33 })
+    );
+    anchorMarker.add(anchorSphere);
+
+    const anchorAxes = new THREE.AxesHelper(0.22);
+    anchorMarker.add(anchorAxes);
+    scene.add(anchorMarker);
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    const PIVOT_STORAGE_KEY = 'threejsViewer:pivot-offsets';
+    let selectedWrapper = null;
+    let editModeEnabled = false;
+    let pivotOffsets = {};
 
     const gltfLoader = new GLTFLoader();
     const objLoader = new OBJLoader();
@@ -183,7 +252,6 @@
         let rotation = transform.rotation ?? [0, 0, 0];
         const scale = transform.scale ?? [1, 1, 1];
 
-        // Convert rotation from degrees to radians if needed
         if (rotationUnit.toLowerCase() === 'degrees') {
             rotation = [
                 degreesToRadians(rotation[0] ?? 0),
@@ -211,6 +279,171 @@
         disposeObject(existing);
     }
 
+    function updateSelectedLabel() {
+        if (!editSelected) {
+            return;
+        }
+        editSelected.textContent = `Selected: ${selectedWrapper ? selectedWrapper.name : 'none'}`;
+    }
+
+    function setSelectedWrapper(wrapper) {
+        selectedWrapper = wrapper;
+        updateSelectedLabel();
+        updateAnchorMarker();
+    }
+
+    function updateAnchorMarker() {
+        if (!editModeEnabled || !selectedWrapper) {
+            anchorMarker.visible = false;
+            return;
+        }
+
+        selectedWrapper.updateMatrixWorld(true);
+        const worldPos = new THREE.Vector3();
+        selectedWrapper.getWorldPosition(worldPos);
+        anchorMarker.position.copy(worldPos);
+        anchorMarker.visible = true;
+    }
+
+    function toggleEditMode() {
+        editModeEnabled = !editModeEnabled;
+        if (!editModeEnabled) {
+            setSelectedWrapper(null);
+        }
+        if (editPanel) {
+            editPanel.classList.toggle('hidden', !editModeEnabled);
+        }
+        updateAnchorMarker();
+        console.info(`[urdf-edit] mode ${editModeEnabled ? 'on' : 'off'}`);
+    }
+
+    function getRootWrapper(object3d) {
+        let current = object3d;
+        while (current && current.parent) {
+            if (current.parent === robotRoot) {
+                return current;
+            }
+            current = current.parent;
+        }
+        return null;
+    }
+
+    function applyPivotDelta(wrapper, deltaX, deltaY, deltaZ) {
+        if (!wrapper || !wrapper.children || wrapper.children.length === 0) {
+            return;
+        }
+        const content = wrapper.children[0];
+        const worldBefore = new THREE.Vector3();
+        content.getWorldPosition(worldBefore);
+
+        content.position.sub(new THREE.Vector3(deltaX, deltaY, deltaZ));
+
+        const worldAfter = new THREE.Vector3();
+        content.getWorldPosition(worldAfter);
+        const compensation = worldBefore.sub(worldAfter);
+        wrapper.position.add(compensation);
+
+        const pivot = Array.isArray(wrapper.userData.pivotOffset)
+            ? wrapper.userData.pivotOffset
+            : [0, 0, 0];
+        pivot[0] = (Number(pivot[0]) || 0) + deltaX;
+        pivot[1] = (Number(pivot[1]) || 0) + deltaY;
+        pivot[2] = (Number(pivot[2]) || 0) + deltaZ;
+        wrapper.userData.pivotOffset = pivot;
+    }
+
+    function collectPivotOffsets() {
+        const offsets = {};
+        robotRoot.children.forEach((child) => {
+            if (!child?.name) {
+                return;
+            }
+            const pivot = Array.isArray(child.userData?.pivotOffset)
+                ? child.userData.pivotOffset
+                : [0, 0, 0];
+            offsets[child.name] = [
+                Number(pivot[0]) || 0,
+                Number(pivot[1]) || 0,
+                Number(pivot[2]) || 0,
+            ];
+        });
+        return offsets;
+    }
+
+    function round3(value) {
+        return Math.round((Number(value) || 0) * 1000) / 1000;
+    }
+
+    function getWrapperState(wrapper) {
+        const pivot = Array.isArray(wrapper.userData?.pivotOffset)
+            ? wrapper.userData.pivotOffset
+            : [0, 0, 0];
+
+        return {
+            name: wrapper.name,
+            position: [
+                round3(wrapper.position.x),
+                round3(wrapper.position.y),
+                round3(wrapper.position.z),
+            ],
+            rotation: [
+                round3(wrapper.rotation.x),
+                round3(wrapper.rotation.y),
+                round3(wrapper.rotation.z),
+            ],
+            pivot: [
+                round3(pivot[0]),
+                round3(pivot[1]),
+                round3(pivot[2]),
+            ],
+        };
+    }
+
+    function getSceneTransforms() {
+        return robotRoot.children
+            .filter((child) => !!child?.name)
+            .map((child) => getWrapperState(child));
+    }
+
+    function logWrapperState(reason, wrapper) {
+        if (!wrapper) {
+            console.info(`[urdf-edit] ${reason}: no selection`);
+            return;
+        }
+        console.info(`[urdf-edit] ${reason} ${JSON.stringify(getWrapperState(wrapper))}`);
+    }
+
+    function logSceneState(reason) {
+        console.info(`[urdf-edit] ${reason} ${JSON.stringify(getSceneTransforms())}`);
+    }
+
+    function savePivotOffsets() {
+        const offsets = collectPivotOffsets();
+        pivotOffsets = offsets;
+        try {
+            localStorage.setItem(PIVOT_STORAGE_KEY, JSON.stringify(offsets));
+            console.info('ThreejsViewer: pivot offsets saved', offsets);
+            return true;
+        } catch (error) {
+            console.error('ThreejsViewer: failed to save pivot offsets', error);
+            return false;
+        }
+    }
+
+    function loadPivotOffsets() {
+        try {
+            const raw = localStorage.getItem(PIVOT_STORAGE_KEY);
+            if (!raw) {
+                pivotOffsets = {};
+                return;
+            }
+            const parsed = JSON.parse(raw);
+            pivotOffsets = parsed && typeof parsed === 'object' ? parsed : {};
+        } catch {
+            pivotOffsets = {};
+        }
+    }
+
     function attachLoadedObject(name, content, options = {}) {
         removeObjectByName(name);
         restyleObject(content, options);
@@ -219,6 +452,36 @@
         wrapper.name = name;
         wrapper.add(content);
         normalizeObject(wrapper, content, options);
+
+        const configuredPivot = Array.isArray(options.pivotOffset) ? options.pivotOffset : null;
+        const persistedPivot = Array.isArray(pivotOffsets[name]) ? pivotOffsets[name] : null;
+        const pivotOffset = configuredPivot || persistedPivot;
+        if (pivotOffset) {
+            const worldBefore = new THREE.Vector3();
+            content.getWorldPosition(worldBefore);
+
+            content.position.sub(
+                new THREE.Vector3(
+                    Number(pivotOffset[0]) || 0,
+                    Number(pivotOffset[1]) || 0,
+                    Number(pivotOffset[2]) || 0
+                )
+            );
+
+            const worldAfter = new THREE.Vector3();
+            content.getWorldPosition(worldAfter);
+            const compensation = worldBefore.sub(worldAfter);
+            wrapper.position.add(compensation);
+
+            wrapper.userData.pivotOffset = [
+                Number(pivotOffset[0]) || 0,
+                Number(pivotOffset[1]) || 0,
+                Number(pivotOffset[2]) || 0,
+            ];
+        } else {
+            wrapper.userData.pivotOffset = [0, 0, 0];
+        }
+
         const rotationUnit = options.rotation_unit ?? 'degrees';
         applyTransform(wrapper, options, rotationUnit);
         robotRoot.add(wrapper);
@@ -294,6 +557,7 @@
 
         console.error(`Unsupported model format for ${name}: ${url}`);
     }
+
     // Grid helper
     const grid = new THREE.GridHelper(10, 10, 0x444466, 0x333355);
     scene.add(grid);
@@ -309,15 +573,76 @@
         renderer.setSize(container.clientWidth, container.clientHeight);
     });
 
+    renderer.domElement.addEventListener('pointerdown', (event) => {
+        renderer.domElement.focus();
+        if (!editModeEnabled) {
+            return;
+        }
+
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+
+        const intersects = raycaster.intersectObjects(robotRoot.children, true);
+        if (!intersects.length) {
+            setSelectedWrapper(null);
+            return;
+        }
+        const wrapper = getRootWrapper(intersects[0].object);
+        setSelectedWrapper(wrapper);
+        logWrapperState('select', wrapper);
+    });
+
+    window.addEventListener('keydown', (event) => {
+        if (event.key && event.key.toLowerCase() === 'e') {
+            toggleEditMode();
+            event.preventDefault();
+            return;
+        }
+
+        if (!editModeEnabled || !selectedWrapper) {
+            return;
+        }
+
+        const step = event.shiftKey ? 0.005 : 0.02;
+        const key = event.key ? event.key.toLowerCase() : '';
+        let handled = true;
+
+        if (key === 'j') {
+            applyPivotDelta(selectedWrapper, -step, 0, 0);
+        } else if (key === 'l') {
+            applyPivotDelta(selectedWrapper, step, 0, 0);
+        } else if (key === 'u') {
+            applyPivotDelta(selectedWrapper, 0, -step, 0);
+        } else if (key === 'o') {
+            applyPivotDelta(selectedWrapper, 0, step, 0);
+        } else if (key === 'i') {
+            applyPivotDelta(selectedWrapper, 0, 0, -step);
+        } else if (key === 'k') {
+            applyPivotDelta(selectedWrapper, 0, 0, step);
+        } else {
+            handled = false;
+        }
+
+        if (handled) {
+            logWrapperState('adjust', selectedWrapper);
+            event.preventDefault();
+        }
+    });
+
     // Animation loop
     function animate() {
         requestAnimationFrame(animate);
+        updateAnchorMarker();
         controls.update();
         renderer.render(scene, camera);
     }
     animate();
 
     // Expose API for Python calls via runJavaScript
+    loadPivotOffsets();
+
     window.clearScene = function() {
         [...robotRoot.children].forEach((child) => {
             robotRoot.remove(child);
@@ -358,6 +683,37 @@
     window.removeObject = function(name) {
         removeObjectByName(name);
     };
+
+    window.nudgeOrbit = function(dx, dy) {
+        const azimuth = Number(dx) || 0;
+        const polar = Number(dy) || 0;
+        if (azimuth !== 0) {
+            controls.rotateLeft(azimuth);
+        }
+        if (polar !== 0) {
+            controls.rotateUp(polar);
+        }
+        controls.update();
+    };
+
+    window.getPivotOffsets = function() {
+        return collectPivotOffsets();
+    };
+
+    window.getSceneTransforms = function() {
+        return getSceneTransforms();
+    };
+
+    window.savePivotOffsets = function() {
+        return savePivotOffsets();
+    };
+
+    if (savePivotButton) {
+        savePivotButton.addEventListener('click', () => {
+            savePivotOffsets();
+            logSceneState('save');
+        });
+    }
 
     window.loadGLTF = function(url) {
         loadModel('gltf-model', url, {});

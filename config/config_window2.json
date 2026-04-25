@@ -40,6 +40,9 @@
             "column": 0,
             "row_span": 1,
             "column_span": 1
+            },
+            "controls": {
+      
             }
         }
       ]
