@@ -175,6 +175,7 @@ class ROS2Client:
 
 	_TRANSFORMS: dict[str, str] = {
 		"dynamic_joint_states": "_transform_dynamic_joint_states",
+		"joy": "_transform_joy",
 	}
 
 	def _handle_message(self, topic_cfg: ROS2TopicConfig, msg: Any) -> None:
@@ -209,6 +210,32 @@ class ROS2Client:
 
 			for field_name, value in joint_snapshot.items():
 				self.event_bus.publish_sync(f"{joint_topic}.{field_name}", value)
+
+	def _transform_joy(self, topic_cfg: ROS2TopicConfig, payload: dict) -> None:
+		"""
+		Transform Joy message to individual input events.
+		Publishes each button and axis on separate event topics.
+		
+		Published topics:
+		- {prefix}.button.{index}: button state (0 or 1)
+		- {prefix}.axis.{index}: axis value (float, usually -1.0 to 1.0)
+		"""
+		prefix = self._event_topic(topic_cfg)
+		
+		# Publish full payload for components that need it
+		self.event_bus.publish_sync(prefix, payload)
+		
+		# Publish each button individually
+		buttons = payload.get("buttons", [])
+		for button_idx, button_value in enumerate(buttons):
+			button_topic = f"{prefix}.button.{button_idx}"
+			self.event_bus.publish_sync(button_topic, button_value)
+		
+		# Publish each axis individually
+		axes = payload.get("axes", [])
+		for axis_idx, axis_value in enumerate(axes):
+			axis_topic = f"{prefix}.axis.{axis_idx}"
+			self.event_bus.publish_sync(axis_topic, axis_value)
 
 	def _message_to_payload(self, msg: Any) -> Any:
 		if message_to_ordereddict is not None:
