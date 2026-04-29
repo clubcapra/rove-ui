@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 
 from PySide6.QtCore import QObject, Qt
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizePolicy, QVBoxLayout, QWidget
 from src.controller.event_bus import EventBus
 
 GST_AVAILABLE = False
@@ -84,7 +84,7 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
             return self.root_widget
 
         self.root_widget = QWidget()
-        self.root_widget.setMinimumSize(640, 360)
+        self.root_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         layout = QVBoxLayout(self.root_widget)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -114,7 +114,8 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
         self.video_widget = QWidget(self.root_widget)
         self.video_widget.setStyleSheet("background: black;")
         self.video_widget.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
-        layout.addWidget(self.video_widget)
+        self.video_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        layout.addWidget(self.video_widget, 1)
 
         if resolved_source_type is None or resolved_source is None:
             layout.addWidget(QLabel("RTSPView: configuration invalide (source manquante)."))

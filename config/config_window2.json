@@ -32,7 +32,11 @@
               "source_type": "rtsp"
             },
             "webcamera": {
-              "device_path": "/dev/video0"
+              "device_path": "/dev/video0",
+              "responsive": {
+                "aspect_ratio": "4:3",
+                "overflow_anchor": "center"
+              }
             }
             },
             "grid": {
@@ -53,10 +57,7 @@
       "content": [
         {
           "type": "console",
-          "name": "event_log",
-          "data": {
-            "source": "wss://{{robot-ip}}/event_log_feed"
-          }
+          "name": "event_log"
         }
       ]
     }

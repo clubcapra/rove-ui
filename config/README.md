@@ -35,7 +35,12 @@
     "type": "webcamera",
     "name": "webcamera",
     "data": {
-        "device_path": "/dev/video0"
+        "device_path": "/dev/video0",
+        "show_udp_button": false,
+        "responsive": {
+            "aspect_ratio": "4:3",
+            "overflow_anchor": "center"
+        }
     },
     "grid": {
     "row": 0,
