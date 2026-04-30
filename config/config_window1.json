@@ -210,7 +210,13 @@
               "deadzone": 0.08,
               "invert_x": false,
               "invert_y": true
-            }
+            },
+            "object_rotations": [
+              {"object": "Flipper FL", "axis": "z", "topic": "joints.flipper_fl_j.position"},
+              {"object": "Flipper RL", "axis": "z", "topic": "joints.flipper_rl_j.position"},
+              {"object": "Flipper FR", "axis": "z", "topic": "joints.flipper_fr_j.position"},
+              {"object": "Flipper RR", "axis": "z", "topic": "joints.flipper_rr_j.position"}
+            ]
           }
         },
         {

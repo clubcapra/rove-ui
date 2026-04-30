@@ -236,3 +236,17 @@
               # graphe line pour la vélocité des 4 odrives
               #URDF (modèle 3D)
           }
+## MAP LOCAL
+```JSON
+{
+  "type": "map",
+  "name": "Carte",
+  "data": {
+    "initial_lat": 45.5048,
+    "initial_lng": -73.5773,
+    "initial_zoom": 15,
+    "local": true,
+    "local_tile_url": "http://localhost:8080/tiles/{z}/{x}/{y}.png"
+  }
+}
+``

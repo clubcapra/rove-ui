@@ -135,7 +135,11 @@ class LayoutPanel:
             return console
         if vtype == "threejsviewer":
             from .components.threejsViewer import ThreejsViewer
-            viewer = ThreejsViewer(data, event_bus=self.event_bus)
+            viewer_config = dict(data)
+            controls = child_cfg.get("controls")
+            if controls is not None:
+                viewer_config["controls"] = controls
+            viewer = ThreejsViewer(viewer_config, event_bus=self.event_bus)
             viewer.build()
             self._register_child(name, viewer)
             return viewer
@@ -151,6 +155,13 @@ class LayoutPanel:
             chart = ChartWidget(data, event_bus=self.event_bus)
             self._register_child(name, chart)
             return chart
+
+        if vtype == "map":
+            from .components.map_widget import MapWidget
+            widget = MapWidget(data, event_bus=self.event_bus)
+            widget.build()
+            self._register_child(name, widget)
+            return widget
 
         if vtype == "bitmap":
             bitmap = BitmapPlaceholder(name, data)

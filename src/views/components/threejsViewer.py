@@ -3,7 +3,7 @@ import tempfile
 import json
 from pathlib import Path
 
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import QUrl, Signal, Slot
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -25,6 +25,8 @@ class ThreejsWebPage(QWebEnginePage):
 
 
 class ThreejsViewer(QWidget):
+    _js_queue: Signal = Signal(str)
+
     def __init__(self, config=None, event_bus: EventBus | None = None):
         super().__init__()
         self.setMinimumSize(400, 300)
@@ -38,6 +40,7 @@ class ThreejsViewer(QWidget):
         self._pending_scripts = []
         self._input_controls_registered = False
         self._save_bind_registered = False
+        self._js_queue.connect(self._exec_js)
 
     def _load_html_template(self) -> str:
         try:
@@ -65,7 +68,45 @@ class ThreejsViewer(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._view)
         self._register_input_controls()
+        self._register_rotation_bindings()
         self._register_save_handler()
+
+    def _register_rotation_bindings(self) -> None:
+        controls = self._config.get("controls", {})
+        if not isinstance(controls, dict):
+            return
+        bindings = controls.get("object_rotations", [])
+        if not isinstance(bindings, list) or not bindings:
+            return
+
+        def _to_float(value: object):
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        count = 0
+        for binding in bindings:
+            if not isinstance(binding, dict):
+                continue
+            obj_name = str(binding.get("object", "")).strip()
+            axis = str(binding.get("axis", "x")).strip().lower()
+            topic = str(binding.get("topic", "")).strip()
+            scale = float(binding.get("scale", 1.0))
+            if not obj_name or not topic or axis not in ("x", "y", "z"):
+                continue
+
+            def _on_value(value, name=obj_name, ax=axis, s=scale):
+                v = _to_float(value)
+                if v is None:
+                    return
+                self.run_js(f"window.setObjectRotationAxis({json.dumps(name)}, {json.dumps(ax)}, {v * s});")
+
+            self._event_bus.subscribe(topic, _on_value)
+            count += 1
+
+        if count:
+            self._event_bus.publish_sync("log", f"ThreejsViewer: {count} rotation binding(s) registered")
 
     def _register_save_handler(self) -> None:
         if self._save_bind_registered:
@@ -257,14 +298,19 @@ class ThreejsViewer(QWidget):
             return [value, value, value]
         return list(value)
 
-    def run_js(self, script):
-        """Execute arbitrary JavaScript in the viewer."""
+    @Slot(str)
+    def _exec_js(self, script: str) -> None:
+        if self._view:
+            self._view.page().runJavaScript(script)
+
+    def run_js(self, script: str) -> None:
+        """Thread-safe JS execution: marshals to the GUI thread via Signal."""
         if not self._view:
             return
         if not self._is_ready:
             self._pending_scripts.append(script)
             return
-        self._view.page().runJavaScript(script)
+        self._js_queue.emit(script)
 
     def clear_scene(self):
         self._event_bus.publish_sync("log", "ThreejsViewer: clear scene")

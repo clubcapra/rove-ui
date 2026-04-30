@@ -700,6 +700,17 @@
         return collectPivotOffsets();
     };
 
+    window.setObjectRotationAxis = function(name, axis, valueRad) {
+        const object3d = robotRoot.getObjectByName(name);
+        if (!object3d) { return false; }
+        const v = Number(valueRad) || 0;
+        if (axis === 'x') object3d.rotation.x = v;
+        else if (axis === 'y') object3d.rotation.y = v;
+        else if (axis === 'z') object3d.rotation.z = v;
+        else { console.warn('setObjectRotationAxis: unknown axis', axis); return false; }
+        return true;
+    };
+
     window.getSceneTransforms = function() {
         return getSceneTransforms();
     };

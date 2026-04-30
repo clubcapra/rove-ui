@@ -51,6 +51,34 @@
         }
       ]
     },
+    "Map": {
+      "type": "layout",
+      "diaposition": "grid",
+      "grid": {
+        "rows": 1,
+        "columns": 1,
+        "spacing": 8
+      },
+      "content": [
+          {
+          "type": "map",
+          "name": "Map",
+            "data": {
+              "topic": "/map",
+              "msg_type": "nav_msgs/msg/OccupancyGrid"
+            },
+            "grid": {
+            "row": 0,
+            "column": 0,
+            "row_span": 1,
+            "column_span": 1
+            },
+            "controls": {
+      
+            }
+        }
+      ]
+    },
     "logs": {
       "type": "layout",
       "diaposition": "vertical",
