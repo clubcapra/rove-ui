@@ -159,7 +159,12 @@ class InputManager:
                 f"{prefix}.button.{button_code}",
                 button_state,
             )
-            
+            #Logging for debugging
+            self.event_bus.publish_sync(
+                "log",
+                f"Button state changed: {button_code} = {button_state}"
+            )
+
             # Publish press/release events
             if button_state and not prev_state:
                 self.event_bus.publish_sync(f"{prefix}.pressed.{button_code}", True)
@@ -186,6 +191,10 @@ class InputManager:
             self.event_bus.publish_sync(
                 f"{prefix}.axis.{axis_code}",
                 normalized,
+            )
+            self.event_bus.publish_sync(
+                "log",
+                f"Axis value changed: {axis_code} = {normalized:.3f}"
             )
         
         # Process axes_as_buttons conversions
