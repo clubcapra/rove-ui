@@ -32,7 +32,11 @@
               "source_type": "rtsp"
             },
             "webcamera": {
-              "device_path": "/dev/video0"
+              "device_path": "/dev/video0",
+              "responsive": {
+                "aspect_ratio": "4:3",
+                "overflow_anchor": "center"
+              }
             }
             },
             "grid": {
@@ -40,6 +44,37 @@
             "column": 0,
             "row_span": 1,
             "column_span": 1
+            },
+            "controls": {
+      
+            }
+        }
+      ]
+    },
+    "Map": {
+      "type": "layout",
+      "diaposition": "grid",
+      "grid": {
+        "rows": 1,
+        "columns": 1,
+        "spacing": 8
+      },
+      "content": [
+          {
+          "type": "map",
+          "name": "Map",
+            "data": {
+              "topic": "/map",
+              "msg_type": "nav_msgs/msg/OccupancyGrid"
+            },
+            "grid": {
+            "row": 0,
+            "column": 0,
+            "row_span": 1,
+            "column_span": 1
+            },
+            "controls": {
+      
             }
         }
       ]
@@ -50,10 +85,7 @@
       "content": [
         {
           "type": "console",
-          "name": "event_log",
-          "data": {
-            "source": "wss://{{robot-ip}}/event_log_feed"
-          }
+          "name": "event_log"
         }
       ]
     }

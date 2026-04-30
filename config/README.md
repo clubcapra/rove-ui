@@ -35,7 +35,12 @@
     "type": "webcamera",
     "name": "webcamera",
     "data": {
-        "device_path": "/dev/video0"
+        "device_path": "/dev/video0",
+        "show_udp_button": false,
+        "responsive": {
+            "aspect_ratio": "4:3",
+            "overflow_anchor": "center"
+        }
     },
     "grid": {
     "row": 0,
@@ -231,3 +236,17 @@
               # graphe line pour la vélocité des 4 odrives
               #URDF (modèle 3D)
           }
+## MAP LOCAL
+```JSON
+{
+  "type": "map",
+  "name": "Carte",
+  "data": {
+    "initial_lat": 45.5048,
+    "initial_lng": -73.5773,
+    "initial_zoom": 15,
+    "local": true,
+    "local_tile_url": "http://localhost:8080/tiles/{z}/{x}/{y}.png"
+  }
+}
+``

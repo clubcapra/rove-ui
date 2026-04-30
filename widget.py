@@ -160,7 +160,15 @@ if __name__ == "__main__":
     window = Widget()
     window.buildInterface("./config/config_window1.json")
     window.showMaximized()
+    # FORCER le bakcground en BLANC
+    window.setStyleSheet("background-color: white;color: black;")
+    screens = app.screens()
+    primary_screen = app.primaryScreen()
 
+    # Mettre window sur l'écran principal
+    window.move(primary_screen.geometry().topLeft())
+    # Chercher un écran secondaire
+    secondary_screens = [s for s in screens if s != primary_screen]
     # Si il  y a un config window 2 existe, on affiche un autre window pour le second écran
     # (ex: config_window2.json)
     if os.path.exists("./config/config_window2.json"):
@@ -169,10 +177,12 @@ if __name__ == "__main__":
         screens = app.screens()
         #Si il y a un autre écran, 
         if len(screens) > 1:
-            window2.move(screens[1].geometry().topLeft())
+            second_screen = secondary_screens[0]
+            window2.move(second_screen.geometry().topLeft())
             asyncio.run(window.event_bus.publish("log", "Window : Application has started on the second screen."))
 
         window2.showMaximized()
+        window2.setStyleSheet("background-color: white;color: black;")
 
         
     try:

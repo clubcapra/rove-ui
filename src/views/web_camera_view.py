@@ -34,9 +34,8 @@ class WebCameraView:
     - sink: str  GStreamer sink element (default: ximagesink)
     - autoplay: bool (default True)
         - responsive: dict
-                - min_width: int  minimum rendered video width before clipping starts
-                - freeze_below_min_width: bool  keep video width at min_width when the
-                    layout gets smaller, clipping the overflow instead of shrinking more
+                - aspect_ratio: str|float  video ratio used for width auto sizing
+                    examples: "4:3", "16:9", 1.3333 (default: "4:3")
                 - overflow_anchor: str  one of left, center, right
     """
 
@@ -81,18 +80,18 @@ class WebCameraView:
 
         responsive_cfg = self.config.get("responsive", {})
         self._viewport = _ResponsiveVideoViewport(responsive_cfg, self._widget)
-        layout.addWidget(self._viewport)
+        layout.addWidget(self._viewport, 1)
 
-        self._video_widget = QWidget(self._viewport)
+        self._video_widget = _VideoSurfaceWidget(self._on_video_surface_resized, self._viewport)
         self._video_widget.setStyleSheet("background: black;")
         self._video_widget.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
         self._viewport.set_video_widget(self._video_widget)
 
-
-        btn = QPushButton("Send '2' UDP")
-        btn.setFixedHeight(32)
-        btn.clicked.connect(self._send_udp_command)
-        layout.addWidget(btn)
+        if bool(self.config.get("show_udp_button", False)):
+            btn = QPushButton("Send '2' UDP")
+            btn.setFixedHeight(32)
+            btn.clicked.connect(self._send_udp_command)
+            layout.addWidget(btn)
 
         if not self._rebuild_pipeline(device):
             layout.addWidget(QLabel("Erreur: impossible de créer le pipeline webcam"))
@@ -200,17 +199,50 @@ class WebCameraView:
             self._teardown_pipeline()
             return False
 
-        if self._video_widget is not None:
-            win_id = int(self._video_widget.winId())
-            if hasattr(sink, "set_window_handle"):
-                sink.set_window_handle(win_id)
-            else:
-                GstVideo.VideoOverlay.set_window_handle(sink, win_id)  # type: ignore[misc]
+        self._sync_video_overlay(sink)
 
         self._bus = self._pipeline.get_bus()
         self._bus.add_signal_watch()
         self._bus.connect("message", self._on_bus_message)
         return True
+
+    def _on_video_surface_resized(self) -> None:
+        if self._pipeline is None:
+            return
+        sink = self._pipeline.get_by_name("video_sink")
+        if sink is None:
+            return
+        self._sync_video_overlay(sink)
+
+    def _sync_video_overlay(self, sink) -> None:
+        if self._video_widget is None:
+            return
+
+        win_id = int(self._video_widget.winId())
+        if hasattr(sink, "set_window_handle"):
+            sink.set_window_handle(win_id)
+        else:
+            GstVideo.VideoOverlay.set_window_handle(sink, win_id)  # type: ignore[misc]
+
+        width = max(1, self._video_widget.width())
+        height = max(1, self._video_widget.height())
+
+        if hasattr(sink, "set_render_rectangle"):
+            try:
+                sink.set_render_rectangle(0, 0, width, height)
+            except Exception:
+                pass
+        else:
+            try:
+                GstVideo.VideoOverlay.set_render_rectangle(sink, 0, 0, width, height)  # type: ignore[misc]
+            except Exception:
+                pass
+
+        if hasattr(sink, "expose"):
+            try:
+                sink.expose()
+            except Exception:
+                pass
 
     def get_widget(self) -> QWidget:
         if self._widget is None:
@@ -224,8 +256,7 @@ class _ResponsiveVideoViewport(QWidget):
         config = config or {}
 
         self._video_widget: QWidget | None = None
-        self._min_width = max(1, int(config.get("min_width", 480)))
-        self._freeze_below_min_width = bool(config.get("freeze_below_min_width", True))
+        self._aspect_ratio = self._parse_aspect_ratio(config.get("aspect_ratio", "4:3"))
         self._overflow_anchor = str(config.get("overflow_anchor", "center")).strip().lower()
 
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -248,10 +279,8 @@ class _ResponsiveVideoViewport(QWidget):
         viewport_width = max(0, self.width())
         viewport_height = max(0, self.height())
 
-        if self._freeze_below_min_width and viewport_width < self._min_width:
-            video_width = self._min_width
-        else:
-            video_width = viewport_width
+        # Height-driven sizing: height follows viewport, width is derived from ratio.
+        video_width = max(1, int(round(viewport_height * self._aspect_ratio)))
 
         x = self._compute_offset(viewport_width, video_width)
         self._video_widget.setGeometry(x, 0, video_width, viewport_height)
@@ -262,3 +291,41 @@ class _ResponsiveVideoViewport(QWidget):
         if self._overflow_anchor == "right":
             return viewport_width - video_width
         return (viewport_width - video_width) // 2
+
+    @staticmethod
+    def _parse_aspect_ratio(value) -> float:
+        if isinstance(value, (int, float)):
+            ratio = float(value)
+            return ratio if ratio > 0 else (4.0 / 3.0)
+
+        if isinstance(value, str):
+            text = value.strip()
+            if ":" in text:
+                left, right = text.split(":", 1)
+                try:
+                    w = float(left)
+                    h = float(right)
+                    if w > 0 and h > 0:
+                        return w / h
+                except Exception:
+                    pass
+            else:
+                try:
+                    ratio = float(text)
+                    if ratio > 0:
+                        return ratio
+                except Exception:
+                    pass
+
+        return 4.0 / 3.0
+
+
+class _VideoSurfaceWidget(QWidget):
+    def __init__(self, on_resize, parent: QWidget | None = None):
+        super().__init__(parent)
+        self._on_resize = on_resize
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if callable(self._on_resize):
+            self._on_resize()

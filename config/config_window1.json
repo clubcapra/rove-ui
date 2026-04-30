@@ -38,6 +38,13 @@
           "qos_depth": 10,
           "event_topic": "joints",
           "transform": "dynamic_joint_states"
+        },
+        {
+          "name": "/joy",
+          "msg_type": "sensor_msgs/msg/Joy",
+          "qos_depth": 10,
+          "event_topic": "input",
+          "transform": "joy"
         }
       ]
     }
@@ -129,21 +136,22 @@
             "object_sources": [
                 {
                     "name": "RoveCore",
-                    "source": "media/RoveCore.obj",
-                    "position": [0, 0.15, 0],
+                    "source": "media/rove_base.obj",
+                    "position": [0, 0, 0],
                     "rotation": [0, 0, 0],
                     "rotation_unit": "degrees",
-                    "scale": [0.3, 0.3, 0.3],
+                    "scale": [3, 3, 3],
                     "center": true,
                     "base_on_ground": true,
                     "color": "#e2d4d4"
                 },
                 {
                     "name": "Flipper FL",
-                    "source": "media/RoveFlipper.obj",
-                    "position": [-1.0, 0, 0.6],
-                    "rotation": [0, 90, 0],
-                    "scale": [0.3, 0.6, 0.6],
+                    "source": "media/rove_flipper.obj",
+                  "position": [-0.52, 0.3, 0.6],
+                  "pivot_offset": [0.16, 0.1, 0.0],
+                    "rotation": [0, 0, 0],
+                    "scale": [3, 3, 3],
                     "rotation_unit": "degrees",
                     "center": true,
                     "base_on_ground": true,
@@ -151,33 +159,36 @@
                 },
                 {
                     "name": "Flipper RL",
-                    "source": "media/RoveFlipper.obj",
-                    "position": [1.0, 0, 0.6],
-                    "rotation": [0, -90, 0],
+                    "source": "media/rove_flipper.obj",
+                  "position": [0.52, 0.2, 0.66],
+                  "pivot_offset": [0.16, 0.1, 0.02],
+                    "rotation": [0, 0, 180],
                     "rotation_unit": "degrees",
-                    "scale": [0.3, 0.6, 0.6],
+                    "scale": [3, 3, 3],
                     "center": true,
                     "base_on_ground": true,
                     "color": "#6b6bc4"
                 },
                 {
                     "name": "Flipper FR",
-                    "source": "media/RoveFlipper.obj",
-                    "position": [-1.0, 0, -0.6],
-                    "rotation": [0, 90, 0],
+                    "source": "media/rove_flipper.obj",
+                  "position": [-0.58, 0.24, -0.66],
+                  "pivot_offset": [0.14, 0.08, -0.02],
+                    "rotation": [0, 0, 0],
                     "rotation_unit": "degrees",
-                    "scale": [0.3, 0.6, 0.6],
+                    "scale": [3, 3, 3],
                     "center": true,
                     "base_on_ground": true,
                     "color": "#d56868"
                 },
                 {
                     "name": "Flipper RR",
-                    "source": "media/RoveFlipper.obj",
-                    "position": [1.0, 0, -0.6],
-                    "rotation": [0, -90, 0],
+                    "source": "media/rove_flipper.obj",
+                  "position": [0.52, 0.26, -0.72],
+                  "pivot_offset": [0.16, 0.08, -0.04],
+                    "rotation": [0, 0, 180],
                     "rotation_unit": "degrees",
-                    "scale": [0.3, 0.6, 0.6],
+                    "scale": [3, 3, 3],
                     "center": true,
                     "base_on_ground": true,
                     "color": "#e1e17c"
@@ -189,6 +200,23 @@
             "column": 0,
             "row_span": 1,
             "column_span": 1
+          },
+          "controls": {
+            "input": {
+              "enabled": true,
+              "yaw_topic": "input.axis.10",
+              "pitch_topic": "input.axis.11",
+              "sensitivity": 0.04,
+              "deadzone": 0.08,
+              "invert_x": false,
+              "invert_y": true
+            },
+            "object_rotations": [
+              {"object": "Flipper FL", "axis": "z", "topic": "joints.flipper_fl_j.position"},
+              {"object": "Flipper RL", "axis": "z", "topic": "joints.flipper_rl_j.position"},
+              {"object": "Flipper FR", "axis": "z", "topic": "joints.flipper_fr_j.position"},
+              {"object": "Flipper RR", "axis": "z", "topic": "joints.flipper_rr_j.position"}
+            ]
           }
         },
         {
@@ -202,6 +230,9 @@
             "column": 1,
             "row_span": 2,
             "column_span": 1
+          },
+          "controls": {
+    
           }
         }
       ]
@@ -219,6 +250,6 @@
         }
       ]
     }
-  },
-  "controls": {}
+  }
+
 }

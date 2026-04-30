@@ -1,56 +1,113 @@
-
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>Carte avec tracé</title>
+    <title>Map</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    />
-    <script
-        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
-    </script>
-
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         html, body, #map {
             height: 100%;
             margin: 0;
             padding: 0;
+            background: #0f172a;
+        }
+        .poi-popup img {
+            max-width: 200px;
+            max-height: 150px;
+            display: block;
+            margin-top: 6px;
+            border-radius: 4px;
+        }
+        .robot-icon {
+            background: #3b82f6;
+            border: 2px solid #fff;
+            border-radius: 50%;
         }
     </style>
 </head>
 <body>
 <div id="map"></div>
-
 <script>
-    const map = L.map('map').setView([48.8566, 2.3522], 13);
+    const map = L.map('map', { zoomControl: false }).setView([45.5048, -73.5773], 15);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    let currentTileLayer = L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        { maxZoom: 19, attribution: '© Esri' }
+    ).addTo(map);
 
-    const positions = [
-        [48.8566, 2.3522],
-        [48.8572, 2.3540],
-        [48.8580, 2.3560],
-        [48.8590, 2.3585]
-    ];
+    window.mapSetTileLayer = function(url, opts) {
+        if (currentTileLayer) { map.removeLayer(currentTileLayer); }
+        currentTileLayer = L.tileLayer(url, opts || { maxZoom: 19 }).addTo(map);
+    };
 
-    // Marqueurs
-    positions.forEach((pos, index) => {
-        L.marker(pos).addTo(map).bindPopup("Point " + (index + 1));
+    const robotIcon = L.divIcon({
+        className: 'robot-icon',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
     });
+    const robotMarker = L.marker([45.5048, -73.5773], { icon: robotIcon });
+    let robotVisible = false;
 
-    // Tracé
-    const line = L.polyline(positions, {
-        weight: 4
-    }).addTo(map);
+    const pois = {};
+    let poiCounter = 0;
 
-    map.fitBounds(line.getBounds(), { padding: [20, 20] });
+    const PAN_PX = 100;
+
+    // --- Navigation ---
+    window.mapPanLeft  = function() { map.panBy([-PAN_PX, 0]); };
+    window.mapPanRight = function() { map.panBy([ PAN_PX, 0]); };
+    window.mapPanUp    = function() { map.panBy([0, -PAN_PX]); };
+    window.mapPanDown  = function() { map.panBy([0,  PAN_PX]); };
+    window.mapZoomIn   = function() { map.zoomIn(); };
+    window.mapZoomOut  = function() { map.zoomOut(); };
+
+    // --- View ---
+    window.mapSetView = function(lat, lng, zoom) {
+        map.setView([lat, lng], zoom !== undefined ? zoom : map.getZoom());
+    };
+
+    // --- Robot position ---
+    window.mapSetRobotPosition = function(lat, lng) {
+        robotMarker.setLatLng([lat, lng]);
+        if (!robotVisible) {
+            robotMarker.addTo(map);
+            robotVisible = true;
+        }
+    };
+
+    // --- POI ---
+    window.mapAddPOI = function(lat, lng, label) {
+        const id = 'poi_' + (++poiCounter);
+        const marker = L.marker([lat, lng]).addTo(map);
+        const safeLabel = label || id;
+        marker.bindPopup('<div class="poi-popup"><b>' + safeLabel + '</b><div id="photo_' + id + '"></div></div>');
+        pois[id] = { marker: marker, label: safeLabel, photo: null };
+        return id;
+    };
+
+    window.mapRemovePOI = function(id) {
+        if (!pois[id]) return;
+        map.removeLayer(pois[id].marker);
+        delete pois[id];
+    };
+
+    window.mapAttachPhoto = function(id, dataUrl) {
+        const poi = pois[id];
+        if (!poi) return false;
+        poi.photo = dataUrl;
+        const img = dataUrl ? '<img src="' + dataUrl + '" />' : '';
+        poi.marker.setPopupContent('<div class="poi-popup"><b>' + poi.label + '</b>' + img + '</div>');
+        return true;
+    };
+
+    window.mapGetPOIs = function() {
+        return Object.keys(pois).map(function(id) {
+            const ll = pois[id].marker.getLatLng();
+            return { id: id, lat: ll.lat, lng: ll.lng, label: pois[id].label, hasPhoto: !!pois[id].photo };
+        });
+    };
 </script>
 </body>
 </html>
