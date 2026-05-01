@@ -24,7 +24,7 @@ Makefile
 *.cmake
 !CMakeLists.txt
 compile_commands.json
-
+*.pdf
 # C++
 *.o
 *.so

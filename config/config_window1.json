@@ -14,22 +14,38 @@
     {
       "type": "odrive_http",
       "name": "odrive_telemetry",
-      "source": "http://192.168.168.37:8080",
-      "base_url": "http://192.168.168.37:8080",
+      "source": "http://localhost:8080",
+      "base_url": "http://localhost:8080",
       "topic": "telemetry.odrive",
       "topic_prefix": "odrive",
       "poll_interval_ms": 250,
       "max_data_age_ms": 2000,
       "publish_node_data": true,
       "publish_field_topics": true,
-      "enabled": false
+      "enabled": true
+    },
+    {
+      "type": "json_http",
+      "name": "track_joints",
+      "source": "http://localhost:8080/track_joints",
+      "topic_prefix": "joints",
+      "poll_interval_ms": 50,
+      "enabled": true
+    },
+    {
+      "type": "json_http",
+      "name": "flipper_joints",
+      "source": "http://localhost:8080/flipper_joints",
+      "topic_prefix": "joints",
+      "poll_interval_ms": 50,
+      "enabled": true
     }
   ],
   "ros2_clients": [
     {
       "name": "joint_states_bridge",
       "node_name": "capraui_ros2_bridge",
-      "enabled": true,
+      "enabled": false,
       "event_prefix": "ros2",
       "topics": [
         {

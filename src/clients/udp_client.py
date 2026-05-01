@@ -85,6 +85,15 @@ class UDPClient:
 			)
 			return
 
+		if self.config.client_type == "json_http":
+			self._thread = Thread(target=self._poll_flat_loop, name=self.config.name, daemon=True)
+			self._thread.start()
+			self.event_bus.publish_sync(
+				"log",
+				f"HTTP client '{self.config.name}' polling {self.config.source} -> prefix '{self.config.topic_prefix}'",
+			)
+			return
+
 		host, port = self._parse_source(self.config.source)
 		self._socket = socket(AF_INET, SOCK_DGRAM)
 		self._socket.bind((host, port))
@@ -131,6 +140,39 @@ class UDPClient:
 				"log",
 				f"UDP '{self.config.name}' received packet from {address[0]}:{address[1]} on topic '{self.config.topic}'",
 			)
+
+	def _poll_flat_loop(self) -> None:
+		"""Poll a single JSON endpoint that returns {outer_key: {field: value}}.
+
+		Publishes each leaf value as '{topic_prefix}.{outer_key}.{field}'.
+		Used for /track_joints and /flipper_joints on the mock server.
+		"""
+		poll_interval_s = self.config.poll_interval_ms / 1000
+		url = self.config.source
+		prefix = self.config.topic_prefix or "joints"
+
+		while not self._stop_event.is_set():
+			try:
+				data = self._http_get_json(url)
+			except Exception as exc:
+				self.event_bus.publish_sync(
+					"log",
+					f"HTTP client '{self.config.name}' fetch failed: {exc}",
+				)
+				time.sleep(poll_interval_s)
+				continue
+
+			if not isinstance(data, dict):
+				time.sleep(poll_interval_s)
+				continue
+
+			for outer_key, fields in data.items():
+				if not isinstance(fields, dict):
+					continue
+				for field_name, value in fields.items():
+					self.event_bus.publish_sync(f"{prefix}.{outer_key}.{field_name}", value)
+
+			time.sleep(poll_interval_s)
 
 	def _poll_loop(self) -> None:
 		poll_interval_s = self.config.poll_interval_ms / 1000

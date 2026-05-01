@@ -1,0 +1,8 @@
+services:
+  mock-server:
+    build: .
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    # Expose on all interfaces so the Qt app can reach it at http://localhost:8080
+    # or at the host LAN IP when running on a separate machine.
