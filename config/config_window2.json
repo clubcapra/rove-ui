@@ -1,9 +1,10 @@
 {
   "header_settings": {
     "signals": [
-      {"name": "VTX", "db": -65},
-      {"name": "Microhard", "db": -72}
+      {"name": "VTX",       "db": -65, "topic": "signals.VTX.db"},
+      {"name": "Microhard", "db": -72, "topic": "signals.Microhard.db"}
     ],
+    "battery_topic": "battery.percentage",
     "E-Stop": {
       "active_color": "#ff0000",
       "inactive_color": "#00ff00",
@@ -11,6 +12,34 @@
     }
   },
 
+  "udp_clients": [
+    {
+      "type": "json_http_flat",
+      "name": "mock_gnss",
+      "source": "http://localhost:8080/gnss",
+      "topic_prefix": "gnss",
+      "poll_interval_ms": 500,
+      "enabled": true
+    },
+    {
+      "type": "json_http_flat",
+      "name": "mock_battery",
+      "source": "http://localhost:8080/battery",
+      "topic_prefix": "battery",
+      "poll_interval_ms": 2000,
+      "enabled": true
+    },
+    {
+      "type": "json_http_named_list",
+      "name": "mock_signals",
+      "source": "http://localhost:8080/signals",
+      "topic_prefix": "signals",
+      "list_key": "signals",
+      "name_key": "name",
+      "poll_interval_ms": 1000,
+      "enabled": true
+    }
+  ],
   "console": true,
   "views": {
     "Cameras": {
@@ -61,22 +90,22 @@
       },
       "content": [
           {
-          "type": "map",
-          "name": "Map",
+            "type": "map",
+            "name": "Carte",
             "data": {
-              "topic": "/map",
-              "msg_type": "nav_msgs/msg/OccupancyGrid"
+              "initial_lat": 45.5017,
+              "initial_lng": -73.5673,
+              "initial_zoom": 17,
+              "robot_position_lat_topic": "gnss.latitude",
+              "robot_position_lng_topic": "gnss.longitude"
             },
             "grid": {
-            "row": 0,
-            "column": 0,
-            "row_span": 1,
-            "column_span": 1
-            },
-            "controls": {
-      
+              "row": 0,
+              "column": 0,
+              "row_span": 1,
+              "column_span": 1
             }
-        }
+          }
       ]
     },
     "logs": {

@@ -12,7 +12,7 @@ from PySide6.QtCharts import (
     QPieSeries,
     QValueAxis,
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 
 from src.controller.event_bus import EventBus
 
@@ -41,9 +41,16 @@ class ChartWidget(QWidget):
         self._line_buffer = deque(maxlen=self._buffer_size)
         self._topic_rows = {}
         self._rows = []
+        self._dirty = False
 
         self.chart.setTitle(self._title)
-        self.view.setRenderHint(self.view.renderHints())
+        self.chart.setAnimationOptions(QChart.AnimationOption.NoAnimation)
+
+        self._render_timer = QTimer(self)
+        self._render_timer.setInterval(100)  # 10 fps max
+        self._render_timer.timeout.connect(self._flush_if_dirty)
+        self._render_timer.start()
+
         self.topic_value_received.connect(self._apply_topic_update)
         self._load_from_config()
 
@@ -114,6 +121,22 @@ class ChartWidget(QWidget):
 
         self._rebuild_chart()
 
+    def _flush_if_dirty(self):
+        if not self._dirty:
+            return
+        self._dirty = False
+        if self._chart_type == "lines":
+            sample = {
+                str(row.get(self._label_key, "")): float(row.get(self._value_key, 0))
+                for row in self._rows
+                if row.get(self._label_key)
+            }
+            if sample:
+                self._line_buffer.append(sample)
+        else:
+            self._data = [float(row.get(self._value_key, 0)) for row in self._rows]
+        self._rebuild_chart()
+
     def _apply_topic_update(self, topic, value):
         row_index = self._topic_rows.get(topic)
         if row_index is None:
@@ -124,12 +147,7 @@ class ChartWidget(QWidget):
             return
 
         self._rows[row_index][self._value_key] = numeric_value
-
-        if self._chart_type == "lines":
-            self.update(list(self._rows))
-            return
-
-        self.set_data([float(row.get(self._value_key, 0)) for row in self._rows])
+        self._dirty = True
 
     def _to_float(self, value):
         try:
@@ -286,7 +304,6 @@ class ChartWidget(QWidget):
 
         if self._chart_type == "lines":
             self._build_line_chart()
-            self.chart.setAnimationOptions(QChart.AnimationOption.SeriesAnimations)
             return
 
         if self._chart_type == "pie":
@@ -323,4 +340,3 @@ class ChartWidget(QWidget):
 
         series.attachAxis(category_axis)
         series.attachAxis(value_axis)
-        self.chart.setAnimationOptions(QChart.AnimationOption.SeriesAnimations)

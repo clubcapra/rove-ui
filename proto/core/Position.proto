@@ -1,0 +1,8 @@
+syntax = "proto3";
+package telemetry;
+
+message Position {
+    double lat = 1;
+    double lon = 2;
+    float alt = 3;
+}

@@ -64,6 +64,7 @@ class UDPClient:
 			publish_field_topics=bool(config.get("publish_field_topics", True)),
 		)
 		self.event_bus = event_bus or EventBus()
+		self._raw_config = config
 		self._socket: socket | None = None
 		self._stop_event = Event()
 		self._thread: Thread | None = None
@@ -91,6 +92,33 @@ class UDPClient:
 			self.event_bus.publish_sync(
 				"log",
 				f"HTTP client '{self.config.name}' polling {self.config.source} -> prefix '{self.config.topic_prefix}'",
+			)
+			return
+
+		if self.config.client_type == "json_http_flat":
+			self._thread = Thread(target=self._poll_flat_simple_loop, name=self.config.name, daemon=True)
+			self._thread.start()
+			self.event_bus.publish_sync(
+				"log",
+				f"HTTP flat client '{self.config.name}' polling {self.config.source} -> prefix '{self.config.topic_prefix}'",
+			)
+			return
+
+		if self.config.client_type == "udp_poll":
+			self._thread = Thread(target=self._poll_udp_loop, name=self.config.name, daemon=True)
+			self._thread.start()
+			self.event_bus.publish_sync(
+				"log",
+				f"UDP poll client '{self.config.name}' -> {self.config.source} (mirror port)",
+			)
+			return
+
+		if self.config.client_type == "json_http_named_list":
+			self._thread = Thread(target=self._poll_named_list_loop, name=self.config.name, daemon=True)
+			self._thread.start()
+			self.event_bus.publish_sync(
+				"log",
+				f"HTTP named-list client '{self.config.name}' polling {self.config.source} -> prefix '{self.config.topic_prefix}'",
 			)
 			return
 
@@ -171,6 +199,196 @@ class UDPClient:
 					continue
 				for field_name, value in fields.items():
 					self.event_bus.publish_sync(f"{prefix}.{outer_key}.{field_name}", value)
+
+			time.sleep(poll_interval_s)
+
+	def _poll_udp_loop(self) -> None:
+		"""Request-response UDP with dynamic port discovery.
+
+		Protocol:
+		  1. GET {base_url}/{discovery_endpoint} → extract UDP port from JSON
+		  2. Bind locally to that port (mirror port = same number as remote)
+		  3. Send b'\\x01' to remote_host:discovered_port
+		  4. Receive response and publish to EventBus
+		  5. Re-discover on startup and after any failure
+
+		Config keys (in addition to standard ones):
+		  base_url               HTTP base URL of the robot API
+		  discovery_endpoint     path to call for port discovery (default "/discovery")
+		  discovery_port_field   JSON field containing the UDP port   (default "port")
+		  rediscovery_interval_s re-discover even if healthy, seconds (default 30)
+		  parse_json             decode UDP response as JSON           (default false)
+		  publish_field_topics   publish {prefix}.{field} per scalar  (default true)
+		"""
+		base_url = (self.config.base_url or self.config.source).rstrip("/")
+		remote_host = urlparse(base_url).hostname or "127.0.0.1"
+		discovery_path = self.config.discovery_endpoint.lstrip("/")
+		discovery_url = f"{base_url}/{discovery_path}"
+		port_field = str(self._raw_config.get("discovery_port_field", "port"))
+		rediscovery_interval_s = float(self._raw_config.get("rediscovery_interval_s", 30))
+		poll_interval_s = self.config.poll_interval_ms / 1000
+
+		current_port: int | None = None
+		sock: socket | None = None
+		last_discovery_t: float = 0.0
+
+		def _discover() -> int | None:
+			try:
+				data = self._http_get_json(discovery_url)
+				return int(data[port_field])
+			except Exception as exc:
+				self.event_bus.publish_sync(
+					"log", f"UDP poll '{self.config.name}' discovery failed: {exc}"
+				)
+				return None
+
+		def _bind(port: int) -> socket | None:
+			s = socket(AF_INET, SOCK_DGRAM)
+			try:
+				s.bind(("0.0.0.0", port))
+				s.settimeout(poll_interval_s)
+				self.event_bus.publish_sync(
+					"log",
+					f"UDP poll '{self.config.name}' bound :{port} -> {remote_host}:{port}",
+				)
+				return s
+			except OSError as exc:
+				self.event_bus.publish_sync(
+					"log", f"UDP poll '{self.config.name}' bind :{port} failed: {exc}"
+				)
+				s.close()
+				return None
+
+		while not self._stop_event.is_set():
+			now = time.monotonic()
+			need_rediscovery = (
+				current_port is None
+				or sock is None
+				or (now - last_discovery_t) >= rediscovery_interval_s
+			)
+
+			if need_rediscovery:
+				new_port = _discover()
+				if new_port is None:
+					time.sleep(poll_interval_s)
+					continue
+
+				if new_port != current_port or sock is None:
+					if sock:
+						sock.close()
+					sock = _bind(new_port)
+					if sock is None:
+						current_port = None
+						time.sleep(poll_interval_s)
+						continue
+					current_port = new_port
+
+				last_discovery_t = now
+
+			try:
+				sock.sendto(b"\x01", (remote_host, current_port))
+			except OSError as exc:
+				self.event_bus.publish_sync(
+					"log", f"UDP poll '{self.config.name}' send failed: {exc}"
+				)
+				current_port = None
+				time.sleep(poll_interval_s)
+				continue
+
+			try:
+				raw, _addr = sock.recvfrom(self.config.buffer_size)
+			except timeout:
+				time.sleep(poll_interval_s)
+				continue
+			except OSError:
+				current_port = None
+				time.sleep(poll_interval_s)
+				continue
+
+			message = self._decode_payload(raw)
+			self.event_bus.publish_sync(self.config.topic, message)
+
+			if self.config.publish_field_topics and isinstance(message, dict):
+				prefix = self.config.topic_prefix
+				for field, value in message.items():
+					if isinstance(value, (int, float, str, bool)):
+						self.event_bus.publish_sync(
+							f"{prefix}.{field}" if prefix else field, value
+						)
+
+			time.sleep(poll_interval_s)
+
+		if sock:
+			sock.close()
+
+	def _poll_named_list_loop(self) -> None:
+		"""Poll an endpoint returning {list_key: [{name_key: X, field: v, ...}]}.
+
+		Publishes {prefix}.{X}.{field} for every scalar field in each item.
+		Used for /signals on the mock server.
+		"""
+		poll_interval_s = self.config.poll_interval_ms / 1000
+		url = self.config.source
+		prefix = self.config.topic_prefix
+		raw = self._raw_config
+		list_key = str(raw.get("list_key", "items"))
+		name_key = str(raw.get("name_key", "name"))
+
+		while not self._stop_event.is_set():
+			try:
+				data = self._http_get_json(url)
+			except Exception as exc:
+				self.event_bus.publish_sync(
+					"log",
+					f"HTTP named-list client '{self.config.name}' fetch failed: {exc}",
+				)
+				time.sleep(poll_interval_s)
+				continue
+
+			items = data.get(list_key, []) if isinstance(data, dict) else []
+			for item in items:
+				if not isinstance(item, dict):
+					continue
+				item_name = str(item.get(name_key, "")).strip()
+				if not item_name:
+					continue
+				for field, value in item.items():
+					if field == name_key:
+						continue
+					if isinstance(value, (int, float, str, bool)):
+						topic = f"{prefix}.{item_name}.{field}" if prefix else f"{item_name}.{field}"
+						self.event_bus.publish_sync(topic, value)
+
+			time.sleep(poll_interval_s)
+
+	def _poll_flat_simple_loop(self) -> None:
+		"""Poll a flat JSON endpoint {field: value} and publish {prefix}.{field}.
+
+		Used for /gnss, /battery and similar single-level endpoints on the mock server.
+		"""
+		poll_interval_s = self.config.poll_interval_ms / 1000
+		url = self.config.source
+		prefix = self.config.topic_prefix
+
+		while not self._stop_event.is_set():
+			try:
+				data = self._http_get_json(url)
+			except Exception as exc:
+				self.event_bus.publish_sync(
+					"log",
+					f"HTTP flat client '{self.config.name}' fetch failed: {exc}",
+				)
+				time.sleep(poll_interval_s)
+				continue
+
+			if not isinstance(data, dict):
+				time.sleep(poll_interval_s)
+				continue
+
+			for field_name, value in data.items():
+				if isinstance(value, (int, float, str, bool)):
+					topic = f"{prefix}.{field_name}" if prefix else field_name
+					self.event_bus.publish_sync(topic, value)
 
 			time.sleep(poll_interval_s)
 

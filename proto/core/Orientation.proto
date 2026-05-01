@@ -1,0 +1,8 @@
+syntax = "proto3";
+package telemetry;
+
+message Orientation {
+    float yaw = 1;
+    float pitch = 2;
+    float roll = 3;
+}

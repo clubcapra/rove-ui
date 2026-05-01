@@ -19,4 +19,9 @@
 - * [ ] finaliser la mise en place de la carte
   - * [ ] Mettre en place l'ajout de POI( via controller touch pad pour la position et un bouton pour mettre le POI)
   - * [ ] Mettre l'ajout de photo sur le POI (bouton dans le widget caméra quand le robot s'approche d'un POI)
-  - * [ ] 
+- [ ] Pour le point d'intérêt le mettre quand on voit l'item, on doit pouvoir le voir sur la bitmap et ajouter une position en hauteur.
+- [ ] Interface pour controle souris / Touch
+- [ ] Quand on tombe en mode Bras, on switch de view et on affiches les composants pour le Bras (URDF, Monitoring et caméra à la palce de la bitmap)
+- [ ] Pour le endpoint UDP, on envoie "0x01" au port udp afficher et l'api retourne la data au port mirroir sur mon device
+- [ ] réception et traitement des protobufs
+- [ ] 

@@ -1,9 +1,10 @@
 {
   "header_settings": {
     "signals": [
-      {"name": "VTX", "db": -65},
-      {"name": "Microhard", "db": -72}
+      {"name": "VTX",       "db": -65, "topic": "signals.VTX.db"},
+      {"name": "Microhard", "db": -72, "topic": "signals.Microhard.db"}
     ],
+    "battery_topic": "battery.percentage",
     "E-Stop": {
       "active_color": "#ff0000",
       "inactive_color": "#00ff00",
@@ -18,7 +19,7 @@
       "base_url": "http://localhost:8080",
       "topic": "telemetry.odrive",
       "topic_prefix": "odrive",
-      "poll_interval_ms": 250,
+      "poll_interval_ms": 800,
       "max_data_age_ms": 2000,
       "publish_node_data": true,
       "publish_field_topics": true,
@@ -29,7 +30,7 @@
       "name": "track_joints",
       "source": "http://localhost:8080/track_joints",
       "topic_prefix": "joints",
-      "poll_interval_ms": 50,
+      "poll_interval_ms": 800,
       "enabled": true
     },
     {
@@ -37,33 +38,38 @@
       "name": "flipper_joints",
       "source": "http://localhost:8080/flipper_joints",
       "topic_prefix": "joints",
-      "poll_interval_ms": 50,
+      "poll_interval_ms": 800,
+      "enabled": true
+    },
+    {
+      "type": "json_http_flat",
+      "name": "mock_gnss",
+      "source": "http://localhost:8080/gnss",
+      "topic_prefix": "gnss",
+      "poll_interval_ms": 800,
+      "enabled": true
+    },
+    {
+      "type": "json_http_flat",
+      "name": "mock_battery",
+      "source": "http://localhost:8080/battery",
+      "topic_prefix": "battery",
+      "poll_interval_ms": 800,
+      "enabled": true
+    },
+    {
+      "type": "json_http_named_list",
+      "name": "mock_signals",
+      "source": "http://localhost:8080/signals",
+      "topic_prefix": "signals",
+      "list_key": "signals",
+      "name_key": "name",
+      "poll_interval_ms": 800,
       "enabled": true
     }
   ],
   "ros2_clients": [
-    {
-      "name": "joint_states_bridge",
-      "node_name": "capraui_ros2_bridge",
-      "enabled": false,
-      "event_prefix": "ros2",
-      "topics": [
-        {
-          "name": "/dynamic_joint_states",
-          "msg_type": "control_msgs/msg/DynamicJointState",
-          "qos_depth": 10,
-          "event_topic": "joints",
-          "transform": "dynamic_joint_states"
-        },
-        {
-          "name": "/joy",
-          "msg_type": "sensor_msgs/msg/Joy",
-          "qos_depth": 10,
-          "event_topic": "input",
-          "transform": "joy"
-        }
-      ]
-    }
+
   ],
   "console": true,
   "views": {
@@ -237,18 +243,17 @@
         },
         {
           "type": "bitmap",
-          "name": "Bitmap Preview",
+          "name": "Costmap",
           "data": {
-              "source": "http://{{robot-ip}}/map_feed"
+            "source": "http://localhost:8080/map_feed",
+            "cornerPositionWidth": 8,
+            "cornerPositionHeight": 8
           },
           "grid": {
             "row": 1,
             "column": 1,
             "row_span": 2,
             "column_span": 1
-          },
-          "controls": {
-    
           }
         }
       ]

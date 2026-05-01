@@ -1,0 +1,8 @@
+syntax = "proto3";
+package telemetry;
+
+message JointState {
+    float vel = 1;
+    float pos_deg = 2;
+    float torque = 3;
+}

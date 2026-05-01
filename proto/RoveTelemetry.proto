@@ -1,0 +1,35 @@
+syntax = "proto3";
+package telemetry;
+import "proto/Battery.proto";
+import "proto/DriveNodeState.proto";
+import "proto/imu/Icm40609.proto";
+import "proto/imu/Vn300.proto";
+
+
+message RoveTelemetry {
+    OdrivesTelemetry odrives = 1;
+    OvisTelemetry ovis = 2;
+    Vn300 vn300 = 3;
+    Battery battery = 4;
+    uint64 timestamp_us = 5;
+}
+
+message OdrivesTelemetry {
+    DriveNodeState node_1 = 1;
+    DriveNodeState node_2 = 2;
+    DriveNodeState node_3 = 3;
+    DriveNodeState node_4 = 4;
+    DriveNodeState node_5 = 5;
+    DriveNodeState node_6 = 6;
+    DriveNodeState node_7 = 7;
+    DriveNodeState node_8 = 8;
+}
+
+message OvisTelemetry {
+    DriveNodeState act_1 = 1;
+    DriveNodeState act_2 = 2;
+    DriveNodeState act_3 = 3;
+    DriveNodeState act_4 = 4;
+    DriveNodeState act_5 = 5;
+    DriveNodeState act_6 = 6;
+}

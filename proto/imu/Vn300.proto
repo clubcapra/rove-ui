@@ -1,0 +1,14 @@
+syntax = "proto3";
+package telemetry;
+import "proto/core/Orientation.proto";
+import "proto/core/Position.proto";
+import "proto/core/Vector3.proto";
+
+message Vn300 {
+    Position position = 1;
+    Orientation orientation = 2;
+
+    Vector3 velocity = 3;
+    Vector3 accel = 4;
+    Vector3 gyro = 5;
+}

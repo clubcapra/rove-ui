@@ -1,0 +1,17 @@
+syntax = "proto3";
+package telemetry;
+import "proto/core/JointState.proto";
+
+message DriveNodeState {
+    uint32 node_id = 1;
+    uint32 node_state = 2;
+
+    float node_temp_c = 3;
+    float motor_temp_c = 4;
+    float motor_amp = 5;
+
+    int32 active_errors = 6;
+    int32 latched_errors = 7;
+
+    float motor_pos = 8;
+}
