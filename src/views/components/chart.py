@@ -101,6 +101,7 @@ class ChartWidget(QWidget):
                 topic,
                 lambda value, topic_name=topic: self.topic_value_received.emit(topic_name, value),
             )
+            self.event_bus.publish_sync("log", f"[Chart:{self._title}] abonné → {topic}")
 
         if self._chart_type == "lines":
             self._reset_line_buffer(self._rows or rows)
@@ -144,7 +145,20 @@ class ChartWidget(QWidget):
 
         numeric_value = self._to_float(value)
         if numeric_value is None:
+            self.event_bus.publish_sync(
+                "log",
+                f"[Chart:{self._title}] {topic} → valeur non-numérique ignorée: {repr(value)}",
+            )
             return
+
+        if not hasattr(self, "_received_topics"):
+            self._received_topics = set()
+        if topic not in self._received_topics:
+            self._received_topics.add(topic)
+            self.event_bus.publish_sync(
+                "log",
+                f"[Chart:{self._title}] 1er update reçu — {topic} = {numeric_value}",
+            )
 
         self._rows[row_index][self._value_key] = numeric_value
         self._dirty = True

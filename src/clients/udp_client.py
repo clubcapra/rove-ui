@@ -319,20 +319,56 @@ class UDPClient:
                 self.event_bus.publish_sync("log", f"UDP '{self.config.name}' subscribe failed: {exc}")
                 return False
 
+        proto_type = str(self._raw_config.get("proto_type", "RoveTelemetry"))
+        _publish_count = 0
+
         def _publish(raw: bytes) -> None:
+            nonlocal _publish_count
             _, payload = _strip_header(raw)
+
+            decode_method = "?"
             try:
-                message = proto_decoder.decode(payload)
+                message = json.loads(payload.decode("utf-8", errors="replace"))
+                decode_method = "json"
             except Exception:
-                message = self._decode_text(payload)
+                try:
+                    message = proto_decoder.decode(payload, proto_type)
+                    decode_method = f"proto:{proto_type}"
+                except Exception as exc:
+                    message = self._decode_text(payload)
+                    decode_method = f"text(err:{exc})"
+
+            # Log first packet + every 100th to confirm data is flowing
+            _publish_count += 1
+            if _publish_count == 1 or _publish_count % 100 == 0:
+                if isinstance(message, dict):
+                    fields = list(message.keys())
+                    self.event_bus.publish_sync(
+                        "log",
+                        f"[UDP:{self.config.name}] pkt#{_publish_count} via {decode_method} "
+                        f"→ {len(fields)} fields: {fields[:5]}{'...' if len(fields) > 5 else ''}",
+                    )
+                else:
+                    self.event_bus.publish_sync(
+                        "log",
+                        f"[UDP:{self.config.name}] pkt#{_publish_count} via {decode_method} "
+                        f"→ type={type(message).__name__} val={str(message)[:80]}",
+                    )
+
             self.event_bus.publish_sync(self.config.topic, message)
             if self.config.publish_field_topics and isinstance(message, dict):
                 prefix = self.config.topic_prefix
+                published = []
                 for field, value in message.items():
                     if isinstance(value, (int, float, str, bool)):
-                        self.event_bus.publish_sync(
-                            f"{prefix}.{field}" if prefix else field, value
-                        )
+                        topic = f"{prefix}.{field}" if prefix else field
+                        self.event_bus.publish_sync(topic, value)
+                        published.append(topic)
+                if _publish_count == 1:
+                    self.event_bus.publish_sync(
+                        "log",
+                        f"[UDP:{self.config.name}] topics publiés: {published}",
+                    )
 
         while not self._stop_event.is_set():
             if current_port is None or sock is None:
