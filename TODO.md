@@ -22,6 +22,6 @@
 - [ ] Pour le point d'intérêt le mettre quand on voit l'item, on doit pouvoir le voir sur la bitmap et ajouter une position en hauteur.
 - [ ] Interface pour controle souris / Touch
 - [ ] Quand on tombe en mode Bras, on switch de view et on affiches les composants pour le Bras (URDF, Monitoring et caméra à la palce de la bitmap)
-- [ ] Pour le endpoint UDP, on envoie "0x01" au port udp afficher et l'api retourne la data au port mirroir sur mon device
-- [ ] réception et traitement des protobufs
+- [x] Pour le endpoint UDP, on envoie "0x01" au port udp afficher et l'api retourne la data au port mirroir sur mon device
+- [x] réception et traitement des protobufs
 - [ ] 

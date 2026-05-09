@@ -14,11 +14,18 @@
 
   "udp_clients": [
     {
-      "type": "json_http_flat",
-      "name": "mock_gnss",
-      "source": "http://localhost:8080/gnss",
+      "type": "udp_poll",
+      "name": "vn300",
+      "base_url": "http://localhost:8080",
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "vectornav_ttyUSB_VN300",
+      "discovery_port_field": "data_port",
+      "topic": "gnss",
       "topic_prefix": "gnss",
-      "poll_interval_ms": 500,
+      "proto_type": "Vn300",
+      "publish_field_topics": true,
+      "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30,
       "enabled": true
     },
     {
@@ -75,7 +82,7 @@
             "column_span": 1
             },
             "controls": {
-      
+
             }
         }
       ]
@@ -96,8 +103,8 @@
               "initial_lat": 45.5017,
               "initial_lng": -73.5673,
               "initial_zoom": 17,
-              "robot_position_lat_topic": "gnss.latitude",
-              "robot_position_lng_topic": "gnss.longitude"
+              "robot_position_lat_topic": "gnss.position_lat",
+              "robot_position_lng_topic": "gnss.position_lon"
             },
             "grid": {
               "row": 0,

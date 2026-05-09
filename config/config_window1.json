@@ -13,40 +13,78 @@
   },
   "udp_clients": [
     {
-      "type": "odrive_http",
-      "name": "odrive_telemetry",
-      "source": "http://localhost:8080",
+      "type": "udp_poll",
+      "name": "odrive_32",
       "base_url": "http://localhost:8080",
-      "topic": "telemetry.odrive",
-      "topic_prefix": "odrive",
-      "poll_interval_ms": 800,
-      "max_data_age_ms": 2000,
-      "publish_node_data": true,
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "odrive_32",
+      "discovery_port_field": "data_port",
+      "topic": "odrive.32",
+      "topic_prefix": "odrive.32",
+      "proto_type": "DriveNodeState",
       "publish_field_topics": true,
+      "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30,
       "enabled": true
     },
     {
-      "type": "json_http",
-      "name": "track_joints",
-      "source": "http://localhost:8080/track_joints",
-      "topic_prefix": "joints",
-      "poll_interval_ms": 800,
+      "type": "udp_poll",
+      "name": "odrive_33",
+      "base_url": "http://localhost:8080",
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "odrive_33",
+      "discovery_port_field": "data_port",
+      "topic": "odrive.33",
+      "topic_prefix": "odrive.33",
+      "proto_type": "DriveNodeState",
+      "publish_field_topics": true,
+      "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30,
       "enabled": true
     },
     {
-      "type": "json_http",
-      "name": "flipper_joints",
-      "source": "http://localhost:8080/flipper_joints",
-      "topic_prefix": "joints",
-      "poll_interval_ms": 800,
+      "type": "udp_poll",
+      "name": "odrive_34",
+      "base_url": "http://localhost:8080",
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "odrive_34",
+      "discovery_port_field": "data_port",
+      "topic": "odrive.34",
+      "topic_prefix": "odrive.34",
+      "proto_type": "DriveNodeState",
+      "publish_field_topics": true,
+      "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30,
       "enabled": true
     },
     {
-      "type": "json_http_flat",
-      "name": "mock_gnss",
-      "source": "http://localhost:8080/gnss",
+      "type": "udp_poll",
+      "name": "odrive_31",
+      "base_url": "http://localhost:8080",
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "odrive_31",
+      "discovery_port_field": "data_port",
+      "topic": "odrive.31",
+      "topic_prefix": "odrive.31",
+      "proto_type": "DriveNodeState",
+      "publish_field_topics": true,
+      "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30,
+      "enabled": true
+    },
+    {
+      "type": "udp_poll",
+      "name": "vn300",
+      "base_url": "http://localhost:8080",
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "vectornav_ttyUSB_VN300",
+      "discovery_port_field": "data_port",
+      "topic": "gnss",
       "topic_prefix": "gnss",
-      "poll_interval_ms": 800,
+      "proto_type": "Vn300",
+      "publish_field_topics": true,
+      "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30,
       "enabled": true
     },
     {
@@ -54,7 +92,7 @@
       "name": "mock_battery",
       "source": "http://localhost:8080/battery",
       "topic_prefix": "battery",
-      "poll_interval_ms": 800,
+      "poll_interval_ms": 2000,
       "enabled": true
     },
     {
@@ -64,13 +102,11 @@
       "topic_prefix": "signals",
       "list_key": "signals",
       "name_key": "name",
-      "poll_interval_ms": 800,
+      "poll_interval_ms": 1000,
       "enabled": true
     }
   ],
-  "ros2_clients": [
-
-  ],
+  "ros2_clients": [],
   "console": true,
   "views": {
     "dashboard": {
@@ -84,18 +120,18 @@
       "content": [
         {
           "type": "chart",
-          "name": "Vitesse Moteurs",
+          "name": "Position Moteurs",
           "data": {
               "chart_type": "lines",
-              "title": "Vitesse Moteurs",
-              "series_name": "Velocity",
+              "title": "Position Moteurs",
+              "series_name": "Position",
               "label_key": "Parameter",
               "value_key": "Value",
               "data": [
-                {"Parameter": "FL", "Value": 0, "unit": "rad/s", "topic": "joints.track_fl_j.velocity"},
-                {"Parameter": "RL", "Value": 0, "unit": "rad/s", "topic": "joints.track_rl_j.velocity"},
-                {"Parameter": "FR", "Value": 0, "unit": "rad/s", "topic": "joints.track_fr_j.velocity"},
-                {"Parameter": "RR", "Value": 0, "unit": "rad/s", "topic": "joints.track_rr_j.velocity"}
+                {"Parameter": "FL", "Value": 0, "unit": "turns", "topic": "odrive.32.motor_pos"},
+                {"Parameter": "RL", "Value": 0, "unit": "turns", "topic": "odrive.33.motor_pos"},
+                {"Parameter": "FR", "Value": 0, "unit": "turns", "topic": "odrive.34.motor_pos"},
+                {"Parameter": "RR", "Value": 0, "unit": "turns", "topic": "odrive.31.motor_pos"}
               ]
           },
           "grid": {
@@ -115,10 +151,10 @@
               "label_key": "Parameter",
               "value_key": "Value",
               "data": [
-                {"Parameter": "FL", "Value": 0, "unit": "°C", "topic": "joints.track_fl_j.motor_temperature"},
-                {"Parameter": "RL", "Value": 0, "unit": "°C", "topic": "joints.track_rl_j.motor_temperature"},
-                {"Parameter": "FR", "Value": 0, "unit": "°C", "topic": "joints.track_fr_j.motor_temperature"},
-                {"Parameter": "RR", "Value": 0, "unit": "°C", "topic": "joints.track_rr_j.motor_temperature"}
+                {"Parameter": "FL", "Value": 0, "unit": "°C", "topic": "odrive.32.motor_temp_c"},
+                {"Parameter": "RL", "Value": 0, "unit": "°C", "topic": "odrive.33.motor_temp_c"},
+                {"Parameter": "FR", "Value": 0, "unit": "°C", "topic": "odrive.34.motor_temp_c"},
+                {"Parameter": "RR", "Value": 0, "unit": "°C", "topic": "odrive.31.motor_temp_c"}
               ]
           },
           "grid": {
@@ -138,10 +174,10 @@
               "label_key": "Parameter",
               "value_key": "Value",
               "data": [
-                {"Parameter": "FL", "Value": 0, "unit": "°C", "topic": "joints.track_fl_j.fet_temperature"},
-                {"Parameter": "RL", "Value": 0, "unit": "°C", "topic": "joints.track_rl_j.fet_temperature"},
-                {"Parameter": "FR", "Value": 0, "unit": "°C", "topic": "joints.track_fr_j.fet_temperature"},
-                {"Parameter": "RR", "Value": 0, "unit": "°C", "topic": "joints.track_rr_j.fet_temperature"}
+                {"Parameter": "FL", "Value": 0, "unit": "°C", "topic": "odrive.32.node_temp_c"},
+                {"Parameter": "RL", "Value": 0, "unit": "°C", "topic": "odrive.33.node_temp_c"},
+                {"Parameter": "FR", "Value": 0, "unit": "°C", "topic": "odrive.34.node_temp_c"},
+                {"Parameter": "RR", "Value": 0, "unit": "°C", "topic": "odrive.31.node_temp_c"}
               ]
           },
           "grid": {
@@ -234,10 +270,10 @@
               "invert_y": true
             },
             "object_rotations": [
-              {"object": "Flipper FL", "axis": "z", "topic": "joints.flipper_fl_j.position"},
-              {"object": "Flipper RL", "axis": "z", "topic": "joints.flipper_rl_j.position"},
-              {"object": "Flipper FR", "axis": "z", "topic": "joints.flipper_fr_j.position"},
-              {"object": "Flipper RR", "axis": "z", "topic": "joints.flipper_rr_j.position"}
+              {"object": "Flipper FL", "axis": "z", "topic": "odrive.32.motor_pos", "scale": 6.2832},
+              {"object": "Flipper RL", "axis": "z", "topic": "odrive.33.motor_pos", "scale": 6.2832},
+              {"object": "Flipper FR", "axis": "z", "topic": "odrive.34.motor_pos", "scale": 6.2832},
+              {"object": "Flipper RR", "axis": "z", "topic": "odrive.31.motor_pos", "scale": 6.2832}
             ]
           }
         },
