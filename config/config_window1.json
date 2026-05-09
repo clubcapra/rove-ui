@@ -1,9 +1,9 @@
 {
   "header_settings": {
     "signals": [
-      {"name": "VTX",       "db": -65, "topic": "signals.VTX.db"},
-      {"name": "Microhard", "db": -72, "topic": "signals.Microhard.db"}
+      {"name": "MicroHard",  "host": "192.168.2.2"}
     ],
+    "ping_interval_s": 2,
     "battery_topic": "battery.percentage",
     "E-Stop": {
       "active_color": "#ff0000",
@@ -23,6 +23,7 @@
       "topic_prefix": "odrive.32",
       "proto_type": "DriveNodeState",
       "publish_field_topics": true,
+      "poll_interval_ms": 100,
       "recv_timeout_s": 2.0,
       "rediscovery_interval_s": 30,
       "enabled": true
@@ -38,6 +39,7 @@
       "topic_prefix": "odrive.33",
       "proto_type": "DriveNodeState",
       "publish_field_topics": true,
+      "poll_interval_ms": 100,
       "recv_timeout_s": 2.0,
       "rediscovery_interval_s": 30,
       "enabled": true
@@ -53,6 +55,7 @@
       "topic_prefix": "odrive.34",
       "proto_type": "DriveNodeState",
       "publish_field_topics": true,
+      "poll_interval_ms": 100,
       "recv_timeout_s": 2.0,
       "rediscovery_interval_s": 30,
       "enabled": true
@@ -68,6 +71,7 @@
       "topic_prefix": "odrive.31",
       "proto_type": "DriveNodeState",
       "publish_field_topics": true,
+      "poll_interval_ms": 100,
       "recv_timeout_s": 2.0,
       "rediscovery_interval_s": 30,
       "enabled": true
@@ -83,16 +87,9 @@
       "topic_prefix": "gnss",
       "proto_type": "Vn300",
       "publish_field_topics": true,
+      "poll_interval_ms": 100,
       "recv_timeout_s": 2.0,
       "rediscovery_interval_s": 30,
-      "enabled": true
-    },
-    {
-      "type": "json_http_flat",
-      "name": "mock_battery",
-      "source": "http://192.168.2.2:8080/battery",
-      "topic_prefix": "battery",
-      "poll_interval_ms": 2000,
       "enabled": true
     }
 
@@ -261,10 +258,10 @@
               "invert_y": true
             },
             "object_rotations": [
-              {"object": "Flipper FL", "axis": "z", "topic": "odrive.32.pos_estimate", "scale": 6.2832},
-              {"object": "Flipper RL", "axis": "z", "topic": "odrive.33.pos_estimate", "scale": 6.2832},
-              {"object": "Flipper FR", "axis": "z", "topic": "odrive.34.pos_estimate", "scale": 6.2832},
-              {"object": "Flipper RR", "axis": "z", "topic": "odrive.31.pos_estimate", "scale": 6.2832}
+              {"object": "Flipper FL", "axis": "z", "topic": "odrive.32.pos_estimate", "scale":  0.01745, "offset": 0},
+              {"object": "Flipper RL", "axis": "z", "topic": "odrive.33.pos_estimate", "scale": -0.01745, "offset": 3.14159},
+              {"object": "Flipper FR", "axis": "z", "topic": "odrive.34.pos_estimate", "scale":  0.01745, "offset": 0},
+              {"object": "Flipper RR", "axis": "z", "topic": "odrive.31.pos_estimate", "scale": -0.01745, "offset": 3.14159}
             ]
           }
         },
@@ -274,7 +271,12 @@
           "data": {
             "source": "http://localhost:8080/map_feed",
             "cornerPositionWidth": 8,
-            "cornerPositionHeight": 8
+            "cornerPositionHeight": 8,
+            "click_topic": "costmap.click",
+            "poi_topic": "costmap.poi",
+            "gps_lat_topic": "gnss.latitude",
+            "gps_lng_topic": "gnss.longitude",
+            "gps_yaw_topic": "gnss.yaw"
           },
           "grid": {
             "row": 1,
@@ -291,10 +293,7 @@
       "content": [
         {
           "type": "console",
-          "name": "event_log",
-          "data": {
-            "source": "wss://{{robot-ip}}/event_log_feed"
-          }
+          "name": "event_log"
         }
       ]
     }

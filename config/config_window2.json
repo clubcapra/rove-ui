@@ -1,9 +1,9 @@
 {
   "header_settings": {
     "signals": [
-      {"name": "VTX",       "db": -65, "topic": "signals.VTX.db"},
-      {"name": "Microhard", "db": -72, "topic": "signals.Microhard.db"}
+      {"name": "MicroHard",  "host": "192.168.2.2"}
     ],
+    "ping_interval_s": 2,
     "battery_topic": "battery.percentage",
     "E-Stop": {
       "active_color": "#ff0000",
@@ -16,7 +16,7 @@
     {
       "type": "udp_poll",
       "name": "vn300",
-      "base_url": "http://localhost:8080",
+      "base_url": "http://192.168.2.2:8080",
       "discovery_endpoint": "/discover",
       "discovery_sensor_id": "vectornav_ttyUSB_VN300",
       "discovery_port_field": "data_port",
@@ -26,24 +26,6 @@
       "publish_field_topics": true,
       "recv_timeout_s": 2.0,
       "rediscovery_interval_s": 30,
-      "enabled": true
-    },
-    {
-      "type": "json_http_flat",
-      "name": "mock_battery",
-      "source": "http://localhost:8080/battery",
-      "topic_prefix": "battery",
-      "poll_interval_ms": 2000,
-      "enabled": true
-    },
-    {
-      "type": "json_http_named_list",
-      "name": "mock_signals",
-      "source": "http://localhost:8080/signals",
-      "topic_prefix": "signals",
-      "list_key": "signals",
-      "name_key": "name",
-      "poll_interval_ms": 1000,
       "enabled": true
     }
   ],
@@ -103,8 +85,9 @@
               "initial_lat": 45.5017,
               "initial_lng": -73.5673,
               "initial_zoom": 17,
-              "robot_position_lat_topic": "gnss.position_lat",
-              "robot_position_lng_topic": "gnss.position_lon"
+              "robot_position_lat_topic": "gnss.latitude",
+              "robot_position_lng_topic": "gnss.longitude",
+              "add_poi_at_topic": "costmap.poi"
             },
             "grid": {
               "row": 0,

@@ -93,14 +93,15 @@ class ThreejsViewer(QWidget):
             axis = str(binding.get("axis", "x")).strip().lower()
             topic = str(binding.get("topic", "")).strip()
             scale = float(binding.get("scale", 1.0))
+            offset = float(binding.get("offset", 0.0))
             if not obj_name or not topic or axis not in ("x", "y", "z"):
                 continue
 
-            def _on_value(value, name=obj_name, ax=axis, s=scale):
+            def _on_value(value, name=obj_name, ax=axis, s=scale, off=offset):
                 v = _to_float(value)
                 if v is None:
                     return
-                self.run_js(f"window.setObjectRotationAxis({json.dumps(name)}, {json.dumps(ax)}, {v * s});")
+                self.run_js(f"window.setObjectRotationAxis({json.dumps(name)}, {json.dumps(ax)}, {v * s + off});")
 
             self._event_bus.subscribe(topic, _on_value)
             count += 1
