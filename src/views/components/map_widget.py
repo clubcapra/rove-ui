@@ -40,6 +40,7 @@ class MapWidget(QWidget):
         self._pending_scripts: list[str] = []
         self._robot_lat: float | None = None
         self._robot_lng: float | None = None
+        self._first_center_done = False
         self._js_queue.connect(self._exec_js)
 
     def _load_html(self) -> str:
@@ -89,16 +90,43 @@ class MapWidget(QWidget):
         lng = float(self._config.get("initial_lng", -73.5773))
         zoom = int(self._config.get("initial_zoom", 15))
         self.run_js(f"window.mapSetView({lat}, {lng}, {zoom});")
+        self.run_js(f"window.mapSetRobotPosition({lat}, {lng});")
+        self._inject_icons()
+
+    def _inject_icons(self) -> None:
+        project_root = Path(__file__).resolve().parents[3]
+
+        robot_img = str(self._config.get("robot_cursor_image", "")).strip()
+        if robot_img:
+            p = Path(robot_img) if Path(robot_img).is_absolute() else project_root / robot_img
+            if p.exists():
+                url = QUrl.fromLocalFile(str(p)).toString()
+                size = self._config.get("robot_cursor_size", [36, 36])
+                w, h = (size[0], size[1]) if isinstance(size, list) and len(size) >= 2 else (36, 36)
+                self.run_js(f"window.mapSetRobotIcon({json.dumps(url)}, {w}, {h});")
+
+        poi_img = str(self._config.get("poi_image", "")).strip()
+        if poi_img:
+            p = Path(poi_img) if Path(poi_img).is_absolute() else project_root / poi_img
+            if p.exists():
+                url = QUrl.fromLocalFile(str(p)).toString()
+                size = self._config.get("poi_size", [24, 32])
+                w, h = (size[0], size[1]) if isinstance(size, list) and len(size) >= 2 else (24, 32)
+                self.run_js(f"window.mapSetPOIIcon({json.dumps(url)}, {w}, {h});")
 
     def _register_position_tracking(self) -> None:
         lat_topic = str(self._config.get("robot_position_lat_topic", "")).strip()
         lng_topic = str(self._config.get("robot_position_lng_topic", "")).strip()
+        yaw_topic = str(self._config.get("robot_position_yaw_topic", "")).strip()
         if not lat_topic and not lng_topic:
             return
 
         def _push():
             if self._robot_lat is not None and self._robot_lng is not None:
                 self.run_js(f"window.mapSetRobotPosition({self._robot_lat}, {self._robot_lng});")
+                if not self._first_center_done:
+                    self._first_center_done = True
+                    self.run_js(f"window.mapSetView({self._robot_lat}, {self._robot_lng});")
 
         if lat_topic:
             def _on_lat(v):
@@ -118,8 +146,18 @@ class MapWidget(QWidget):
                 _push()
             self._event_bus.subscribe(lng_topic, _on_lng)
 
+        if yaw_topic:
+            def _on_yaw(v):
+                try:
+                    yaw = float(v)
+                except (TypeError, ValueError):
+                    return
+                self.run_js(f"window.mapSetRobotYaw({yaw:.4f});")
+            self._event_bus.subscribe(yaw_topic, _on_yaw)
+
         self._event_bus.publish_sync(
-            "log", f"MapWidget: position tracking (lat={lat_topic or '-'}, lng={lng_topic or '-'})"
+            "log",
+            f"MapWidget: position tracking (lat={lat_topic or '-'}, lng={lng_topic or '-'}, yaw={yaw_topic or '-'})"
         )
 
     def _register_poi_button(self) -> None:

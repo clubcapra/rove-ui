@@ -44,9 +44,15 @@
           "type": "camera",
           "name": "Camera",
             "data": {
-            "mode": "webcamera",
+            "mode": "rtsp",
+            "vtx_host": "192.168.2.2",
+            "vtx_port": 5540,
+            "cameras": [
+              {"name": "Front", "udp_vtx_id": 2, "rtsp_ip": "192.168.2.32"},
+              {"name": "Back",  "udp_vtx_id": 3, "rtsp_ip": "192.168.2.34"}
+            ],
             "rtsp": {
-              "source": "rtsp://192.168.2.34:554/",
+              "source": "rtsp://192.168.2.32:554/",
               "source_type": "rtsp"
             },
             "webcamera": {
@@ -67,35 +73,6 @@
 
             }
         }
-      ]
-    },
-    "Map": {
-      "type": "layout",
-      "diaposition": "grid",
-      "grid": {
-        "rows": 1,
-        "columns": 1,
-        "spacing": 8
-      },
-      "content": [
-          {
-            "type": "map",
-            "name": "Carte",
-            "data": {
-              "initial_lat": 45.5017,
-              "initial_lng": -73.5673,
-              "initial_zoom": 17,
-              "robot_position_lat_topic": "gnss.latitude",
-              "robot_position_lng_topic": "gnss.longitude",
-              "add_poi_at_topic": "costmap.poi"
-            },
-            "grid": {
-              "row": 0,
-              "column": 0,
-              "row_span": 1,
-              "column_span": 1
-            }
-          }
       ]
     },
     "logs": {

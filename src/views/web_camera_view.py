@@ -111,17 +111,20 @@ class WebCameraView:
             idx = 0
         return f"/dev/video{idx}"
     
-    def _send_udp_command(self):
+    def send_vtx_command(self, vtx_id: int, host: str = "192.168.2.2", port: int = 5540) -> None:
         try:
             subprocess.Popen(
-                "echo '2' | nc -u 192.168.2.2 5540",
+                f"echo '{vtx_id}' | nc -u {host} {port}",
                 shell=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            self.event_bus.publish_sync("log", "[CMD] echo '2' | nc -u 192.168.2.2 5540")
+            self.event_bus.publish_sync("log", f"[CMD] VTX id={vtx_id} → {host}:{port}")
         except Exception as e:
             self.event_bus.publish_sync("log", f"[CMD][ERROR] {e}")
+
+    def _send_udp_command(self):
+        self.send_vtx_command(2)
 
     def _on_bus_message(self, bus, message):
         if message.type == Gst.MessageType.ERROR:  # type: ignore[misc]

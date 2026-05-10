@@ -53,6 +53,7 @@ class RTSPView(QObject):
         self.pipeline = None
         self.bus = None
         self.urlField = None
+        self._url_row: QWidget | None = None
 
 
     def build(self, source_type: str | None = None, source: str | None = None) -> QWidget:
@@ -93,6 +94,7 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
         resolved_source_type, resolved_source = self._resolve_source(source_type, source)
 
         url_row = QWidget(self.root_widget)
+        self._url_row = url_row
         url_row_layout = QHBoxLayout(url_row)
         url_row_layout.setContentsMargins(4, 4, 4, 4)
         url_row_layout.setSpacing(6)
@@ -218,6 +220,20 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
         self.config["source_type"] = resolved_source_type
         self.event_bus.publish_sync("log", f"RTSPView[{self.name}] URL changed to {resolved_source}")
         self._rebuild_pipeline(resolved_source_type, resolved_source)
+
+    def hide_controls(self) -> None:
+        if self._url_row is not None:
+            self._url_row.hide()
+
+    def set_source(self, source: str) -> None:
+        self.config["source"] = source
+        self.config.pop("source_type", None)
+        if self.urlField is not None:
+            self.urlField.setText(source)
+        source_type, resolved = self._resolve_source(None, source)
+        if source_type and resolved:
+            self.event_bus.publish_sync("log", f"RTSPView[{self.name}] source → {resolved}")
+            self._rebuild_pipeline(source_type, resolved)
 
     def restart_pipeline(self):
         resolved_source_type, resolved_source = self._resolve_source(None, None)

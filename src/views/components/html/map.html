@@ -20,10 +20,9 @@
             margin-top: 6px;
             border-radius: 4px;
         }
-        .robot-icon {
-            background: #3b82f6;
-            border: 2px solid #fff;
-            border-radius: 50%;
+        .robot-cursor-wrap {
+            display: flex; align-items: center; justify-content: center;
+            transform-origin: center center;
         }
     </style>
 </head>
@@ -42,10 +41,32 @@
         currentTileLayer = L.tileLayer(url, opts || { maxZoom: 19 }).addTo(map);
     };
 
+    // --- Custom icon config (set via mapSetRobotIcon / mapSetPOIIcon) ---
+    let _robotIconUrl = null;
+    let _robotIconSize = [36, 36];
+    let _poiIconUrl = null;
+    let _poiIconSize = [24, 32];
+
+    // --- Robot cursor ---
+    let robotYaw = 0;
+
+    function _robotIconHtml(yaw) {
+        const [w, h] = _robotIconUrl ? _robotIconSize : [36, 36];
+        const inner = _robotIconUrl
+            ? '<img src="' + _robotIconUrl + '" style="width:' + w + 'px;height:' + h + 'px;display:block"/>'
+            : '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="-18 -18 36 36">' +
+              '<circle r="16" fill="rgba(0,0,0,0.35)" stroke="rgba(255,255,255,0.55)" stroke-width="1.5"/>' +
+              '<polygon points="0,-13 -8,7 8,7" fill="#22c55e" stroke="rgba(0,0,0,0.45)" stroke-width="1"/>' +
+              '<circle r="3.5" fill="#ef4444"/>' +
+              '</svg>';
+        return '<div class="robot-cursor-wrap" style="transform:rotate(' + yaw + 'deg);width:' + w + 'px;height:' + h + 'px">' + inner + '</div>';
+    }
+
     const robotIcon = L.divIcon({
-        className: 'robot-icon',
-        iconSize: [14, 14],
-        iconAnchor: [7, 7]
+        html: _robotIconHtml(0),
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+        className: ''
     });
     const robotMarker = L.marker([45.5048, -73.5773], { icon: robotIcon });
     let robotVisible = false;
@@ -77,10 +98,48 @@
         }
     };
 
+    // --- Robot heading ---
+    window.mapSetRobotYaw = function(yaw_deg) {
+        robotYaw = yaw_deg;
+        const el = robotMarker.getElement();
+        if (el) {
+            const wrap = el.querySelector('.robot-cursor-wrap');
+            if (wrap) wrap.style.transform = 'rotate(' + yaw_deg + 'deg)';
+        }
+    };
+
+    // --- Set custom robot icon (called from Python after map loads) ---
+    window.mapSetRobotIcon = function(url, w, h) {
+        _robotIconUrl = url;
+        if (w && h) _robotIconSize = [w, h];
+        const [iw, ih] = _robotIconSize;
+        robotMarker.setIcon(L.divIcon({
+            html: _robotIconHtml(robotYaw),
+            iconSize: [iw, ih],
+            iconAnchor: [iw / 2, ih / 2],
+            className: ''
+        }));
+    };
+
+    // --- Set custom POI icon (used for all future mapAddPOI calls) ---
+    window.mapSetPOIIcon = function(url, w, h) {
+        _poiIconUrl = url;
+        if (w && h) _poiIconSize = [w, h];
+    };
+
     // --- POI ---
     window.mapAddPOI = function(lat, lng, label) {
         const id = 'poi_' + (++poiCounter);
-        const marker = L.marker([lat, lng]).addTo(map);
+        const opts = {};
+        if (_poiIconUrl) {
+            const [iw, ih] = _poiIconSize;
+            opts.icon = L.icon({
+                iconUrl: _poiIconUrl,
+                iconSize: [iw, ih],
+                iconAnchor: [iw / 2, ih]
+            });
+        }
+        const marker = L.marker([lat, lng], opts).addTo(map);
         const safeLabel = label || id;
         marker.bindPopup('<div class="poi-popup"><b>' + safeLabel + '</b><div id="photo_' + id + '"></div></div>');
         pois[id] = { marker: marker, label: safeLabel, photo: null };

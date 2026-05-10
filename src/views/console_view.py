@@ -1,6 +1,5 @@
 from PySide6.QtWidgets import QTextEdit
 from PySide6.QtCore import Signal
-from src.model.log_status import LogStatus
 from src.controller.event_bus import EventBus
 
 class DebugConsole(QTextEdit):
