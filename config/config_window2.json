@@ -1,7 +1,7 @@
 {
   "header_settings": {
     "signals": [
-      {"name": "MicroHard",  "host": "192.168.2.2"}
+      {"name": "MicroHard",  "host": "192.168.2.10"}
     ],
     "ping_interval_s": 2,
     "battery_topic": "battery.percentage",

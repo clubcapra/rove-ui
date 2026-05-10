@@ -1,7 +1,7 @@
 {
   "header_settings": {
     "signals": [
-      {"name": "MicroHard",  "host": "192.168.2.2"}
+      {"name": "MicroHard",  "host": "192.168.2.10"}
     ],
     "ping_interval_s": 2,
     "battery_topic": "battery.percentage",
@@ -294,6 +294,163 @@
         {
           "type": "console",
           "name": "event_log"
+        }
+      ]
+    }
+  },
+
+  "aliases_views":{
+    "armControl": {
+      "adaptationOf": "dashboard",
+      "content_modifications": [
+        {
+          "type": "layout",
+          "diaposition": "grid",
+          "grid": {
+            "rows": 3,
+            "columns": 2,
+            "spacing": 8
+          },
+          "content": [
+            {
+              "type": "chart",
+              "name": "Position Moteurs",
+              "data": {
+                  "chart_type": "lines",
+                  "title": "Position Moteurs",
+                  "series_name": "Position",
+                  "label_key": "Parameter",
+                  "value_key": "Value",
+                  "data": [
+                    {"Parameter": "Moteur 1", "Value": 0, "unit": "turns", "topic": "Ovis.1.pos_estimate"},
+                    {"Parameter": "Moteur 2", "Value": 0, "unit": "turns", "topic": "Ovis.2.pos_estimate"},
+                    {"Parameter": "Moteur 3", "Value": 0, "unit": "turns", "topic": "Ovis.3.pos_estimate"},
+                    {"Parameter": "Moteur 4", "Value": 0, "unit": "turns", "topic": "Ovis.4.pos_estimate"},
+                    {"Parameter": "Moteur 5", "Value": 0, "unit": "turns", "topic": "Ovis.5.pos_estimate"},
+                    {"Parameter": "Moteur 6", "Value": 0, "unit": "turns", "topic": "Ovis.6.pos_estimate"}
+                  ]
+              },
+              "grid": {
+                "row": 0,
+                "column": 0,
+                "row_span": 1,
+                "column_span": 1
+              }
+            },
+            {
+              "type": "chart",
+              "name": "Temp. Moteurs",
+              "data": {
+                  "chart_type": "band",
+                  "title": "Températures Moteurs",
+                  "series_name": "Temperature",
+                  "label_key": "Parameter",
+                  "value_key": "Value",
+                  "data": [
+                    {"Parameter": "Moteur 1", "Value": 0, "unit": "turns", "topic": "Ovis.1.motor_temp"},
+                    {"Parameter": "Moteur 2", "Value": 0, "unit": "turns", "topic": "Ovis.2.motor_temp"},
+                    {"Parameter": "Moteur 3", "Value": 0, "unit": "turns", "topic": "Ovis.3.motor_temp"},
+                    {"Parameter": "Moteur 4", "Value": 0, "unit": "turns", "topic": "Ovis.4.motor_temp"},
+                    {"Parameter": "Moteur 5", "Value": 0, "unit": "turns", "topic": "Ovis.5.motor_temp"},
+                    {"Parameter": "Moteur 6", "Value": 0, "unit": "turns", "topic": "Ovis.6.motor_temp"}
+                  ]
+              },
+              "grid": {
+                "row": 0,
+                "column": 1,
+                "row_span": 1,
+                "column_span": 1
+              }
+            },
+            {
+              "type": "chart",
+              "name": "Temp. Drivers",
+              "data": {
+                  "chart_type": "band",
+                  "title": "Températures Drivers",
+                  "series_name": "Temperature",
+                  "label_key": "Parameter",
+                  "value_key": "Value",
+                  "data": [
+                    {"Parameter": "Moteur 1", "Value": 0, "unit": "turns", "topic": "Ovis.1.motor_temp"},
+                    {"Parameter": "Moteur 2", "Value": 0, "unit": "turns", "topic": "Ovis.2.motor_temp"},
+                    {"Parameter": "Moteur 3", "Value": 0, "unit": "turns", "topic": "Ovis.3.motor_temp"},
+                    {"Parameter": "Moteur 4", "Value": 0, "unit": "turns", "topic": "Ovis.4.motor_temp"},
+                    {"Parameter": "Moteur 5", "Value": 0, "unit": "turns", "topic": "Ovis.5.motor_temp"},
+                    {"Parameter": "Moteur 6", "Value": 0, "unit": "turns", "topic": "Ovis.6.motor_temp"}
+                  ]
+              },
+              "grid": {
+                "row": 1,
+                "column": 0,
+                "row_span": 1,
+                "column_span": 1
+              }
+            },
+            {
+              "type": "threejsViewer",
+              "name": "URDF Preview",
+              "data": {
+                "object_sources": [
+                    {
+                        "name": "base",
+                        "source": "media/arm_base.obj",
+                        "position": [0, 0, 0],
+                        "rotation": [0, 0, 0],
+                        "rotation_unit": "degrees",
+                        "scale": [3, 3, 3],
+                        "center": true,
+                        "base_on_ground": true,
+                        "color": "#e2d4d4"
+                    }
+                    
+                ]
+              },
+              "grid": {
+                "row": 2,
+                "column": 0,
+                "row_span": 1,
+                "column_span": 1
+              },
+              "controls": {
+                "input": {
+                  "enabled": true,
+                  "yaw_topic": "input.axis.10",
+                  "pitch_topic": "input.axis.11",
+                  "sensitivity": 0.04,
+                  "deadzone": 0.08,
+                  "invert_x": false,
+                  "invert_y": true
+                },
+                "object_rotations": [
+                  {"object": "Flipper FL", "axis": "z", "topic": "odrive.32.pos_estimate", "scale":  0.01745, "offset": 0},
+                  {"object": "Flipper RL", "axis": "z", "topic": "odrive.33.pos_estimate", "scale": -0.01745, "offset": 3.14159},
+                  {"object": "Flipper FR", "axis": "z", "topic": "odrive.34.pos_estimate", "scale":  0.01745, "offset": 0},
+                  {"object": "Flipper RR", "axis": "z", "topic": "odrive.31.pos_estimate", "scale": -0.01745, "offset": 3.14159}
+                ]
+              }
+            },
+            {
+              "type": "bitmap",
+              "name": "Costmap",
+              "data": {
+                "source": "http://localhost:8080/map_feed",
+                "cornerPositionWidth": 8,
+                "cornerPositionHeight": 8,
+                "click_topic": "costmap.click",
+                "poi_topic": "costmap.poi",
+                "gps_lat_topic": "gnss.latitude",
+                "gps_lng_topic": "gnss.longitude",
+                "gps_yaw_topic": "gnss.yaw"
+              },
+              "grid": {
+                "row": 1,
+                "column": 1,
+                "row_span": 2,
+                "column_span": 1
+              }
+            }
+          ]
         }
       ]
     }
