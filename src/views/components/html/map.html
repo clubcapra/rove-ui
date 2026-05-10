@@ -20,10 +20,10 @@
             margin-top: 6px;
             border-radius: 4px;
         }
-        .robot-icon {
-            background: #3b82f6;
-            border: 2px solid #fff;
-            border-radius: 50%;
+        .robot-cursor-wrap {
+            width: 36px; height: 36px;
+            display: flex; align-items: center; justify-content: center;
+            transform-origin: center center;
         }
     </style>
 </head>
@@ -42,10 +42,23 @@
         currentTileLayer = L.tileLayer(url, opts || { maxZoom: 19 }).addTo(map);
     };
 
+    // --- Robot cursor (rotatable arrow) ---
+    let robotYaw = 0;
+
+    function _robotIconHtml(yaw) {
+        return '<div class="robot-cursor-wrap" style="transform:rotate(' + yaw + 'deg)">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="-18 -18 36 36">' +
+            '<circle r="16" fill="rgba(0,0,0,0.35)" stroke="rgba(255,255,255,0.55)" stroke-width="1.5"/>' +
+            '<polygon points="0,-13 -8,7 8,7" fill="#22c55e" stroke="rgba(0,0,0,0.45)" stroke-width="1"/>' +
+            '<circle r="3.5" fill="#ef4444"/>' +
+            '</svg></div>';
+    }
+
     const robotIcon = L.divIcon({
-        className: 'robot-icon',
-        iconSize: [14, 14],
-        iconAnchor: [7, 7]
+        html: _robotIconHtml(0),
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+        className: ''
     });
     const robotMarker = L.marker([45.5048, -73.5773], { icon: robotIcon });
     let robotVisible = false;
@@ -74,6 +87,16 @@
         if (!robotVisible) {
             robotMarker.addTo(map);
             robotVisible = true;
+        }
+    };
+
+    // --- Robot heading ---
+    window.mapSetRobotYaw = function(yaw_deg) {
+        robotYaw = yaw_deg;
+        const el = robotMarker.getElement();
+        if (el) {
+            const wrap = el.querySelector('.robot-cursor-wrap');
+            if (wrap) wrap.style.transform = 'rotate(' + yaw_deg + 'deg)';
         }
     };
 

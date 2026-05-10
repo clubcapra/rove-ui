@@ -4,14 +4,14 @@ services:
     ports:
       - "8080:8080"
       # UDP data ports (subscribe / push)
-      - "5000:5000/udp"   # vectornav_ttyUSB_VN300  data
+      - "5000:5000/udp"   # vectornav_ttyUSB_VN300   data
       - "5002:5002/udp"   # kinova_arm               data
       - "5004:5004/udp"   # odrive_34                data
       - "5006:5006/udp"   # odrive_31                data
       - "5008:5008/udp"   # odrive_33                data
       - "5010:5010/udp"   # odrive_32                data
       # UDP command ports
-      - "5001:5001/udp"   # vectornav_ttyUSB_VN300  cmd
+      - "5001:5001/udp"   # vectornav_ttyUSB_VN300   cmd
       - "5003:5003/udp"   # kinova_arm               cmd
       - "5005:5005/udp"   # odrive_34                cmd
       - "5007:5007/udp"   # odrive_31                cmd

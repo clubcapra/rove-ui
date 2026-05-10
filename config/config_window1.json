@@ -245,6 +245,36 @@
         }
       ]
     },
+    "Map": {
+      "type": "layout",
+      "diaposition": "grid",
+      "grid": {
+        "rows": 1,
+        "columns": 1,
+        "spacing": 8
+      },
+      "content": [
+        {
+          "type": "map",
+          "name": "Carte",
+          "data": {
+            "initial_lat": 0,
+            "initial_lng": 0,
+            "initial_zoom": 17,
+            "robot_position_lat_topic": "gnss.latitude",
+            "robot_position_lng_topic": "gnss.longitude",
+            "robot_position_yaw_topic": "gnss.yaw",
+            "add_poi_at_topic": "costmap.poi"
+          },
+          "grid": {
+            "row": 0,
+            "column": 0,
+            "row_span": 1,
+            "column_span": 1
+          }
+        }
+      ]
+    },
     "logs": {
       "type": "layout",
       "diaposition": "vertical",
