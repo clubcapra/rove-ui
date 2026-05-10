@@ -24,7 +24,7 @@ Makefile
 *.cmake
 !CMakeLists.txt
 compile_commands.json
-
+*.pdf
 # C++
 *.o
 *.so
@@ -62,3 +62,4 @@ __pycache__/
 # Test results
 Testing/
 test_results/
+.claude/*

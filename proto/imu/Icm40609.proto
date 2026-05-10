@@ -1,0 +1,9 @@
+syntax = "proto3";
+package telemetry;
+import "proto/core/Vector3.proto";
+
+message Icm40609 {
+    Vector3 accel = 1;
+    Vector3 gyro = 2;
+    float temp_c = 3;
+}

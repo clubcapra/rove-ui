@@ -1,0 +1,33 @@
+syntax = "proto3";
+package telemetry;
+
+import "proto/core/JointState.proto";
+
+message RoveControl {
+    Tracks tracks = 1;
+    Flippers flippers = 2;
+    Ovis ovis = 3;
+    uint64 timestamp_us = 4;
+}
+
+// normalized value vectorial value for tracks ( -1.0 to 1.0 )
+message Tracks {
+    float left_vel = 1;
+    float right_vel = 2;
+}
+
+message Flippers {
+    JointState fl = 1;
+    JointState fr = 2;
+    JointState rl = 3;
+    JointState rr = 4;
+}
+
+message Ovis {
+    JointState act_1 = 1;
+    JointState act_2 = 2;
+    JointState act_3 = 3;
+    JointState act_4 = 4;
+    JointState act_5 = 5;
+    JointState act_6 = 6;
+}

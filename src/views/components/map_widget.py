@@ -124,19 +124,33 @@ class MapWidget(QWidget):
 
     def _register_poi_button(self) -> None:
         topic = str(self._config.get("add_poi_topic", "")).strip()
-        if not topic:
-            return
+        if topic:
+            def _on_press(value):
+                if not value:
+                    return
+                if self._robot_lat is None or self._robot_lng is None:
+                    return
+                label = f"POI {self._robot_lat:.5f},{self._robot_lng:.5f}"
+                self.run_js(f"window.mapAddPOI({self._robot_lat}, {self._robot_lng}, {json.dumps(label)});")
 
-        def _on_press(value):
-            if not value:
-                return
-            if self._robot_lat is None or self._robot_lng is None:
-                return
-            label = f"POI {self._robot_lat:.5f},{self._robot_lng:.5f}"
-            self.run_js(f"window.mapAddPOI({self._robot_lat}, {self._robot_lng}, {json.dumps(label)});")
+            self._event_bus.subscribe(topic, _on_press)
+            self._event_bus.publish_sync("log", f"MapWidget: add-POI bound to '{topic}'")
 
-        self._event_bus.subscribe(topic, _on_press)
-        self._event_bus.publish_sync("log", f"MapWidget: add-POI bound to '{topic}'")
+        at_topic = str(self._config.get("add_poi_at_topic", "")).strip()
+        if at_topic:
+            def _on_poi_at(payload):
+                if not isinstance(payload, dict):
+                    return
+                try:
+                    lat = float(payload["lat"])
+                    lng = float(payload["lng"])
+                except (KeyError, TypeError, ValueError):
+                    return
+                label = str(payload.get("label", f"{lat:.5f},{lng:.5f}"))
+                self.run_js(f"window.mapAddPOI({lat}, {lng}, {json.dumps(label)});")
+
+            self._event_bus.subscribe(at_topic, _on_poi_at)
+            self._event_bus.publish_sync("log", f"MapWidget: add-POI-at bound to '{at_topic}'")
 
     @Slot(str)
     def _exec_js(self, script: str) -> None:

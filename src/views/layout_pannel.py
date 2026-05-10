@@ -3,7 +3,7 @@ from typing import List
 
 from .web_camera_view import WebCameraView
 from .camera_widget import CameraWidget
-from .components.bitmap_placeholder import BitmapPlaceholder
+from .components.bitmap import Bitmap
 from src.controller.event_bus import EventBus
 
 # Import known view wrappers for high-level composition
@@ -164,7 +164,7 @@ class LayoutPanel:
             return widget
 
         if vtype == "bitmap":
-            bitmap = BitmapPlaceholder(name, data)
+            bitmap = Bitmap(name, data, event_bus=self.event_bus)
             bitmap.build()
             self._register_child(name, bitmap)
             return bitmap.get_widget()
