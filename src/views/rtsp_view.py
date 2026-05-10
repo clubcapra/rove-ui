@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import subprocess
 
-from PySide6.QtCore import QObject, Qt
+from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizePolicy, QVBoxLayout, QWidget
 from src.controller.event_bus import EventBus
@@ -142,6 +142,7 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
         self.video_widget.setStyleSheet("background: black;")
         self.video_widget.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
         self.video_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.video_widget.installEventFilter(self)
         layout.addWidget(self.video_widget, 1)
 
         if resolved_source_type is None or resolved_source is None:
@@ -163,12 +164,8 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
     def start(self):
         if self.pipeline is not None:
             sink = self.pipeline.get_by_name("video_sink")
-            if sink is not None and self.video_widget is not None:
-                win_id = int(self.video_widget.winId())
-                if hasattr(sink, "set_window_handle"):
-                    sink.set_window_handle(win_id)
-                else:
-                    GstVideo.VideoOverlay.set_window_handle(sink, win_id)  # type: ignore[misc]
+            if sink is not None:
+                self._sync_video_overlay(sink)
             self.pipeline.set_state(Gst.State.PLAYING)  # type: ignore[misc]
             self.event_bus.publish_sync("log", f"RTSPView[{self.name}] PLAYING")
 
@@ -194,6 +191,34 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
             self.bus.remove_signal_watch()
             self.bus = None
 
+    def _sync_video_overlay(self, sink) -> None:
+        if self.video_widget is None:
+            return
+        win_id = int(self.video_widget.winId())
+        if hasattr(sink, "set_window_handle"):
+            sink.set_window_handle(win_id)
+        else:
+            GstVideo.VideoOverlay.set_window_handle(sink, win_id)  # type: ignore[misc]
+
+        width  = max(1, self.video_widget.width())
+        height = max(1, self.video_widget.height())
+        if hasattr(sink, "set_render_rectangle"):
+            try:
+                sink.set_render_rectangle(0, 0, width, height)
+            except Exception:
+                pass
+        else:
+            try:
+                GstVideo.VideoOverlay.set_render_rectangle(sink, 0, 0, width, height)  # type: ignore[misc]
+            except Exception:
+                pass
+
+        if hasattr(sink, "expose"):
+            try:
+                sink.expose()
+            except Exception:
+                pass
+
     def _bind_video_sink(self):
         if self.pipeline is None or self.video_widget is None:
             return False
@@ -203,12 +228,16 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
             print("Erreur: impossible de récupérer video_sink")
             return False
 
-        win_id = int(self.video_widget.winId())
-        if hasattr(sink, "set_window_handle"):
-            sink.set_window_handle(win_id)
-        else:
-            GstVideo.VideoOverlay.set_window_handle(sink, win_id)  # type: ignore[misc]
+        self._sync_video_overlay(sink)
         return True
+
+    def eventFilter(self, obj, event) -> bool:
+        if obj is self.video_widget and event.type() == QEvent.Type.Resize:
+            if self.pipeline is not None:
+                sink = self.pipeline.get_by_name("video_sink")
+                if sink is not None:
+                    self._sync_video_overlay(sink)
+        return False
 
     def _rebuild_pipeline(self, source_type: str, source: str) -> bool:
         self.event_bus.publish_sync("log", f"RTSPView[{self.name}] rebuilding pipeline ({source_type}: {source})")
@@ -311,8 +340,16 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
         sample = snap_sink.get_property("last-sample")
         return _gst_sample_to_pixmap(sample)
 
+    def _choose_sink_type(self) -> str:
+        explicit = str(self.config.get("sink", "")).strip()
+        if explicit:
+            return explicit
+        if GST_AVAILABLE and Gst.ElementFactory.find("xvimagesink"):  # type: ignore[misc]
+            return "xvimagesink"
+        return "ximagesink"
+
     def _create_pipeline(self, source_type: str, source: str):
-        sink_type = str(self.config.get("sink", "ximagesink")).strip() or "ximagesink"
+        sink_type = self._choose_sink_type()
 
         if source_type == self.SourceType.USB_VTX:
             pipeline_str = (
