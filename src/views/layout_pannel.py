@@ -168,7 +168,18 @@ class LayoutPanel:
             bitmap.build()
             self._register_child(name, bitmap)
             return bitmap.get_widget()
-        
+
+        if vtype == "robot":
+            from .components.urdf_viewer import URDFViewer
+            controls = child_cfg.get("controls")
+            viewer_config = dict(data)
+            if controls is not None:
+                viewer_config["controls"] = controls
+            viewer = URDFViewer(name, viewer_config, event_bus=self.event_bus)
+            viewer.build()
+            self._register_child(name, viewer)
+            return viewer
+
         # Placeholder for other view types (table, map, point_cloud, etc.)
         lbl = QLabel(f"Placeholder {vtype}: {name}")
         return lbl

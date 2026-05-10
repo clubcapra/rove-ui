@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>URDF Robot Viewer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      overflow: hidden; background: #111827;
+    }
+    #c { display: block; width: 100%; height: 100%; }
+
+    /* ── overlay UI ─────────────────────────────────────────────── */
+    #ui {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+    }
+
+    /* loading bar */
+    #loading {
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: #1f2937;
+    }
+    #loading-bar {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #3b82f6, #60a5fa);
+      transition: width 0.25s;
+    }
+
+    /* joint panel (bottom-left) */
+    #joint-panel {
+      position: absolute; bottom: 10px; left: 10px;
+      max-width: 220px; max-height: 55vh;
+      overflow-y: auto;
+      background: rgba(17,24,39,0.82);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: 11px/1.5 "Segoe UI", monospace;
+      color: #9ca3af;
+      pointer-events: auto;
+    }
+    #joint-panel::-webkit-scrollbar { width: 4px; }
+    #joint-panel::-webkit-scrollbar-thumb { background: #374151; border-radius: 2px; }
+    .jp-title { font-weight: 700; color: #e5e7eb; margin-bottom: 6px; font-size: 12px; }
+    .jp-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+    .jp-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      flex-shrink: 0; background: #374151;
+      transition: background 0.2s;
+    }
+    .jp-dot.active { background: #3b82f6; }
+    .jp-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .jp-val { color: #60a5fa; font-family: monospace; min-width: 44px; text-align: right; }
+
+    /* info top-right */
+    #info {
+      position: absolute; top: 10px; right: 10px;
+      background: rgba(17,24,39,0.72);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px; padding: 6px 10px;
+      font: 11px "Segoe UI", sans-serif; color: #6b7280;
+    }
+    #info b { color: #d1d5db; }
+  </style>
+
+  <!-- URDF data injected by Python -->
+  <script>/* URDF_DATA_PLACEHOLDER */</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div id="loading"><div id="loading-bar"></div></div>
+  <div id="joint-panel">
+    <div class="jp-title">Joints</div>
+    <div id="joint-rows"></div>
+  </div>
+  <div id="info"><b>URDF</b> — orbit: drag · zoom: scroll · pan: right-drag</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader }   from 'three/addons/loaders/GLTFLoader.js';
+
+// ── renderer ──────────────────────────────────────────────────────────────────
+const canvas   = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111827);
+scene.fog = new THREE.FogExp2(0x111827, 0.05);
+
+// ── camera & controls ─────────────────────────────────────────────────────────
+const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 100);
+camera.position.set(1.5, 1.2, 2.0);
+camera.lookAt(0, 0.3, 0);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping  = true;
+controls.dampingFactor  = 0.08;
+controls.target.set(0, 0.3, 0);
+controls.minDistance    = 0.3;
+controls.maxDistance    = 12;
+
+// ── lighting ──────────────────────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+
+const sun = new THREE.DirectionalLight(0xffffff, 1.8);
+sun.position.set(3, 6, 4);
+sun.castShadow = true;
+sun.shadow.camera.near = 0.1;
+sun.shadow.camera.far  = 30;
+sun.shadow.camera.left   = -4;
+sun.shadow.camera.right  =  4;
+sun.shadow.camera.top    =  4;
+sun.shadow.camera.bottom = -4;
+sun.shadow.mapSize.set(1024, 1024);
+scene.add(sun);
+scene.add(new THREE.DirectionalLight(0x8ab4f8, 0.6).position.set(-3, 2, -3) && sun);
+
+const fill = new THREE.DirectionalLight(0x8ab4f8, 0.5);
+fill.position.set(-3, 2, -3);
+scene.add(fill);
+
+// ── ground ────────────────────────────────────────────────────────────────────
+const gridHelper = new THREE.GridHelper(8, 32, 0x1f2937, 0x1f2937);
+gridHelper.material.opacity = 0.45;
+gridHelper.material.transparent = true;
+scene.add(gridHelper);
+
+const groundMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(8, 8),
+  new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95, transparent: true, opacity: 0.4 })
+);
+groundMesh.rotation.x = -Math.PI / 2;
+groundMesh.receiveShadow = true;
+scene.add(groundMesh);
+
+// ── URDF kinematic tree ───────────────────────────────────────────────────────
+const urdfData   = window.URDF_DATA || { root: null, links: {}, joints: [], link_colors: {} };
+const linkGroups = {};   // link name → THREE.Group
+const revolutes  = {};   // joint name → { group, axis Vector3, initialQ }
+const jointAngles = {};  // joint name → current angle rad
+
+// ── coordinate-system correction ──────────────────────────────────────────────
+// URDF uses ROS convention: X-forward, Y-left, Z-up.
+// GLBs exported from that toolchain keep Z-up geometry.
+// Apply a -90° rotation around X to the root so Z-up → Y-up in Three.js.
+const poseGroup = new THREE.Group();
+poseGroup.rotation.x = -Math.PI / 2;
+scene.add(poseGroup);
+
+let _roll = 0, _pitch = 0, _yaw = 0;
+function _updatePose() {
+  // Combine the coord-correction with IMU orientation
+  const correction = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(-Math.PI / 2, 0, 0)
+  );
+  const imu = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(_roll, _pitch, _yaw, 'XYZ')
+  );
+  poseGroup.quaternion.multiplyQuaternions(imu, correction);
+}
+
+// ── build link groups ─────────────────────────────────────────────────────────
+for (const name of Object.keys(urdfData.links)) {
+  const g = new THREE.Group();
+  g.name = name;
+  linkGroups[name] = g;
+}
+
+// Wire joints
+for (const joint of urdfData.joints) {
+  const parentGroup = linkGroups[joint.parent];
+  const childGroup  = linkGroups[joint.child];
+  if (!parentGroup || !childGroup) continue;
+
+  childGroup.position.set(...joint.xyz);
+
+  if (joint.rpy && joint.rpy.some(v => Math.abs(v) > 1e-6)) {
+    childGroup.rotation.set(joint.rpy[0], joint.rpy[1], joint.rpy[2], 'XYZ');
+  }
+
+  parentGroup.add(childGroup);
+
+  if (joint.type === 'revolute' || joint.type === 'continuous') {
+    revolutes[joint.name] = {
+      group:    childGroup,
+      axis:     new THREE.Vector3(...joint.axis),
+      initialQ: childGroup.quaternion.clone(),
+      limit:    joint.limit,
+    };
+    jointAngles[joint.name] = 0;
+  }
+}
+
+// Mount root link
+if (urdfData.root && linkGroups[urdfData.root]) {
+  poseGroup.add(linkGroups[urdfData.root]);
+} else {
+  for (const g of Object.values(linkGroups)) {
+    if (!g.parent) poseGroup.add(g);
+  }
+}
+
+// ── color helper ──────────────────────────────────────────────────────────────
+function applyLinkColor(gltfScene, hexColor) {
+  const color = new THREE.Color(hexColor);
+  gltfScene.traverse((child) => {
+    if (!child.isMesh) return;
+    const applyTo = (mat) => {
+      const m = mat.clone();
+      m.color = color;
+      m.roughness  = Math.max(m.roughness  ?? 0.7, 0.35);
+      m.metalness  = Math.min(m.metalness  ?? 0.1, 0.4);
+      return m;
+    };
+    child.material = Array.isArray(child.material)
+      ? child.material.map(applyTo)
+      : applyTo(child.material);
+    child.castShadow    = true;
+    child.receiveShadow = true;
+  });
+}
+
+function styleMesh(gltfScene) {
+  gltfScene.traverse((child) => {
+    if (!child.isMesh) return;
+    child.castShadow    = true;
+    child.receiveShadow = true;
+    if (child.material) {
+      const m = child.material;
+      m.roughness = Math.max(m.roughness ?? 0.7, 0.35);
+    }
+  });
+}
+
+// ── GLB loading ───────────────────────────────────────────────────────────────
+const meshLinks  = Object.entries(urdfData.links).filter(([, d]) => d.mesh_url);
+const totalCount = meshLinks.length;
+let   loadedCount = 0;
+const loadingBar  = document.getElementById('loading-bar');
+
+function onLoadProgress() {
+  loadedCount++;
+  const pct = totalCount > 0 ? (loadedCount / totalCount) * 100 : 100;
+  loadingBar.style.width = pct + '%';
+  if (loadedCount >= totalCount) {
+    setTimeout(() => { loadingBar.parentElement.style.display = 'none'; }, 500);
+    _fitCamera();
+  }
+}
+
+function _fitCamera() {
+  const box = new THREE.Box3().setFromObject(poseGroup);
+  if (box.isEmpty()) return;
+  const center = box.getCenter(new THREE.Vector3());
+  const size   = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const dist   = maxDim * 1.7;
+  camera.position.set(
+    center.x + dist * 0.55,
+    center.y + dist * 0.45,
+    center.z + dist * 0.75
+  );
+  controls.target.copy(center);
+  controls.update();
+}
+
+const loader = new GLTFLoader();
+
+if (totalCount === 0) {
+  onLoadProgress();
+} else {
+  for (const [name, data] of meshLinks) {
+    loader.load(
+      data.mesh_url,
+      (gltf) => {
+        const mesh = gltf.scene;
+        const color = urdfData.link_colors?.[name];
+        if (color) {
+          applyLinkColor(mesh, color);
+        } else {
+          styleMesh(mesh);
+        }
+        if (linkGroups[name]) linkGroups[name].add(mesh);
+        console.log(`[URDF] loaded: ${name}${color ? ' color=' + color : ''}`);
+        onLoadProgress();
+      },
+      undefined,
+      (err) => {
+        console.warn(`[URDF] failed: ${name} — ${err}`);
+        onLoadProgress();
+      }
+    );
+  }
+}
+
+// ── joint panel UI ────────────────────────────────────────────────────────────
+const jointRowsEl = document.getElementById('joint-rows');
+const jointDots   = {};
+const jointValEls = {};
+
+for (const [name, j] of Object.entries(revolutes)) {
+  const row = document.createElement('div');
+  row.className = 'jp-row';
+
+  const dot = document.createElement('div');
+  dot.className = 'jp-dot';
+
+  const label = document.createElement('span');
+  label.className = 'jp-name';
+  label.textContent = name.replace('joint_', '').replace(/_/g, ' ');
+  label.title = name;
+
+  const val = document.createElement('span');
+  val.className = 'jp-val';
+  val.textContent = '0.0°';
+
+  row.appendChild(dot);
+  row.appendChild(label);
+  row.appendChild(val);
+  jointRowsEl.appendChild(row);
+  jointDots[name]   = dot;
+  jointValEls[name] = val;
+}
+
+if (Object.keys(revolutes).length === 0) {
+  jointRowsEl.textContent = 'No revolute joints';
+}
+
+function _updateJointUI(name, rad) {
+  if (jointValEls[name])
+    jointValEls[name].textContent = (rad * 180 / Math.PI).toFixed(1) + '°';
+  if (jointDots[name])
+    jointDots[name].classList.toggle('active', Math.abs(rad) > 0.01);
+}
+
+// ── public API ────────────────────────────────────────────────────────────────
+
+window.setJointAngle = function (name, angle) {
+  const j = revolutes[name];
+  if (!j) return;
+  const q = new THREE.Quaternion().setFromAxisAngle(j.axis, angle);
+  j.group.quaternion.multiplyQuaternions(j.initialQ, q);
+  jointAngles[name] = angle;
+  _updateJointUI(name, angle);
+};
+
+window.setJointAngles = function (obj) {
+  for (const [n, a] of Object.entries(obj)) window.setJointAngle(n, a);
+};
+
+window.resetJoints = function () {
+  for (const n of Object.keys(revolutes)) window.setJointAngle(n, 0);
+};
+
+window.setRobotRoll  = (r) => { _roll  = r; _updatePose(); };
+window.setRobotPitch = (p) => { _pitch = p; _updatePose(); };
+window.setRobotYaw   = (y) => { _yaw   = y; _updatePose(); };
+
+// ── resize & render ───────────────────────────────────────────────────────────
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== w || canvas.height !== h) {
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+}
+
+(function animate() {
+  requestAnimationFrame(animate);
+  resize();
+  controls.update();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>

@@ -44,9 +44,15 @@
           "type": "camera",
           "name": "Camera",
             "data": {
-            "mode": "webcamera",
+            "mode": "rtsp",
+            "vtx_host": "192.168.2.2",
+            "vtx_port": 5540,
+            "cameras": [
+              {"name": "Front", "udp_vtx_id": 2, "rtsp_ip": "192.168.2.32"},
+              {"name": "Back",  "udp_vtx_id": 3, "rtsp_ip": "192.168.2.34"}
+            ],
             "rtsp": {
-              "source": "rtsp://192.168.2.34:554/",
+              "source": "rtsp://192.168.2.32:554/",
               "source_type": "rtsp"
             },
             "webcamera": {
