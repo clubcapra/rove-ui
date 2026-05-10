@@ -256,7 +256,7 @@ class URDFViewer(QWidget):
 
                 def _on_pose(value, fn=js_fn):
                     try:
-                        angle = float(value)
+                        angle = float(value) * (math.pi / 180.0)
                     except (TypeError, ValueError):
                         return
                     self.run_js(f"window.{fn}({angle:.6f});")

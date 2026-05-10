@@ -204,10 +204,10 @@
             },
             "controls": {
               "joint_angles": [
-                {"joint": "joint_revolute_6", "topic": "odrive.32.pos_estimate", "scale":  0.01745, "offset": 0},
-                {"joint": "joint_revolute_5", "topic": "odrive.33.pos_estimate", "scale": -0.01745, "offset": 3.14159},
-                {"joint": "joint_revolute_7", "topic": "odrive.34.pos_estimate", "scale": -0.01745, "offset": 3.14159},
-                {"joint": "joint_revolute_8", "topic": "odrive.31.pos_estimate", "scale":  0.01745, "offset": 0}
+                {"joint": "joint_revolute_6", "topic": "odrive.42.pos_estimate", "scale":  0.01745, "offset": 0},
+                {"joint": "joint_revolute_5", "topic": "odrive.43.pos_estimate", "scale": -0.01745, "offsets": 3.14159},
+                {"joint": "joint_revolute_7", "topic": "odrive.44.pos_estimate", "scale": -0.01745, "offset": 3.14159},
+                {"joint": "joint_revolute_8", "topic": "odrive.45.pos_estimate", "scale":  0.01745, "offset": 0}
               ],
               "robot_pose": {
                 "roll_topic":  "gnss.roll",

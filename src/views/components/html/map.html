@@ -128,8 +128,8 @@
     };
 
     // --- POI ---
-    window.mapAddPOI = function(lat, lng, label) {
-        const id = 'poi_' + (++poiCounter);
+    window.mapAddPOI = function(lat, lng, label, poiId) {
+        const id = (poiId && poiId !== '') ? poiId : ('poi_' + (++poiCounter));
         const opts = {};
         if (_poiIconUrl) {
             const [iw, ih] = _poiIconSize;

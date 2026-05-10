@@ -155,6 +155,8 @@ class CameraWidget:
         self._set_mode(mode, force_rebuild=True)
         self.event_bus.publish_sync("log", f"CameraWidget[{self.name}] ready (mode: {mode})")
 
+        self.event_bus.subscribe("camera.snapshot_request", self._do_snapshot)
+
     # ── Sidebar ───────────────────────────────────────────────────────────
 
     def _build_sidebar(self) -> QWidget:
@@ -321,6 +323,21 @@ class CameraWidget:
             self._set_mode(target_mode, force_rebuild=False)
 
     # ── Helpers ───────────────────────────────────────────────────────────
+
+    def _do_snapshot(self, callback=None) -> None:
+        if not callable(callback):
+            return
+        active_view = self._views.get(self._active_mode or "rtsp")
+        snap_fn = getattr(active_view, "capture_snapshot", None)
+        if callable(snap_fn):
+            pix = snap_fn()
+            if pix is not None and not pix.isNull():
+                callback(pix)
+                return
+        # fallback: Qt widget grab (black for GStreamer overlay, but better than nothing)
+        target = self._stack if self._stack is not None else self._widget
+        if target is not None:
+            callback(target.grab())
 
     def get_widget(self) -> QWidget:
         if self._widget is None:

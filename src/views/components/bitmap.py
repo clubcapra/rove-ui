@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import base64
 import math
 import random
+import tempfile
+import os
 from pathlib import Path
 
 from PySide6.QtCore import QDateTime, QPointF, Qt, QTimer, QUrl
@@ -32,8 +35,9 @@ class _AltitudePicker(QDialog):
             | Qt.WindowType.WindowStaysOnTopHint
         )
         self.setModal(True)
-        self.setFixedWidth(200)
+        self.setFixedWidth(224)
         self._altitude = 0.0
+        self._photo_data_url: str | None = None
 
         self.setStyleSheet(f"""
             QDialog {{
@@ -53,6 +57,16 @@ class _AltitudePicker(QDialog):
                 font-weight: 700; border: none;
             }}
             QPushButton#ok:hover {{ background: #fbbf24; }}
+            QPushButton#photo {{
+                background: #1e3a5f; color: #93c5fd;
+                border: 1px solid #3b82f6; border-radius: 5px;
+                padding: 5px 8px; font-size: 12px;
+            }}
+            QPushButton#photo:hover {{ background: #1e40af; color: #fff; }}
+            QPushButton#photo[captured="true"] {{
+                background: #14532d; color: #86efac;
+                border-color: #22c55e;
+            }}
             QSlider::groove:vertical {{
                 background: #334155; width: 8px; border-radius: 4px; margin: 0 8px;
             }}
@@ -128,6 +142,20 @@ class _AltitudePicker(QDialog):
         hint.setStyleSheet("font-size: 8px; color: #475569;")
         outer.addWidget(hint)
 
+        # Photo capture preview (16:9, 192×108)
+        self._photo_preview = QLabel("Pas de photo")
+        self._photo_preview.setFixedSize(192, 108)
+        self._photo_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._photo_preview.setStyleSheet(
+            "background: #0f172a; color: #475569; border-radius: 4px; font-size: 10px;"
+        )
+        outer.addWidget(self._photo_preview)
+
+        self._photo_btn = QPushButton("📷 Capturer photo")
+        self._photo_btn.setObjectName("photo")
+        self._photo_btn.clicked.connect(self._capture_photo)
+        outer.addWidget(self._photo_btn)
+
         # Buttons
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
@@ -145,8 +173,47 @@ class _AltitudePicker(QDialog):
         self._altitude = value / 100.0
         self._val_label.setText(f"{self._altitude:.2f} m")
 
+    def _capture_photo(self) -> None:
+        captured: list[QPixmap | None] = [None]
+
+        def _on_snap(pix: QPixmap) -> None:
+            captured[0] = pix
+
+        EventBus().publish_sync("camera.snapshot_request", _on_snap)
+
+        pix = captured[0]
+        if pix is None or pix.isNull():
+            self._photo_preview.setText("Aucune caméra")
+            return
+
+        # Scale down for display
+        preview = pix.scaled(
+            192, 108,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        self._photo_preview.setPixmap(preview)
+
+        # Convert full-size (max 640px) snapshot to JPEG data URL via temp file
+        if pix.width() > 640:
+            pix = pix.scaledToWidth(640, Qt.TransformationMode.SmoothTransformation)
+        tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+        tmp.close()
+        pix.save(tmp.name, "JPEG", 82)
+        with open(tmp.name, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        os.unlink(tmp.name)
+        self._photo_data_url = "data:image/jpeg;base64," + b64
+
+        self._photo_btn.setText("✓ Photo capturée")
+        self._photo_btn.setProperty("captured", "true")
+        self._photo_btn.style().polish(self._photo_btn)
+
     def altitude(self) -> float:
         return self._altitude
+
+    def photo_data_url(self) -> str | None:
+        return self._photo_data_url
 
 
 # ── Clickable label (with debounce) ───────────────────────────────────────────
@@ -282,6 +349,7 @@ class Bitmap:
             return
 
         altitude = picker.altitude()
+        photo_url = picker.photo_data_url()
 
         radius_x = float(self.config.get("cornerPositionWidth",  1.0)) / 2.0
         radius_y = float(self.config.get("cornerPositionHeight", 1.0)) / 2.0
@@ -296,7 +364,6 @@ class Bitmap:
 
         poi_topic = str(self.config.get("poi_topic", "")).strip()
         if poi_topic:
-            # TODO: retirer le fallback (0, 0) quand le GPS sera fiable
             has_gps    = self._robot_lat is not None and self._robot_lng is not None
             robot_lat  = self._robot_lat if has_gps else 0.0
             robot_lng  = self._robot_lng if has_gps else 0.0
@@ -313,11 +380,20 @@ class Bitmap:
             payload["lng"] = round(poi_lng, 8)
 
             self._poi_seq += 1
-            label = f"#{self._poi_seq}"
-            self.event_bus.publish_sync(
-                poi_topic,
-                {"lat": poi_lat, "lng": poi_lng, "label": label, "alt": altitude},
-            )
+            label   = f"#{self._poi_seq}"
+            poi_id  = f"poi_{self._poi_seq}"
+
+            poi_payload: dict = {
+                "lat":    poi_lat,
+                "lng":    poi_lng,
+                "label":  label,
+                "alt":    altitude,
+                "poi_id": poi_id,
+            }
+            if photo_url:
+                poi_payload["photo"] = photo_url
+
+            self.event_bus.publish_sync(poi_topic, poi_payload)
 
             # Overlay marker
             self._pois.append({"nx": nx, "ny": ny, "alt": altitude, "label": label})

@@ -171,7 +171,7 @@ function _updatePose() {
     new THREE.Euler(-Math.PI / 2, 0, 0)
   );
   const imu = new THREE.Quaternion().setFromEuler(
-    new THREE.Euler(_roll, _pitch, _yaw, 'XYZ')
+    new THREE.Euler(-_roll, _yaw, _pitch, 'YZX')
   );
   poseGroup.quaternion.multiplyQuaternions(imu, correction);
 }

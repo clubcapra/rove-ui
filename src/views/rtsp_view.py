@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 
 from PySide6.QtCore import QObject, Qt
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizePolicy, QVBoxLayout, QWidget
 from src.controller.event_bus import EventBus
 
@@ -10,7 +11,7 @@ GST_AVAILABLE = False
 GST_IMPORT_ERROR: Exception | None = None
 
 try:
-    import gi  # type: ignore
+    import gi  # type: ignore[import]
 
     gi.require_version("Gst", "1.0")
     gi.require_version("GstVideo", "1.0")
@@ -23,6 +24,30 @@ except Exception as e:  # pragma: no cover
     GST_IMPORT_ERROR = e
     Gst = None  # type: ignore[assignment]
     GstVideo = None  # type: ignore[assignment]
+
+
+def _gst_sample_to_pixmap(sample) -> "QPixmap | None":
+    """Convert a GStreamer sample (video/x-raw,format=RGB) to QPixmap."""
+    if sample is None:
+        return None
+    buf = sample.get_buffer()
+    caps = sample.get_caps()
+    if buf is None or caps is None:
+        return None
+    s = caps.get_structure(0)
+    width  = s.get_value("width")
+    height = s.get_value("height")
+    ok, map_info = buf.map(Gst.MapFlags.READ)  # type: ignore[misc]
+    if not ok:
+        return None
+    try:
+        img = QImage(
+            bytes(map_info.data), width, height, width * 3,
+            QImage.Format.Format_RGB888,
+        )
+        return QPixmap.fromImage(img.copy())
+    finally:
+        buf.unmap(map_info)
 
 
 class RTSPView(QObject):
@@ -277,6 +302,15 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
 
         return normalized_type, resolved_source
 
+    def capture_snapshot(self) -> "QPixmap | None":
+        if not GST_AVAILABLE or self.pipeline is None:
+            return None
+        snap_sink = self.pipeline.get_by_name("snapshot_sink")
+        if snap_sink is None:
+            return None
+        sample = snap_sink.get_property("last-sample")
+        return _gst_sample_to_pixmap(sample)
+
     def _create_pipeline(self, source_type: str, source: str):
         sink_type = str(self.config.get("sink", "ximagesink")).strip() or "ximagesink"
 
@@ -285,7 +319,12 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
                 f"v4l2src device={source} io-mode=2 do-timestamp=false ! "
                 f"queue max-size-buffers=1 leaky=downstream ! "
                 f"videoconvert ! "
-                f"{sink_type} name=video_sink sync=false qos=false"
+                f"tee name=t "
+                f"t. ! queue max-size-buffers=1 leaky=downstream ! "
+                f"{sink_type} name=video_sink sync=false qos=false "
+                f"t. ! queue max-size-buffers=1 leaky=downstream ! "
+                f"videoconvert ! video/x-raw,format=RGB ! "
+                f"appsink name=snapshot_sink drop=true max-buffers=1 emit-signals=false sync=false"
             )
             print("[GStreamer] Pipeline:", pipeline_str)
             try:
@@ -302,7 +341,7 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
             return None
 
     def _create_rtsp_pipeline(self, source: str, sink_type: str):
-        """Build the RTSP pipeline programmatically.
+        """Build the RTSP pipeline programmatically with tee+appsink for snapshots.
 
         rtspsrc exposes dynamic "sometimes" pads that are created only after
         RTSP negotiation.  Linking it statically via parse_launch causes a
@@ -312,35 +351,40 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
         # GstRTSPLowerTrans flags: UDP=4, TCP=16
         protocols_flag = 4 if transport == "udp" else 16
 
-        print(
-            f'[GStreamer] Pipeline: rtspsrc location="{source}" protocols={transport} latency=0 '
-            f"buffer-mode=none drop-on-latency=true ! rtph265depay ! h265parse ! "
-            f"avdec_h265 max-threads=4 ! queue max-size-buffers=1 leaky=downstream ! "
-            f"videoconvert ! {sink_type} name=video_sink sync=false qos=false"
-        )
-
         try:
             pipeline = Gst.Pipeline.new("rtsp-pipeline")  # type: ignore[misc]
 
-            rtspsrc = Gst.ElementFactory.make("rtspsrc", "rtspsrc0")  # type: ignore[misc]
-            depay   = Gst.ElementFactory.make("rtph265depay", "depay")  # type: ignore[misc]
-            parse   = Gst.ElementFactory.make("h265parse", "h265parse")  # type: ignore[misc]
-            decode  = Gst.ElementFactory.make("avdec_h265", "decode")  # type: ignore[misc]
-            queue   = Gst.ElementFactory.make("queue", "queue")  # type: ignore[misc]
-            convert = Gst.ElementFactory.make("videoconvert", "convert")  # type: ignore[misc]
-            sink    = Gst.ElementFactory.make(sink_type, "video_sink")  # type: ignore[misc]
+            rtspsrc   = Gst.ElementFactory.make("rtspsrc",      "rtspsrc0")   # type: ignore[misc]
+            depay     = Gst.ElementFactory.make("rtph265depay", "depay")       # type: ignore[misc]
+            parse     = Gst.ElementFactory.make("h265parse",    "h265parse")   # type: ignore[misc]
+            decode    = Gst.ElementFactory.make("avdec_h265",   "decode")      # type: ignore[misc]
+            tee       = Gst.ElementFactory.make("tee",          "tee")         # type: ignore[misc]
+            # Display branch
+            q_disp    = Gst.ElementFactory.make("queue",        "q_disp")      # type: ignore[misc]
+            conv_disp = Gst.ElementFactory.make("videoconvert", "conv_disp")   # type: ignore[misc]
+            sink      = Gst.ElementFactory.make(sink_type,      "video_sink")  # type: ignore[misc]
+            # Snapshot branch
+            q_snap    = Gst.ElementFactory.make("queue",        "q_snap")      # type: ignore[misc]
+            conv_snap = Gst.ElementFactory.make("videoconvert", "conv_snap")   # type: ignore[misc]
+            caps_snap = Gst.ElementFactory.make("capsfilter",   "caps_snap")   # type: ignore[misc]
+            appsink   = Gst.ElementFactory.make("appsink",      "snapshot_sink")  # type: ignore[misc]
 
-            for name, el in (
-                ("rtspsrc", rtspsrc),
+            for elem_name, el in (
+                ("rtspsrc",      rtspsrc),
                 ("rtph265depay", depay),
-                ("h265parse", parse),
-                ("avdec_h265", decode),
-                ("queue", queue),
-                ("videoconvert", convert),
-                (sink_type, sink),
+                ("h265parse",    parse),
+                ("avdec_h265",   decode),
+                ("tee",          tee),
+                ("q_disp",       q_disp),
+                ("conv_disp",    conv_disp),
+                (sink_type,      sink),
+                ("q_snap",       q_snap),
+                ("conv_snap",    conv_snap),
+                ("capsfilter",   caps_snap),
+                ("appsink",      appsink),
             ):
                 if el is None:
-                    print(f"[GStreamer] Impossible de créer l'élément: {name}")
+                    print(f"[GStreamer] Impossible de créer l'élément: {elem_name}")
                     return None
                 pipeline.add(el)
 
@@ -348,21 +392,47 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
             rtspsrc.set_property("protocols", protocols_flag)
             rtspsrc.set_property("latency", 0)
             rtspsrc.set_property("drop-on-latency", True)
-
             decode.set_property("max-threads", 4)
-            queue.set_property("max-size-buffers", 1)
-            queue.set_property("leaky", 2)  # 2 = downstream
+
+            q_disp.set_property("max-size-buffers", 1)
+            q_disp.set_property("leaky", 2)
             sink.set_property("sync", False)
             sink.set_property("qos", False)
 
-            # Link the static portion of the pipeline (depay → sink)
-            for src_el, dst_el in ((depay, parse), (parse, decode), (decode, queue), (queue, convert), (convert, sink)):
+            q_snap.set_property("max-size-buffers", 1)
+            q_snap.set_property("leaky", 2)
+            caps_snap.set_property("caps", Gst.Caps.from_string("video/x-raw,format=RGB"))  # type: ignore[misc]
+            appsink.set_property("drop", True)
+            appsink.set_property("max-buffers", 1)
+            appsink.set_property("emit-signals", False)
+            appsink.set_property("sync", False)
+
+            # Link display branch: depay → parse → decode → tee → q_disp → conv_disp → sink
+            # tee.link() auto-requests a new src_%u pad — no manual get_request_pad needed
+            for src_el, dst_el in (
+                (depay,     parse),
+                (parse,     decode),
+                (decode,    tee),
+                (tee,       q_disp),
+                (q_disp,    conv_disp),
+                (conv_disp, sink),
+            ):
+                if not src_el.link(dst_el):
+                    print(f"[GStreamer] Échec du lien: {src_el.get_name()} → {dst_el.get_name()}")
+                    return None
+
+            # Link snapshot branch: second tee.link() auto-requests a second src_%u pad
+            for src_el, dst_el in (
+                (tee,       q_snap),
+                (q_snap,    conv_snap),
+                (conv_snap, caps_snap),
+                (caps_snap, appsink),
+            ):
                 if not src_el.link(dst_el):
                     print(f"[GStreamer] Échec du lien: {src_el.get_name()} → {dst_el.get_name()}")
                     return None
 
             # rtspsrc creates its src pad dynamically after RTSP negotiation.
-            # Link it to rtph265depay once the pad is available.
             def _on_pad_added(src, new_pad, depay_el=depay):  # type: ignore[misc]
                 sink_pad = depay_el.get_static_pad("sink")
                 if sink_pad.is_linked():

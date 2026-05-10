@@ -4,6 +4,7 @@ import subprocess
 from typing import Optional
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget
 
 from src.controller.event_bus import EventBus
@@ -23,6 +24,29 @@ except Exception as e:
     GST_IMPORT_ERROR = e
     Gst = None  # type: ignore[assignment]
     GstVideo = None  # type: ignore[assignment]
+
+
+def _gst_sample_to_pixmap(sample) -> "QPixmap | None":
+    if sample is None:
+        return None
+    buf = sample.get_buffer()
+    caps = sample.get_caps()
+    if buf is None or caps is None:
+        return None
+    s = caps.get_structure(0)
+    width  = s.get_value("width")
+    height = s.get_value("height")
+    ok, map_info = buf.map(Gst.MapFlags.READ)  # type: ignore[misc]
+    if not ok:
+        return None
+    try:
+        img = QImage(
+            bytes(map_info.data), width, height, width * 3,
+            QImage.Format.Format_RGB888,
+        )
+        return QPixmap.fromImage(img.copy())
+    finally:
+        buf.unmap(map_info)
 
 
 class WebCameraView:
@@ -186,7 +210,12 @@ class WebCameraView:
             f"v4l2src device={device} ! "
             f"queue max-size-buffers=1 leaky=downstream ! "
             f"videoconvert ! "
-            f"{sink_type} name=video_sink sync=false qos=false"
+            f"tee name=t "
+            f"t. ! queue max-size-buffers=1 leaky=downstream ! "
+            f"{sink_type} name=video_sink sync=false qos=false "
+            f"t. ! queue max-size-buffers=1 leaky=downstream ! "
+            f"videoconvert ! video/x-raw,format=RGB ! "
+            f"appsink name=snapshot_sink drop=true max-buffers=1 emit-signals=false sync=false"
         )
         print(f"[GStreamer][WebCam] Pipeline: {pipeline_str}")
 
@@ -246,6 +275,15 @@ class WebCameraView:
                 sink.expose()
             except Exception:
                 pass
+
+    def capture_snapshot(self) -> "QPixmap | None":
+        if not GST_AVAILABLE or self._pipeline is None:
+            return None
+        snap_sink = self._pipeline.get_by_name("snapshot_sink")
+        if snap_sink is None:
+            return None
+        sample = snap_sink.get_property("last-sample")
+        return _gst_sample_to_pixmap(sample)
 
     def get_widget(self) -> QWidget:
         if self._widget is None:
