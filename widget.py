@@ -17,7 +17,8 @@ from PySide6.QtWidgets import (
     QStackedWidget,
 )
 
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QIcon
+from pathlib import Path
 
 # Import view skeletons (high-level)
 from src.views.console_view import DebugConsole
@@ -32,7 +33,7 @@ from src.clients.ros2_client import ROS2Client
 class Widget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Capraui - Dashboard")
+        self.setWindowTitle("Rove - UI")
 
         self._header = Header(parent=self)
         self._menu = QMenuBar(self)
@@ -157,7 +158,19 @@ class Widget(QWidget):
 
 if __name__ == "__main__":
     app = QApplication([])
+    app.setApplicationName("Rove - UI")
+    app.setDesktopFileName("rove-ui")
+    _icon_dir = Path(__file__).resolve().parent / "src" / "media" / "icons"
+    _app_icon: QIcon | None = None
+    for _candidate in (_icon_dir / "app_icon.png", _icon_dir / "app_icons.png"):
+        if _candidate.exists():
+            _app_icon = QIcon(str(_candidate))
+            break
+    if _app_icon:
+        app.setWindowIcon(_app_icon)
     window = Widget()
+    if _app_icon:
+        window.setWindowIcon(_app_icon)
     window.buildInterface("./config/config_window1.json")
     window.showMaximized()
     # FORCER le bakcground en BLANC
@@ -173,6 +186,8 @@ if __name__ == "__main__":
     # (ex: config_window2.json)
     if os.path.exists("./config/config_window2.json"):
         window2 = Widget()
+        if _app_icon:
+            window2.setWindowIcon(_app_icon)
         window2.buildInterface("./config/config_window2.json")
         screens = app.screens()
         #Si il y a un autre écran, 

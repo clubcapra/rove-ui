@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import random
+from pathlib import Path
 
 from PySide6.QtCore import QDateTime, QPointF, Qt, QTimer, QUrl
 from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap, QPolygonF
@@ -196,6 +197,12 @@ class Bitmap:
         self._pois: list[dict] = []         # {"nx", "ny", "alt", "label"}
         self._poi_seq: int = 0
 
+        # Custom image cache (loaded once on first use)
+        self._robot_cursor_pixmap: QPixmap | None = None
+        self._poi_pixmap: QPixmap | None = None
+        self._robot_img_tried: bool = False
+        self._poi_img_tried: bool = False
+
     # ── Build ──────────────────────────────────────────────────────────────────
 
     def build(self) -> None:
@@ -339,27 +346,53 @@ class Bitmap:
         painter.end()
         self._label.setPixmap(result)
 
+    def _load_image(self, config_key: str, tried_flag: str, cache_attr: str) -> QPixmap | None:
+        if getattr(self, tried_flag):
+            return getattr(self, cache_attr)
+        setattr(self, tried_flag, True)
+        img_path = str(self.config.get(config_key, "")).strip()
+        if not img_path:
+            return None
+        p = Path(img_path) if Path(img_path).is_absolute() else Path(__file__).resolve().parents[3] / img_path
+        pix = QPixmap(str(p))
+        result = pix if not pix.isNull() else None
+        setattr(self, cache_attr, result)
+        return result
+
     def _draw_robot_cursor(
         self, painter: QPainter, cx: int, cy: int, yaw_deg: float, size: int
     ) -> None:
         """Arrow centred at (cx, cy) pointing in the heading direction."""
+        pix = self._load_image("robot_cursor_image", "_robot_img_tried", "_robot_cursor_pixmap")
+        if pix is not None:
+            dim = size * 2
+            scaled = pix.scaled(
+                dim, dim,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            painter.save()
+            painter.translate(cx, cy)
+            painter.rotate(yaw_deg)
+            painter.drawPixmap(-scaled.width() // 2, -scaled.height() // 2, scaled)
+            painter.restore()
+            return
+
+        # Fallback: SVG-style arrow
         painter.save()
         painter.translate(cx, cy)
-        # QPainter.rotate(deg) is clockwise; 0° = arrow tip pointing UP = North
         painter.rotate(yaw_deg)
 
-        # Translucent halo
         ring_r = int(size * 1.15)
         painter.setPen(QPen(QColor(255, 255, 255, 150), 2))
         painter.setBrush(QColor(0, 0, 0, 70))
         painter.drawEllipse(-ring_r, -ring_r, ring_r * 2, ring_r * 2)
 
-        # Arrow triangle (tip UP = North when yaw=0)
         tip_y   = -int(size * 0.85)
         base_y  =  int(size * 0.55)
         base_hw =  int(size * 0.45)
         arrow = QPolygonF([
-            QPointF(0,       tip_y),
+            QPointF(0,        tip_y),
             QPointF(-base_hw, base_y),
             QPointF(base_hw,  base_y),
         ])
@@ -367,7 +400,6 @@ class Bitmap:
         painter.setBrush(QColor(34, 197, 94, 230))
         painter.drawPolygon(arrow)
 
-        # Red dot at exact robot position
         dot_r = max(3, size // 7)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(239, 68, 68, 240))
@@ -379,28 +411,38 @@ class Bitmap:
         r = max(7, min(w, h) // 40)
         font_size = max(7, min(w, h) // 55)
         painter.setFont(QFont("Sans Serif", font_size, QFont.Weight.Bold))
+        poi_pix = self._load_image("poi_image", "_poi_img_tried", "_poi_pixmap")
 
         for poi in self._pois:
             px = int(poi["nx"] * w)
             py = int(poi["ny"] * h)
 
-            # Pin circle — golden with dark border
-            painter.setPen(QPen(QColor("#78350f"), 2))
-            painter.setBrush(QColor(245, 158, 11, 220))
-            painter.drawEllipse(px - r, py - r, r * 2, r * 2)
+            if poi_pix is not None:
+                # Custom image — anchored at bottom-centre
+                ih = r * 3
+                iw = int(ih * poi_pix.width() / max(1, poi_pix.height()))
+                scaled = poi_pix.scaled(
+                    iw, ih,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+                painter.drawPixmap(px - scaled.width() // 2, py - scaled.height(), scaled)
+            else:
+                # Fallback: golden pin
+                painter.setPen(QPen(QColor("#78350f"), 2))
+                painter.setBrush(QColor(245, 158, 11, 220))
+                painter.drawEllipse(px - r, py - r, r * 2, r * 2)
 
-            # Pin stem
-            stem = max(3, r // 2)
-            painter.setPen(QPen(QColor("#f59e0b"), max(2, stem // 2)))
-            painter.drawLine(px, py + r, px, py + r + stem)
+                stem = max(3, r // 2)
+                painter.setPen(QPen(QColor("#f59e0b"), max(2, stem // 2)))
+                painter.drawLine(px, py + r, px, py + r + stem)
 
-            # White centre dot
-            cr = max(2, r // 3)
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(255, 255, 255, 230))
-            painter.drawEllipse(px - cr, py - cr, cr * 2, cr * 2)
+                cr = max(2, r // 3)
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(255, 255, 255, 230))
+                painter.drawEllipse(px - cr, py - cr, cr * 2, cr * 2)
 
-            # Label + altitude (shadow then white)
+            # Label + altitude (shadow then white) — always drawn
             text = f"{poi['label']}  {poi['alt']:.2f} m"
             tx, ty = px + r + 3, py + font_size // 2
             painter.setPen(QPen(QColor(0, 0, 0, 160), 1))

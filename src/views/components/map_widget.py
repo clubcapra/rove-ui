@@ -91,6 +91,28 @@ class MapWidget(QWidget):
         zoom = int(self._config.get("initial_zoom", 15))
         self.run_js(f"window.mapSetView({lat}, {lng}, {zoom});")
         self.run_js(f"window.mapSetRobotPosition({lat}, {lng});")
+        self._inject_icons()
+
+    def _inject_icons(self) -> None:
+        project_root = Path(__file__).resolve().parents[3]
+
+        robot_img = str(self._config.get("robot_cursor_image", "")).strip()
+        if robot_img:
+            p = Path(robot_img) if Path(robot_img).is_absolute() else project_root / robot_img
+            if p.exists():
+                url = QUrl.fromLocalFile(str(p)).toString()
+                size = self._config.get("robot_cursor_size", [36, 36])
+                w, h = (size[0], size[1]) if isinstance(size, list) and len(size) >= 2 else (36, 36)
+                self.run_js(f"window.mapSetRobotIcon({json.dumps(url)}, {w}, {h});")
+
+        poi_img = str(self._config.get("poi_image", "")).strip()
+        if poi_img:
+            p = Path(poi_img) if Path(poi_img).is_absolute() else project_root / poi_img
+            if p.exists():
+                url = QUrl.fromLocalFile(str(p)).toString()
+                size = self._config.get("poi_size", [24, 32])
+                w, h = (size[0], size[1]) if isinstance(size, list) and len(size) >= 2 else (24, 32)
+                self.run_js(f"window.mapSetPOIIcon({json.dumps(url)}, {w}, {h});")
 
     def _register_position_tracking(self) -> None:
         lat_topic = str(self._config.get("robot_position_lat_topic", "")).strip()
