@@ -9,7 +9,10 @@ from pathlib import Path
 
 from PySide6.QtCore import QDateTime, QPointF, Qt, QTimer, QUrl
 from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap, QPolygonF
-from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
+from PySide6.QtNetwork import (
+    QHttpMultiPart, QHttpPart,
+    QNetworkAccessManager, QNetworkReply, QNetworkRequest,
+)
 from PySide6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QPushButton,
     QSlider, QVBoxLayout, QWidget,
@@ -26,8 +29,10 @@ _PANEL  = "#1e293b"
 class _AltitudePicker(QDialog):
     """Modal popup to pick POI altitude (0–5 m, precision 0.01 m)."""
 
-    def __init__(self, parent=None):
+    def __init__(self, event_bus: EventBus, ocr_url: str, parent=None):
         super().__init__(parent)
+        self._event_bus = event_bus
+        self._ocr_url   = ocr_url
         self.setWindowTitle("Altitude du point")
         self.setWindowFlags(
             Qt.WindowType.Dialog
@@ -38,6 +43,7 @@ class _AltitudePicker(QDialog):
         self.setFixedWidth(224)
         self._altitude = 0.0
         self._photo_data_url: str | None = None
+        self._nam_ocr: QNetworkAccessManager | None = None
 
         self.setStyleSheet(f"""
             QDialog {{
@@ -194,20 +200,63 @@ class _AltitudePicker(QDialog):
         )
         self._photo_preview.setPixmap(preview)
 
-        # Convert full-size (max 640px) snapshot to JPEG data URL via temp file
+        # Convert full-size (max 640px) snapshot to JPEG bytes
         if pix.width() > 640:
             pix = pix.scaledToWidth(640, Qt.TransformationMode.SmoothTransformation)
         tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
         tmp.close()
         pix.save(tmp.name, "JPEG", 82)
         with open(tmp.name, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode()
+            jpeg_bytes = f.read()
         os.unlink(tmp.name)
-        self._photo_data_url = "data:image/jpeg;base64," + b64
+        self._photo_data_url = "data:image/jpeg;base64," + base64.b64encode(jpeg_bytes).decode()
 
         self._photo_btn.setText("✓ Photo capturée")
         self._photo_btn.setProperty("captured", "true")
         self._photo_btn.style().polish(self._photo_btn)
+
+        # Send to OCR endpoint asynchronously
+        self._post_ocr(jpeg_bytes)
+
+    def _post_ocr(self, jpeg_bytes: bytes) -> None:
+        if not self._ocr_url:
+            return
+        if self._nam_ocr is None:
+            self._nam_ocr = QNetworkAccessManager(self)
+
+        part = QHttpPart()
+        part.setHeader(
+            QNetworkRequest.KnownHeaders.ContentDispositionHeader,
+            'form-data; name="image"; filename="snapshot.jpg"',
+        )
+        part.setHeader(QNetworkRequest.KnownHeaders.ContentTypeHeader, "image/jpeg")
+        part.setBody(jpeg_bytes)
+
+        multipart = QHttpMultiPart(QHttpMultiPart.ContentType.FormDataType, self)
+        multipart.append(part)
+
+        request = QNetworkRequest(QUrl(self._ocr_url))
+        reply = self._nam_ocr.post(request, multipart)
+        multipart.setParent(reply)
+        reply.finished.connect(lambda r=reply: self._on_ocr_reply(r))
+
+    def _on_ocr_reply(self, reply: QNetworkReply) -> None:
+        try:
+            if reply.error() != QNetworkReply.NetworkError.NoError:
+                self._event_bus.publish_sync(
+                    "log", f"[OCR] Erreur réseau: {reply.errorString()}"
+                )
+                return
+            import json as _json
+            data = _json.loads(bytes(reply.readAll()))
+            text = str(data.get("text", "")).strip()
+            ms   = data.get("processing_time_ms", "?")
+            if text:
+                self._event_bus.publish_sync("log", f"[OCR] Titre POI: «{text}» ({ms} ms)")
+            else:
+                self._event_bus.publish_sync("log", f"[OCR] Aucun texte détecté ({ms} ms)")
+        finally:
+            reply.deleteLater()
 
     def altitude(self) -> float:
         return self._altitude
@@ -334,7 +383,8 @@ class Bitmap:
     # ── Click → altitude picker → POI ─────────────────────────────────────────
 
     def _handle_click(self, nx: float, ny: float) -> None:
-        picker = _AltitudePicker(self._widget)
+        ocr_url = str(self.config.get("ocr_url", "http://localhost:8080/camera/ocr")).strip()
+        picker = _AltitudePicker(self.event_bus, ocr_url, self._widget)
 
         # Centre the picker on the bitmap widget
         if self._widget:

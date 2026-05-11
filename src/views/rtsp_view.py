@@ -192,7 +192,7 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
             self.bus = None
 
     def _sync_video_overlay(self, sink) -> None:
-        if self.video_widget is None:
+        if self.video_widget is None or not self.video_widget.isVisible():
             return
         win_id = int(self.video_widget.winId())
         if hasattr(sink, "set_window_handle"):
@@ -253,7 +253,9 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
 
         self.bus = self.pipeline.get_bus()
         self.bus.add_signal_watch()
+        self.bus.enable_sync_message_emission()
         self.bus.connect("message", self._on_bus_message)
+        self.bus.connect("sync-message::element", self._on_sync_message)
 
         self.start()
         return True
@@ -311,7 +313,12 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
             print("[GStreamer] End of stream")
             self.event_bus.publish_sync("log", f"RTSPView[{self.name}] End of stream")
 
-
+    def _on_sync_message(self, _, message) -> None:
+        struct = message.get_structure()
+        if struct is None or struct.get_name() != "prepare-window-handle":
+            return
+        if self.video_widget is not None and self.video_widget.isVisible():
+            GstVideo.VideoOverlay.set_window_handle(message.src, int(self.video_widget.winId()))  # type: ignore[misc]
 
     def _resolve_source(self, source_type: str | None, source: str | None) -> tuple[str | None, str | None]:
         resolved_source = source or self.config.get("source") or self.config.get("url")

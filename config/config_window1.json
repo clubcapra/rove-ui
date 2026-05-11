@@ -91,6 +91,21 @@
       "recv_timeout_s": 2.0,
       "rediscovery_interval_s": 30,
       "enabled": true
+    },
+    {
+      "type": "udp_poll",
+      "name": "kinova_arm",
+      "base_url": "http://192.168.2.2:8080",
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "kinova_arm",
+      "discovery_port_field": "data_port",
+      "topic": "kinova_arm",
+      "topic_prefix": "kinova_arm",
+      "publish_field_topics": true,
+      "poll_interval_ms": 100,
+      "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30,
+      "enabled": true
     }
 
   ],
@@ -204,10 +219,14 @@
             },
             "controls": {
               "joint_angles": [
-                {"joint": "joint_revolute_6", "topic": "odrive.42.pos_estimate", "scale":  0.01745, "offset": 0},
-                {"joint": "joint_revolute_5", "topic": "odrive.43.pos_estimate", "scale": -0.01745, "offsets": 3.14159},
-                {"joint": "joint_revolute_7", "topic": "odrive.44.pos_estimate", "scale": -0.01745, "offset": 3.14159},
-                {"joint": "joint_revolute_8", "topic": "odrive.45.pos_estimate", "scale":  0.01745, "offset": 0}
+               
+                {"joint": "joint_revolute_9",  "topic": "kinova_arm.joint_1_pos", "scale": 0.01745, "offset": 1.5708},
+                {"joint": "joint_revolute_10", "topic": "kinova_arm.joint_2_pos", "scale": -0.01745, "offset": 0},
+                {"joint": "joint_revolute_11", "topic": "kinova_arm.joint_3_pos", "scale": 0.01745, "offset": 1.5708},
+                {"joint": "joint_revolute_12", "topic": "kinova_arm.joint_4_pos", "scale": 0.01745, "offset": 0},
+                {"joint": "joint_revolute_13", "topic": "kinova_arm.joint_5_pos", "scale": 0.01745, "offset": 1.5708},
+                {"joint": "joint_revolute_14", "topic": "kinova_arm.joint_6_pos", "scale": 0.01745, "offset": 1.5708}
+
               ],
               "robot_pose": {
                 "roll_topic":  "gnss.roll",
@@ -270,7 +289,7 @@
             "robot_position_lng_topic": "gnss.longitude",
             "robot_position_yaw_topic": "gnss.yaw",
             "add_poi_at_topic": "costmap.poi",
-
+            "ocr_url": "http://localhost:8080/camera/ocr",
             "robot_cursor_image": "src/media/icons/robot_icons.png",
             "robot_cursor_size": [40, 40],
             "poi_image": "src/media/icons/poi_icons.png",

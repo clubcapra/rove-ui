@@ -67,9 +67,18 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Callable
 
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, File, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from PIL import Image
+from PIL import Image, ImageDraw
+
+try:
+    import cv2
+    import numpy as np
+    import pytesseract
+    _OCR_AVAILABLE = True
+except ImportError as _ocr_err:
+    _OCR_AVAILABLE = False
+    print(f"[ocr] disabled ({_ocr_err}); install opencv-python-headless pytesseract", flush=True)
 
 # ---------------------------------------------------------------------------
 # Protobuf (optional — graceful fallback to JSON-only if not compiled)
@@ -1058,3 +1067,69 @@ def api_sensors() -> list:
         }
         for s in _SENSORS
     ]
+
+
+# ---------------------------------------------------------------------------
+# OCR  —  POST /camera/ocr
+# ---------------------------------------------------------------------------
+
+def _make_mock_ocr_image() -> "np.ndarray":
+    """Generate a synthetic image with readable text for mock OCR testing."""
+    img = Image.new("RGB", (640, 160), color=(245, 245, 245))
+    draw = ImageDraw.Draw(img)
+    lines = [
+        "ROVE ROBOTICS — Mock OCR Frame",
+        f"Time: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        "Battery: 82%  |  Speed: 0.35 m/s  |  Heading: 047°",
+    ]
+    for i, line in enumerate(lines):
+        draw.text((20, 15 + i * 44), line, fill=(10, 10, 10))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    arr = np.frombuffer(buf.getvalue(), np.uint8)
+    return cv2.imdecode(arr, cv2.IMREAD_COLOR)  # type: ignore[return-value]
+
+
+def _preprocess_for_ocr(frame: "np.ndarray") -> "np.ndarray":
+    """Grayscale → Otsu threshold → light denoise."""
+    gray     = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    denoised = cv2.fastNlMeansDenoising(binary, h=10)
+    return denoised
+
+
+@app.post("/camera/ocr", summary="Capture or upload an image and extract text via OCR")
+async def camera_ocr(image: UploadFile | None = File(default=None)) -> dict:
+    """
+    Run Tesseract OCR on an image.
+
+    - **image** *(optional)*: upload a JPEG/PNG file.
+      If omitted the server generates a synthetic mock frame.
+
+    Returns `{"text": "...", "processing_time_ms": ...}`.
+    """
+    if not _OCR_AVAILABLE:
+        return Response(  # type: ignore[return-value]
+            content='{"error":"OCR libraries not installed (opencv-python-headless + pytesseract)"}',
+            status_code=503,
+            media_type="application/json",
+        )
+
+    t0 = time.monotonic()
+
+    if image is not None:
+        raw = await image.read()
+        arr = np.frombuffer(raw, np.uint8)
+        frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if frame is None:
+            return {"error": "could not decode image", "text": "", "processing_time_ms": 0.0}
+    else:
+        frame = _make_mock_ocr_image()
+
+    processed = _preprocess_for_ocr(frame)
+    text = pytesseract.image_to_string(processed, config="--psm 3 --oem 3").strip()
+
+    return {
+        "text":               text,
+        "processing_time_ms": round((time.monotonic() - t0) * 1000, 1),
+    }

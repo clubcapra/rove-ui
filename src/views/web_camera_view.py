@@ -159,12 +159,19 @@ class WebCameraView:
         elif message.type == Gst.MessageType.EOS:  # type: ignore[misc]
             self.event_bus.publish_sync("log", "[GStreamer][WebCam] End of stream")
 
+    def _on_sync_message(self, _, message) -> None:
+        struct = message.get_structure()
+        if struct is None or struct.get_name() != "prepare-window-handle":
+            return
+        if self._video_widget is not None and self._video_widget.isVisible():
+            GstVideo.VideoOverlay.set_window_handle(message.src, int(self._video_widget.winId()))  # type: ignore[misc]
+
     def start(self) -> None:
         if self._pipeline is None:
             self.restart_pipeline()
         if self._pipeline is not None:
             sink = self._pipeline.get_by_name("video_sink")
-            if sink is not None and self._video_widget is not None:
+            if sink is not None and self._video_widget is not None and self._video_widget.isVisible():
                 win_id = int(self._video_widget.winId())
                 if hasattr(sink, "set_window_handle"):
                     sink.set_window_handle(win_id)
@@ -235,7 +242,9 @@ class WebCameraView:
 
         self._bus = self._pipeline.get_bus()
         self._bus.add_signal_watch()
+        self._bus.enable_sync_message_emission()
         self._bus.connect("message", self._on_bus_message)
+        self._bus.connect("sync-message::element", self._on_sync_message)
         return True
 
     def _on_video_surface_resized(self) -> None:
@@ -247,7 +256,7 @@ class WebCameraView:
         self._sync_video_overlay(sink)
 
     def _sync_video_overlay(self, sink) -> None:
-        if self._video_widget is None:
+        if self._video_widget is None or not self._video_widget.isVisible():
             return
 
         win_id = int(self._video_widget.winId())
