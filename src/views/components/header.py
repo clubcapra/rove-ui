@@ -55,8 +55,8 @@ class Header(QWidget):
 
     _BAR_STYLE = """
         Header {
-            background-color: #1a1a2e;
-            border-bottom: 1px solid #2e2e4e;
+            background-color: #1c1c1b;
+            border-bottom: 1px solid #292928;
         }
         QLabel {
             color: #e0e0e0;

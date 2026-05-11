@@ -4,6 +4,7 @@ import subprocess
 from typing import Optional
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget
 
 from src.controller.event_bus import EventBus
@@ -23,6 +24,29 @@ except Exception as e:
     GST_IMPORT_ERROR = e
     Gst = None  # type: ignore[assignment]
     GstVideo = None  # type: ignore[assignment]
+
+
+def _gst_sample_to_pixmap(sample) -> "QPixmap | None":
+    if sample is None:
+        return None
+    buf = sample.get_buffer()
+    caps = sample.get_caps()
+    if buf is None or caps is None:
+        return None
+    s = caps.get_structure(0)
+    width  = s.get_value("width")
+    height = s.get_value("height")
+    ok, map_info = buf.map(Gst.MapFlags.READ)  # type: ignore[misc]
+    if not ok:
+        return None
+    try:
+        img = QImage(
+            bytes(map_info.data), width, height, width * 3,
+            QImage.Format.Format_RGB888,
+        )
+        return QPixmap.fromImage(img.copy())
+    finally:
+        buf.unmap(map_info)
 
 
 class WebCameraView:
@@ -135,12 +159,19 @@ class WebCameraView:
         elif message.type == Gst.MessageType.EOS:  # type: ignore[misc]
             self.event_bus.publish_sync("log", "[GStreamer][WebCam] End of stream")
 
+    def _on_sync_message(self, _, message) -> None:
+        struct = message.get_structure()
+        if struct is None or struct.get_name() != "prepare-window-handle":
+            return
+        if self._video_widget is not None and self._video_widget.isVisible():
+            GstVideo.VideoOverlay.set_window_handle(message.src, int(self._video_widget.winId()))  # type: ignore[misc]
+
     def start(self) -> None:
         if self._pipeline is None:
             self.restart_pipeline()
         if self._pipeline is not None:
             sink = self._pipeline.get_by_name("video_sink")
-            if sink is not None and self._video_widget is not None:
+            if sink is not None and self._video_widget is not None and self._video_widget.isVisible():
                 win_id = int(self._video_widget.winId())
                 if hasattr(sink, "set_window_handle"):
                     sink.set_window_handle(win_id)
@@ -186,7 +217,12 @@ class WebCameraView:
             f"v4l2src device={device} ! "
             f"queue max-size-buffers=1 leaky=downstream ! "
             f"videoconvert ! "
-            f"{sink_type} name=video_sink sync=false qos=false"
+            f"tee name=t "
+            f"t. ! queue max-size-buffers=1 leaky=downstream ! "
+            f"{sink_type} name=video_sink sync=false qos=false "
+            f"t. ! queue max-size-buffers=1 leaky=downstream ! "
+            f"videoconvert ! video/x-raw,format=RGB ! "
+            f"appsink name=snapshot_sink drop=true max-buffers=1 emit-signals=false sync=false"
         )
         print(f"[GStreamer][WebCam] Pipeline: {pipeline_str}")
 
@@ -206,7 +242,9 @@ class WebCameraView:
 
         self._bus = self._pipeline.get_bus()
         self._bus.add_signal_watch()
+        self._bus.enable_sync_message_emission()
         self._bus.connect("message", self._on_bus_message)
+        self._bus.connect("sync-message::element", self._on_sync_message)
         return True
 
     def _on_video_surface_resized(self) -> None:
@@ -218,7 +256,7 @@ class WebCameraView:
         self._sync_video_overlay(sink)
 
     def _sync_video_overlay(self, sink) -> None:
-        if self._video_widget is None:
+        if self._video_widget is None or not self._video_widget.isVisible():
             return
 
         win_id = int(self._video_widget.winId())
@@ -246,6 +284,15 @@ class WebCameraView:
                 sink.expose()
             except Exception:
                 pass
+
+    def capture_snapshot(self) -> "QPixmap | None":
+        if not GST_AVAILABLE or self._pipeline is None:
+            return None
+        snap_sink = self._pipeline.get_by_name("snapshot_sink")
+        if snap_sink is None:
+            return None
+        sample = snap_sink.get_property("last-sample")
+        return _gst_sample_to_pixmap(sample)
 
     def get_widget(self) -> QWidget:
         if self._widget is None:

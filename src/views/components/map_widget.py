@@ -184,8 +184,16 @@ class MapWidget(QWidget):
                     lng = float(payload["lng"])
                 except (KeyError, TypeError, ValueError):
                     return
-                label = str(payload.get("label", f"{lat:.5f},{lng:.5f}"))
-                self.run_js(f"window.mapAddPOI({lat}, {lng}, {json.dumps(label)});")
+                label  = str(payload.get("label", f"{lat:.5f},{lng:.5f}"))
+                poi_id = str(payload.get("poi_id", ""))
+                self.run_js(
+                    f"window.mapAddPOI({lat}, {lng}, {json.dumps(label)}, {json.dumps(poi_id)});"
+                )
+                photo = str(payload.get("photo", ""))
+                if photo and poi_id:
+                    self.run_js(
+                        f"window.mapAttachPhoto({json.dumps(poi_id)}, {json.dumps(photo)});"
+                    )
 
             self._event_bus.subscribe(at_topic, _on_poi_at)
             self._event_bus.publish_sync("log", f"MapWidget: add-POI-at bound to '{at_topic}'")

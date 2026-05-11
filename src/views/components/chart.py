@@ -13,8 +13,26 @@ from PySide6.QtCharts import (
     QValueAxis,
 )
 from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QBrush, QColor, QPen
 
 from src.controller.event_bus import EventBus
+
+# ── Theme ──────────────────────────────────────────────────────────────────────
+_C_BG     = QColor("#1c1c1b")
+_C_BG_LT  = QColor("#292928")
+_C_TEXT   = QColor("#e0e0e0")
+_C_GRID   = QColor("#3a3a38")
+
+_PALETTE = [
+    QColor("#eb4034"),  # red (accent)
+    QColor("#60a5fa"),  # blue
+    QColor("#22c55e"),  # green
+    QColor("#f59e0b"),  # amber
+    QColor("#a78bfa"),  # purple
+    QColor("#f472b6"),  # pink
+    QColor("#34d399"),  # teal
+    QColor("#fb923c"),  # orange
+]
 
 
 class ChartWidget(QWidget):
@@ -45,6 +63,7 @@ class ChartWidget(QWidget):
 
         self.chart.setTitle(self._title)
         self.chart.setAnimationOptions(QChart.AnimationOption.NoAnimation)
+        self._apply_base_theme()
 
         self._render_timer = QTimer(self)
         self._render_timer.setInterval(100)  # 10 fps max
@@ -86,6 +105,45 @@ class ChartWidget(QWidget):
     def set_title(self, title: str):
         self._title = title
         self.chart.setTitle(title)
+
+    def _apply_base_theme(self) -> None:
+        self.chart.setBackgroundBrush(QBrush(_C_BG))
+        self.chart.setPlotAreaBackgroundBrush(QBrush(_C_BG_LT))
+        self.chart.setPlotAreaBackgroundVisible(True)
+        self.chart.setTitleBrush(QBrush(_C_TEXT))
+        self.chart.setDropShadowEnabled(False)
+        legend = self.chart.legend()
+        legend.setLabelColor(_C_TEXT)
+        legend.setBackgroundVisible(False)
+        self.view.setBackgroundBrush(QBrush(_C_BG))
+        self.view.setStyleSheet("border: none;")
+
+    def _apply_axes_and_series_theme(self) -> None:
+        grid_pen  = QPen(_C_GRID, 1)
+        minor_pen = QPen(_C_GRID, 1, Qt.PenStyle.DotLine)
+        axis_pen  = QPen(_C_GRID, 1)
+        for axis in self.chart.axes():
+            axis.setLabelsBrush(QBrush(_C_TEXT))
+            axis.setTitleBrush(QBrush(_C_TEXT))
+            axis.setGridLinePen(grid_pen)
+            axis.setMinorGridLinePen(minor_pen)
+            axis.setLinePen(axis_pen)
+            axis.setShadesVisible(False)
+
+        for i, series in enumerate(self.chart.series()):
+            color = _PALETTE[i % len(_PALETTE)]
+            if isinstance(series, QLineSeries):
+                series.setPen(QPen(color, 2))
+                series.setColor(color)
+            elif isinstance(series, (QBarSeries, QHorizontalBarSeries)):
+                for bar_set in series.barSets():
+                    bar_set.setColor(color)
+                    bar_set.setBorderColor(_C_BG_LT)
+                    bar_set.setLabelColor(_C_TEXT)
+            elif isinstance(series, QPieSeries):
+                for j, slice_ in enumerate(series.slices()):
+                    slice_.setColor(_PALETTE[j % len(_PALETTE)])
+                    slice_.setLabelColor(_C_TEXT)
 
     def _load_from_config(self):
         rows = self.config.get("data", [])
@@ -318,6 +376,7 @@ class ChartWidget(QWidget):
 
         if self._chart_type == "lines":
             self._build_line_chart()
+            self._apply_axes_and_series_theme()
             return
 
         if self._chart_type == "pie":
@@ -326,6 +385,7 @@ class ChartWidget(QWidget):
                 series.append(label, value)
             self.chart.addSeries(series)
             self.chart.legend().setVisible(True)
+            self._apply_axes_and_series_theme()
             return
 
         bar_set = QBarSet(self._series_name)
@@ -354,3 +414,4 @@ class ChartWidget(QWidget):
 
         series.attachAxis(category_axis)
         series.attachAxis(value_axis)
+        self._apply_axes_and_series_theme()

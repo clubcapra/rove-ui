@@ -11,13 +11,11 @@ from PySide6.QtWidgets import (
     QApplication,
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,
-    QMenuBar,
     QLabel,
     QStackedWidget,
 )
 
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtGui import QIcon
 from pathlib import Path
 
 # Import view skeletons (high-level)
@@ -26,6 +24,7 @@ from src.views.rtsp_view import RTSPView
 from src.views.layout_pannel import LayoutPanel
 from src.controller.event_bus import EventBus
 from src.views.components.header import Header
+from src.views.components.nav_bar import NavBar
 from src.clients.udp_client import UDPClient
 from src.clients.ros2_client import ROS2Client
 
@@ -36,21 +35,20 @@ class Widget(QWidget):
         self.setWindowTitle("Rove - UI")
 
         self._header = Header(parent=self)
-        self._menu = QMenuBar(self)
+        self._nav = NavBar(self)
         self._central = QWidget(self)
         self._central_layout = QVBoxLayout(self._central)
         self._central_layout.setContentsMargins(0, 0, 0, 0)
         # stacked widget for top-level pages (dashboard, logs, ...)
         self._stack = QStackedWidget(self._central)
         self._central_layout.addWidget(self._stack)
-        #self._console = DebugConsole(self)
         self.event_bus = EventBus()
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(self._header)
-        layout.addWidget(self._menu)
+        layout.addWidget(self._nav)
         layout.addWidget(self._central)
         #layout.addWidget(self._console)
 
@@ -91,9 +89,7 @@ class Widget(QWidget):
             self._stack.removeWidget(w)
             w.setParent(None)
 
-        # Build a 'Views' menu to navigate top-level view pages
-        self._menu.clear()
-        menu = self._menu.addMenu("Views")
+        self._nav.clear()
 
         for view_name, view_cfg in views_root.items():
             vtype = view_cfg.get("type")
@@ -107,13 +103,11 @@ class Widget(QWidget):
 
             idx = self._stack.addWidget(page_widget)
             self._pages[view_name] = idx
-
-            action = QAction(view_name, self)
-            action.triggered.connect(lambda checked, i=idx: self._stack.setCurrentIndex(i))
-            menu.addAction(action)
+            self._nav.add_page(view_name, lambda i=idx: self._stack.setCurrentIndex(i))
 
         if self._stack.count() > 0:
             self._stack.setCurrentIndex(0)
+            self._nav.activate_first()
 
         self._restart_udp_clients(config.get("udp_clients", []))
         self._restart_ros2_clients(config.get("ros2_clients", []))
@@ -174,7 +168,7 @@ if __name__ == "__main__":
     window.buildInterface("./config/config_window1.json")
     window.showMaximized()
     # FORCER le bakcground en BLANC
-    window.setStyleSheet("background-color: white;color: black;")
+    window.setStyleSheet("background-color: #1c1c1b; color: #e0e0e0;")
     screens = app.screens()
     primary_screen = app.primaryScreen()
 
@@ -197,7 +191,7 @@ if __name__ == "__main__":
             asyncio.run(window.event_bus.publish("log", "Window : Application has started on the second screen."))
 
         window2.showMaximized()
-        window2.setStyleSheet("background-color: white;color: black;")
+        window2.setStyleSheet("background-color: #1c1c1b; color: #e0e0e0;")
 
         
     try:
