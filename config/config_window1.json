@@ -289,7 +289,6 @@
             "robot_position_lng_topic": "gnss.longitude",
             "robot_position_yaw_topic": "gnss.yaw",
             "add_poi_at_topic": "costmap.poi",
-            "ocr_url": "http://localhost:8080/camera/ocr",
             "robot_cursor_image": "src/media/icons/robot_icons.png",
             "robot_cursor_size": [40, 40],
             "poi_image": "src/media/icons/poi_icons.png",

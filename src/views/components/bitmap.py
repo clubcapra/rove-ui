@@ -20,8 +20,8 @@ from PySide6.QtWidgets import (
 
 from src.controller.event_bus import EventBus
 
-_ACCENT = "#f59e0b"
-_PANEL  = "#1e293b"
+_ACCENT = "#eb4034"
+_PANEL  = "#1c1c1b"
 
 
 # ── Altitude picker dialog ─────────────────────────────────────────────────────
@@ -51,30 +51,30 @@ class _AltitudePicker(QDialog):
                 border: 2px solid {_ACCENT};
                 border-radius: 10px;
             }}
-            QLabel {{ color: #f1f5f9; background: transparent; }}
+            QLabel {{ color: #e0e0e0; background: transparent; }}
             QPushButton {{
-                background: #334155; color: #f1f5f9;
-                border: 1px solid #475569; border-radius: 5px;
+                background: #292928; color: #e0e0e0;
+                border: 1px solid #444; border-radius: 5px;
                 padding: 5px 14px; font-size: 12px;
             }}
-            QPushButton:hover {{ background: #475569; }}
+            QPushButton:hover {{ background: #3a3a38; }}
             QPushButton#ok {{
-                background: {_ACCENT}; color: #1e293b;
+                background: {_ACCENT}; color: #fff;
                 font-weight: 700; border: none;
             }}
-            QPushButton#ok:hover {{ background: #fbbf24; }}
+            QPushButton#ok:hover {{ background: #c93028; }}
             QPushButton#photo {{
-                background: #1e3a5f; color: #93c5fd;
-                border: 1px solid #3b82f6; border-radius: 5px;
+                background: #292928; color: #e0e0e0;
+                border: 1px solid #555; border-radius: 5px;
                 padding: 5px 8px; font-size: 12px;
             }}
-            QPushButton#photo:hover {{ background: #1e40af; color: #fff; }}
+            QPushButton#photo:hover {{ background: #3a3a38; color: #fff; }}
             QPushButton#photo[captured="true"] {{
-                background: #14532d; color: #86efac;
+                background: #1a3320; color: #86efac;
                 border-color: #22c55e;
             }}
             QSlider::groove:vertical {{
-                background: #334155; width: 8px; border-radius: 4px; margin: 0 8px;
+                background: #292928; width: 8px; border-radius: 4px; margin: 0 8px;
             }}
             QSlider::handle:vertical {{
                 background: {_ACCENT};
@@ -87,7 +87,7 @@ class _AltitudePicker(QDialog):
                 background: {_ACCENT}; border-radius: 4px; margin: 0 8px;
             }}
             QSlider::add-page:vertical {{
-                background: #334155; border-radius: 4px; margin: 0 8px;
+                background: #292928; border-radius: 4px; margin: 0 8px;
             }}
         """)
 
@@ -119,13 +119,13 @@ class _AltitudePicker(QDialog):
         tick_col.setSpacing(0)
         for txt in ("5", "4", "3", "2", "1", "0"):
             lbl = QLabel(txt)
-            lbl.setStyleSheet("font-size: 9px; color: #64748b;")
+            lbl.setStyleSheet("font-size: 9px; color: #888;")
             lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             tick_col.addWidget(lbl, stretch=1)
         slider_row.addLayout(tick_col)
 
         lbl_m = QLabel("m")
-        lbl_m.setStyleSheet("font-size: 9px; color: #475569;")
+        lbl_m.setStyleSheet("font-size: 9px; color: #888;")
         lbl_m.setAlignment(Qt.AlignmentFlag.AlignTop)
         slider_row.addWidget(lbl_m)
 
@@ -145,7 +145,7 @@ class _AltitudePicker(QDialog):
         # Precision hint
         hint = QLabel("← ↑↓ 0.01 m  |  PgUp/Dn 0.10 m")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        hint.setStyleSheet("font-size: 8px; color: #475569;")
+        hint.setStyleSheet("font-size: 8px; color: #888;")
         outer.addWidget(hint)
 
         # Photo capture preview (16:9, 192×108)
@@ -153,7 +153,7 @@ class _AltitudePicker(QDialog):
         self._photo_preview.setFixedSize(192, 108)
         self._photo_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._photo_preview.setStyleSheet(
-            "background: #0f172a; color: #475569; border-radius: 4px; font-size: 10px;"
+            "background: #292928; color: #888; border-radius: 4px; font-size: 10px;"
         )
         outer.addWidget(self._photo_preview)
 
