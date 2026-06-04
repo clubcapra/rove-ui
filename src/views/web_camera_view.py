@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from typing import Optional
 
@@ -127,13 +128,28 @@ class WebCameraView:
 
     def _resolve_device(self) -> str:
         device = self.config.get("device_path", "").strip()
-        if device:
+        if not device:
+            try:
+                idx = int(self.config.get("device_index", 0))
+            except Exception:
+                idx = 0
+            device = f"/dev/video{idx}"
+
+        if os.path.exists(device):
             return device
-        try:
-            idx = int(self.config.get("device_index", 0))
-        except Exception:
-            idx = 0
-        return f"/dev/video{idx}"
+
+        available = sorted(
+            p for p in (f"/dev/video{i}" for i in range(10)) if os.path.exists(p)
+        )
+        if available:
+            fallback = available[0]
+            self.event_bus.publish_sync(
+                "log",
+                f"WebCameraView[{self.name}] {device} introuvable → fallback {fallback}",
+            )
+            return fallback
+
+        return device
     
     def send_vtx_command(self, vtx_id: int, host: str = "192.168.2.2", port: int = 5540) -> None:
         try:

@@ -24,4 +24,6 @@
 - [ ] Quand on tombe en mode Bras, on switch de view et on affiches les composants pour le Bras (URDF, Monitoring et caméra à la palce de la bitmap)
 - [x] Pour le endpoint UDP, on envoie "0x01" au port udp afficher et l'api retourne la data au port mirroir sur mon device
 - [x] réception et traitement des protobufs
+
+# TODO - 16 Mai
 - [ ] 

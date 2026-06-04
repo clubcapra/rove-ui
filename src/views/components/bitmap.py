@@ -265,6 +265,137 @@ class _AltitudePicker(QDialog):
         return self._photo_data_url
 
 
+# ── Virtual keyboard dialog ───────────────────────────────────────────────────
+
+class _NamePicker(QDialog):
+    """On-screen QWERTY keyboard for naming a POI."""
+
+    _KB_ROWS = [
+        "1234567890",
+        "QWERTYUIOP",
+        "ASDFGHJKL",
+        "ZXCVBNM",
+    ]
+    _KEY_W = 26
+    _KEY_H = 30
+    _KEY_GAP = 4
+
+    def __init__(self, default_name: str = "", parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(
+            Qt.WindowType.Dialog
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+        )
+        self.setModal(True)
+        self._text = default_name
+
+        self.setStyleSheet(f"""
+            QDialog {{
+                background: {_PANEL};
+                border: 2px solid {_ACCENT};
+                border-radius: 10px;
+            }}
+            QLabel {{ color: #e0e0e0; background: transparent; }}
+            QPushButton {{
+                background: #292928; color: #e0e0e0;
+                border: 1px solid #3a3a38; border-radius: 4px;
+                font-size: 11px; font-weight: 600; padding: 0;
+            }}
+            QPushButton:hover  {{ background: #3a3a38; border-color: #666; }}
+            QPushButton:pressed {{ background: #444; }}
+            QPushButton#ok {{
+                background: {_ACCENT}; color: #fff;
+                font-weight: 700; border: none; border-radius: 5px;
+                font-size: 12px; padding: 5px 14px;
+            }}
+            QPushButton#ok:hover {{ background: #c93028; }}
+            QPushButton#cancel {{
+                background: #292928; color: #e0e0e0;
+                border: 1px solid #444; border-radius: 5px;
+                font-size: 12px; padding: 5px 14px;
+            }}
+            QPushButton#cancel:hover {{ background: #3a3a38; }}
+        """)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(14, 14, 14, 14)
+        outer.setSpacing(8)
+
+        title = QLabel("Nom du POI")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet(f"font-size: 13px; font-weight: 700; color: {_ACCENT};")
+        outer.addWidget(title)
+
+        self._display = QLabel()
+        self._display.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._display.setStyleSheet(
+            "font-size: 18px; font-weight: 700; "
+            "background: #292928; border: 1px solid #555; border-radius: 4px; "
+            "padding: 4px 8px; min-height: 32px; color: #e0e0e0;"
+        )
+        self._display.setMinimumWidth(280)
+        outer.addWidget(self._display)
+        self._refresh_display()
+
+        for row_str in self._KB_ROWS:
+            row_layout = QHBoxLayout()
+            row_layout.setSpacing(self._KEY_GAP)
+            row_layout.addStretch()
+            for ch in row_str:
+                btn = QPushButton(ch)
+                btn.setFixedSize(self._KEY_W, self._KEY_H)
+                btn.clicked.connect(lambda _=False, c=ch: self._press(c))
+                row_layout.addWidget(btn)
+            row_layout.addStretch()
+            outer.addLayout(row_layout)
+
+        # Space + backspace row
+        bot = QHBoxLayout()
+        bot.setSpacing(self._KEY_GAP)
+        space_btn = QPushButton("ESPACE")
+        space_btn.setFixedHeight(self._KEY_H)
+        space_btn.clicked.connect(lambda: self._press(" "))
+        bs_btn = QPushButton("⌫")
+        bs_btn.setFixedSize(self._KEY_W * 2 + self._KEY_GAP, self._KEY_H)
+        bs_btn.setStyleSheet(
+            "QPushButton { background: #3a2020; color: #f87171; border: 1px solid #6b2020; border-radius: 4px; font-size: 13px; }"
+            "QPushButton:hover { background: #4a2828; }"
+            "QPushButton:pressed { background: #5a3030; }"
+        )
+        bs_btn.clicked.connect(self._backspace)
+        bot.addWidget(space_btn, 1)
+        bot.addWidget(bs_btn)
+        outer.addLayout(bot)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+        cancel_btn = QPushButton("Annuler")
+        cancel_btn.setObjectName("cancel")
+        cancel_btn.clicked.connect(self.reject)
+        ok_btn = QPushButton("✓ OK")
+        ok_btn.setObjectName("ok")
+        ok_btn.setDefault(True)
+        ok_btn.clicked.connect(self.accept)
+        btn_row.addWidget(cancel_btn)
+        btn_row.addWidget(ok_btn)
+        outer.addLayout(btn_row)
+
+    def _press(self, char: str) -> None:
+        self._text += char
+        self._refresh_display()
+
+    def _backspace(self) -> None:
+        self._text = self._text[:-1]
+        self._refresh_display()
+
+    def _refresh_display(self) -> None:
+        self._display.setText((self._text + "▌") if self._text else "▌")
+
+    def name(self) -> str:
+        return self._text
+
+
 # ── Clickable label (with debounce) ───────────────────────────────────────────
 
 class _ClickableLabel(QLabel):
@@ -398,8 +529,26 @@ class Bitmap:
         if picker.exec() != QDialog.DialogCode.Accepted:
             return
 
-        altitude = picker.altitude()
+        altitude  = picker.altitude()
         photo_url = picker.photo_data_url()
+
+        # Virtual keyboard — name the POI before creating it
+        next_seq     = self._poi_seq + 1
+        default_name = f"#{next_seq}"
+        name_picker  = _NamePicker(default_name, self._widget)
+        if self._widget:
+            center = self._widget.mapToGlobal(self._widget.rect().center())
+            name_picker.adjustSize()
+            name_picker.move(
+                center.x() - name_picker.width()  // 2,
+                center.y() - name_picker.height() // 2,
+            )
+        if name_picker.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        self._poi_seq = next_seq
+        label  = name_picker.name() or default_name
+        poi_id = f"poi_{self._poi_seq}"
 
         radius_x = float(self.config.get("cornerPositionWidth",  1.0)) / 2.0
         radius_y = float(self.config.get("cornerPositionHeight", 1.0)) / 2.0
@@ -414,9 +563,9 @@ class Bitmap:
 
         poi_topic = str(self.config.get("poi_topic", "")).strip()
         if poi_topic:
-            has_gps    = self._robot_lat is not None and self._robot_lng is not None
-            robot_lat  = self._robot_lat if has_gps else 0.0
-            robot_lng  = self._robot_lng if has_gps else 0.0
+            has_gps   = self._robot_lat is not None and self._robot_lng is not None
+            robot_lat = self._robot_lat if has_gps else 0.0
+            robot_lng = self._robot_lng if has_gps else 0.0
 
             yaw_rad = math.radians(self._robot_yaw)
             east    = local_x * math.cos(yaw_rad) - local_y * math.sin(yaw_rad)
@@ -428,10 +577,6 @@ class Bitmap:
 
             payload["lat"] = round(poi_lat, 8)
             payload["lng"] = round(poi_lng, 8)
-
-            self._poi_seq += 1
-            label   = f"#{self._poi_seq}"
-            poi_id  = f"poi_{self._poi_seq}"
 
             poi_payload: dict = {
                 "lat":    poi_lat,
@@ -445,7 +590,6 @@ class Bitmap:
 
             self.event_bus.publish_sync(poi_topic, poi_payload)
 
-            # Overlay marker
             self._pois.append({"nx": nx, "ny": ny, "alt": altitude, "label": label})
             self._update_display()
 
@@ -453,7 +597,7 @@ class Bitmap:
         self.event_bus.publish_sync(click_topic, payload)
         self.event_bus.publish_sync(
             "log",
-            f"[Bitmap:{self.name}] POI {self._poi_seq} → "
+            f"[Bitmap:{self.name}] POI {self._poi_seq} «{label}» → "
             f"local=({payload['x']},{payload['y']}) alt={altitude:.2f}m "
             f"gps={payload.get('lat','?')},{payload.get('lng','?')}",
         )

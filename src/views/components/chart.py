@@ -17,21 +17,21 @@ from PySide6.QtGui import QBrush, QColor, QPen
 
 from src.controller.event_bus import EventBus
 
-# ── Theme ──────────────────────────────────────────────────────────────────────
-_C_BG     = QColor("#1c1c1b")
-_C_BG_LT  = QColor("#292928")
-_C_TEXT   = QColor("#e0e0e0")
-_C_GRID   = QColor("#3a3a38")
+# ── Theme (strings only — QColor/QBrush/QPen must be created after QApplication) ─
+_S_BG    = "#1c1c1b"
+_S_BG_LT = "#292928"
+_S_TEXT  = "#e0e0e0"
+_S_GRID  = "#3a3a38"
 
-_PALETTE = [
-    QColor("#eb4034"),  # red (accent)
-    QColor("#60a5fa"),  # blue
-    QColor("#22c55e"),  # green
-    QColor("#f59e0b"),  # amber
-    QColor("#a78bfa"),  # purple
-    QColor("#f472b6"),  # pink
-    QColor("#34d399"),  # teal
-    QColor("#fb923c"),  # orange
+_PALETTE_HEX = [
+    "#eb4034",  # red (accent)
+    "#60a5fa",  # blue
+    "#22c55e",  # green
+    "#f59e0b",  # amber
+    "#a78bfa",  # purple
+    "#f472b6",  # pink
+    "#34d399",  # teal
+    "#fb923c",  # orange
 ]
 
 
@@ -107,43 +107,49 @@ class ChartWidget(QWidget):
         self.chart.setTitle(title)
 
     def _apply_base_theme(self) -> None:
-        self.chart.setBackgroundBrush(QBrush(_C_BG))
-        self.chart.setPlotAreaBackgroundBrush(QBrush(_C_BG_LT))
+        bg    = QColor(_S_BG)
+        bg_lt = QColor(_S_BG_LT)
+        text  = QColor(_S_TEXT)
+        self.chart.setBackgroundBrush(QBrush(bg))
+        self.chart.setPlotAreaBackgroundBrush(QBrush(bg_lt))
         self.chart.setPlotAreaBackgroundVisible(True)
-        self.chart.setTitleBrush(QBrush(_C_TEXT))
+        self.chart.setTitleBrush(QBrush(text))
         self.chart.setDropShadowEnabled(False)
         legend = self.chart.legend()
-        legend.setLabelColor(_C_TEXT)
+        legend.setLabelColor(text)
         legend.setBackgroundVisible(False)
-        self.view.setBackgroundBrush(QBrush(_C_BG))
+        self.view.setBackgroundBrush(QBrush(bg))
         self.view.setStyleSheet("border: none;")
 
     def _apply_axes_and_series_theme(self) -> None:
-        grid_pen  = QPen(_C_GRID, 1)
-        minor_pen = QPen(_C_GRID, 1, Qt.PenStyle.DotLine)
-        axis_pen  = QPen(_C_GRID, 1)
+        text      = QColor(_S_TEXT)
+        grid      = QColor(_S_GRID)
+        bg_lt     = QColor(_S_BG_LT)
+        grid_pen  = QPen(grid, 1)
+        minor_pen = QPen(grid, 1, Qt.PenStyle.DotLine)
+        axis_pen  = QPen(grid, 1)
         for axis in self.chart.axes():
-            axis.setLabelsBrush(QBrush(_C_TEXT))
-            axis.setTitleBrush(QBrush(_C_TEXT))
+            axis.setLabelsBrush(QBrush(text))
+            axis.setTitleBrush(QBrush(text))
             axis.setGridLinePen(grid_pen)
             axis.setMinorGridLinePen(minor_pen)
             axis.setLinePen(axis_pen)
             axis.setShadesVisible(False)
 
         for i, series in enumerate(self.chart.series()):
-            color = _PALETTE[i % len(_PALETTE)]
+            color = QColor(_PALETTE_HEX[i % len(_PALETTE_HEX)])
             if isinstance(series, QLineSeries):
                 series.setPen(QPen(color, 2))
                 series.setColor(color)
             elif isinstance(series, (QBarSeries, QHorizontalBarSeries)):
                 for bar_set in series.barSets():
                     bar_set.setColor(color)
-                    bar_set.setBorderColor(_C_BG_LT)
-                    bar_set.setLabelColor(_C_TEXT)
+                    bar_set.setBorderColor(bg_lt)
+                    bar_set.setLabelColor(text)
             elif isinstance(series, QPieSeries):
                 for j, slice_ in enumerate(series.slices()):
-                    slice_.setColor(_PALETTE[j % len(_PALETTE)])
-                    slice_.setLabelColor(_C_TEXT)
+                    slice_.setColor(QColor(_PALETTE_HEX[j % len(_PALETTE_HEX)]))
+                    slice_.setLabelColor(text)
 
     def _load_from_config(self):
         rows = self.config.get("data", [])
