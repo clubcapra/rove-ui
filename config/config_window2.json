@@ -119,14 +119,6 @@
           }
         }
       ]
-    },
-
-    "LOGS": {
-      "type": "layout",
-      "diaposition": "vertical",
-      "content": [
-        { "type": "console", "name": "event_log" }
-      ]
     }
   },
 

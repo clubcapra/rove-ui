@@ -103,6 +103,8 @@ class Widget(QWidget):
             self._stack.setCurrentIndex(0)
             self._nav.activate_first()
 
+        self._nav.setVisible(self._stack.count() > 1)
+
         self._rebuild_bottom_bar(config.get("bottom_bar"))
         self._restart_udp_clients(config.get("udp_clients", []))
         self._restart_ros2_clients(config.get("ros2_clients", []))
