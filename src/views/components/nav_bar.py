@@ -3,40 +3,51 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHBoxLayout, QPushButton, QWidget
 
+from src.views import theme
+
 
 class NavBar(QWidget):
-    """Horizontal tab navigation bar."""
+    """Tactical horizontal tab navigation."""
 
-    _NAVBAR_BG = "#1c1c1b"
-    _ACCENT    = "#eb4034"
-    _TEXT_DIM  = "#888888"
-    _HEIGHT    = 44
+    _HEIGHT = 40
+
+    _STYLE = f"""
+        NavBar {{
+            background: {theme.BG_PANEL};
+            border-bottom: 1px solid {theme.BORDER};
+        }}
+        QPushButton {{
+            background: transparent;
+            color: {theme.TEXT_DIM};
+            border: none;
+            border-bottom: 2px solid transparent;
+            padding: 0 26px;
+            font-family: {theme.FONT_MONO};
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            min-height: {_HEIGHT}px;
+            border-radius: 0;
+        }}
+        QPushButton:hover {{
+            color: {theme.TEXT};
+            background: {theme.BG_SURFACE};
+        }}
+        QPushButton[active="true"] {{
+            color: {theme.CYAN};
+            border-bottom: 2px solid {theme.CYAN};
+            background: {theme.BG_SURFACE};
+        }}
+    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedHeight(self._HEIGHT)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet(f"""
-            NavBar {{ background: {self._NAVBAR_BG}; }}
-            QPushButton {{
-                background: transparent;
-                color: {self._TEXT_DIM};
-                border: none;
-                border-bottom: 3px solid transparent;
-                padding: 0 28px;
-                font-size: 13px;
-                font-weight: 600;
-                letter-spacing: 0.5px;
-                min-height: {self._HEIGHT}px;
-            }}
-            QPushButton:hover {{ color: #e5e7eb; background: rgba(255,255,255,0.05); }}
-            QPushButton[active="true"] {{
-                color: {self._ACCENT};
-                border-bottom: 3px solid {self._ACCENT};
-            }}
-        """)
+        self.setStyleSheet(self._STYLE)
+
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 0, 12, 0)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addStretch(1)
         self._buttons: dict[str, QPushButton] = {}
@@ -62,8 +73,7 @@ class NavBar(QWidget):
 
     def activate_first(self) -> None:
         if self._buttons:
-            first = next(iter(self._buttons))
-            self._activate(first, lambda: None)
+            self._activate(next(iter(self._buttons)), lambda: None)
 
     def clear(self) -> None:
         layout = self.layout()

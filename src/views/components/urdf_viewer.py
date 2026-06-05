@@ -18,6 +18,28 @@ TEMPLATE_PATH = Path(__file__).resolve().parent / "html" / "urdfViewer.html"
 FALLBACK_HTML = "<html><body style='color:red;background:#111'>urdfViewer.html template missing</body></html>"
 
 
+def _temp_to_hex(t: float, min_t: float, max_t: float) -> str:
+    """Map temperature to a hex color on a cold→green→amber→hot gradient."""
+    ratio = max(0.0, min(1.0, (t - min_t) / max(max_t - min_t, 1.0)))
+    stops = [
+        (0.00, (0x1a, 0x6f, 0xff)),  # cold blue
+        (0.35, (0x00, 0xe6, 0x76)),  # nominal green
+        (0.65, (0xff, 0xb3, 0x00)),  # warm amber
+        (1.00, (0xff, 0x3d, 0x3d)),  # hot red
+    ]
+    for i in range(len(stops) - 1):
+        t0, c0 = stops[i]
+        t1, c1 = stops[i + 1]
+        if ratio <= t1:
+            f = (ratio - t0) / (t1 - t0)
+            r = int(c0[0] + f * (c1[0] - c0[0]))
+            g = int(c0[1] + f * (c1[1] - c0[1]))
+            b = int(c0[2] + f * (c1[2] - c0[2]))
+            return f"#{r:02x}{g:02x}{b:02x}"
+    c = stops[-1][1]
+    return f"#{c[0]:02x}{c[1]:02x}{c[2]:02x}"
+
+
 def _parse_floats(text: str) -> list[float]:
     try:
         return [float(v) for v in text.strip().split()]
@@ -184,7 +206,10 @@ class URDFViewer(QWidget):
             self._event_bus.publish_sync("log", f"URDFViewer[{self.name}]: template missing at {TEMPLATE_PATH}")
             template = FALLBACK_HTML
 
-        urdf_data["link_colors"] = self._config.get("link_colors", {})
+        controls = self._config.get("controls", {})
+        urdf_data["link_colors"]      = self._config.get("link_colors", {})
+        urdf_data["hide_joint_panel"] = bool(self._config.get("hide_joint_panel", False))
+        urdf_data["thermal_links"]    = controls.get("thermal_links", []) if isinstance(controls, dict) else []
         urdf_json = json.dumps(urdf_data, separators=(",", ":"))
         html = template.replace("/* URDF_DATA_PLACEHOLDER */", f"window.URDF_DATA = {urdf_json};")
         self._html_file.write_text(html, encoding="utf-8")
@@ -263,6 +288,30 @@ class URDFViewer(QWidget):
 
                 self._event_bus.subscribe(topic, _on_pose)
                 count += 1
+
+        for binding in controls.get("thermal_links", []):
+            if not isinstance(binding, dict):
+                continue
+            link  = str(binding.get("link",  "")).strip()
+            topic = str(binding.get("topic", "")).strip()
+            if not link or not topic:
+                continue
+            min_t = float(binding.get("min_temp", 20.0))
+            max_t = float(binding.get("max_temp", 80.0))
+
+            def _on_temp(value, lk=link, mn=min_t, mx=max_t):
+                try:
+                    temp = float(value)
+                except (TypeError, ValueError):
+                    return
+                hex_color = _temp_to_hex(temp, mn, mx)
+                self.run_js(f"window.setLinkColor({json.dumps(lk)}, {json.dumps(hex_color)});")
+                self.run_js(
+                    f"window.setThermalBar({json.dumps(lk)}, {temp:.2f}, {mn}, {mx}, {json.dumps(hex_color)});"
+                )
+
+            self._event_bus.subscribe(topic, _on_temp)
+            count += 1
 
         if count:
             self._event_bus.publish_sync("log", f"URDFViewer[{self.name}]: {count} binding(s) registered")

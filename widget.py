@@ -19,6 +19,7 @@ from PySide6.QtGui import QIcon
 from pathlib import Path
 
 from src.views.layout_pannel import LayoutPanel
+from src.views import theme
 from src.controller.event_bus import EventBus
 from src.views.components.header import Header
 from src.views.components.nav_bar import NavBar
@@ -169,33 +170,30 @@ if __name__ == "__main__":
     window = Widget()
     if _app_icon:
         window.setWindowIcon(_app_icon)
+    app.setStyleSheet(theme.GLOBAL)
+
     window.buildInterface("./config/config_window1.json")
-    window.showMaximized()
-    # FORCER le bakcground en BLANC
-    window.setStyleSheet("background-color: #1c1c1b; color: #e0e0e0;")
+    window.showFullScreen()
+    window.setStyleSheet(f"background: {theme.BG_DEEP};")
     screens = app.screens()
     primary_screen = app.primaryScreen()
 
-    # Mettre window sur l'écran principal
     window.move(primary_screen.geometry().topLeft())
-    # Chercher un écran secondaire
     secondary_screens = [s for s in screens if s != primary_screen]
-    # Si il  y a un config window 2 existe, on affiche un autre window pour le second écran
-    # (ex: config_window2.json)
+
     if os.path.exists("./config/config_window2.json"):
         window2 = Widget(event_bus=window.event_bus)
         if _app_icon:
             window2.setWindowIcon(_app_icon)
         window2.buildInterface("./config/config_window2.json")
         screens = app.screens()
-        #Si il y a un autre écran, 
         if len(screens) > 1:
             second_screen = secondary_screens[0]
             window2.move(second_screen.geometry().topLeft())
             asyncio.run(window.event_bus.publish("log", "Window : Application has started on the second screen."))
 
-        window2.showMaximized()
-        window2.setStyleSheet("background-color: #1c1c1b; color: #e0e0e0;")
+        window2.showFullScreen()
+        window2.setStyleSheet(f"background: {theme.BG_DEEP};")
 
         
     try:

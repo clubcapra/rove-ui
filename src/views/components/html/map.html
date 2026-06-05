@@ -1,172 +1,270 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8" />
-    <title>Map</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <style>
-        html, body, #map {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            background: #0f172a;
-        }
-        .poi-popup img {
-            max-width: 200px;
-            max-height: 150px;
-            display: block;
-            margin-top: 6px;
-            border-radius: 4px;
-        }
-        .robot-cursor-wrap {
-            display: flex; align-items: center; justify-content: center;
-            transform-origin: center center;
-        }
-    </style>
+  <meta charset="utf-8"/>
+  <title>MAP</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <link rel="stylesheet" href="leaflet.min.css"/>
+  <script src="leaflet.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #080808; font-family: 'Courier New', monospace; overflow: hidden; }
+
+    #map {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 24px;
+      background: #080808;
+    }
+    .leaflet-container { cursor: crosshair !important; }
+
+    /* Status bar */
+    #status-bar {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 24px;
+      background: #0f0f0f; border-top: 1px solid #2e2e2e;
+      display: flex; align-items: center;
+      font-size: 10px; color: #505050; z-index: 1000; pointer-events: none;
+    }
+    .sb { padding: 0 12px; border-right: 1px solid #222222; white-space: nowrap; }
+    .sb:last-child { border-right: none; }
+    #sb-coords { color: #d0d8e0; }
+    .sb-spacer { flex: 1; }
+
+    /* Popup */
+    .leaflet-popup-content-wrapper {
+      background: #161616; color: #d0d8e0;
+      border: 1px solid #2e2e2e; border-radius: 0;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.85), 0 0 0 1px rgba(0,212,255,0.06);
+      font-family: 'Courier New', monospace; font-size: 11px;
+    }
+    .leaflet-popup-content { margin: 10px 14px; }
+    .leaflet-popup-tip { background: #161616; }
+    .leaflet-popup-close-button { color: #505050 !important; font-size: 18px !important; }
+    .leaflet-popup-close-button:hover { color: #ffae00 !important; background: transparent !important; }
+
+    /* Zoom controls */
+    .leaflet-control-zoom a {
+      background: #161616 !important; color: #d0d8e0 !important;
+      border-color: #2e2e2e !important; border-radius: 0 !important;
+      font-family: monospace;
+    }
+    .leaflet-control-zoom a:hover { background: #1e1e1e !important; color: #ffae00 !important; }
+    .leaflet-bar { border: 1px solid #2e2e2e !important; box-shadow: none !important; }
+    .leaflet-bar a { border-bottom-color: #2e2e2e !important; }
+    .leaflet-control-attribution {
+      background: rgba(6,10,15,0.8) !important; color: #1e3040 !important;
+      font-family: monospace; font-size: 9px;
+    }
+    .leaflet-control-attribution a { color: #484848 !important; }
+
+    /* POI popup content */
+    .tac-popup { display: flex; flex-direction: column; gap: 4px; }
+    .tac-label { color: #ffae00; font-weight: 700; letter-spacing: 1px; }
+    .tac-coords { color: #505050; font-size: 10px; }
+    .tac-popup img { max-width: 200px; max-height: 150px; margin-top: 6px; border: 1px solid #2e2e2e; }
+
+    /* Click feedback */
+    @keyframes flash {
+      0%   { opacity: 1; transform: scale(0.4); }
+      60%  { opacity: 0.7; transform: scale(1.8); }
+      100% { opacity: 0; transform: scale(2.4); }
+    }
+    .click-flash {
+      position: absolute; width: 14px; height: 14px;
+      border: 1px solid #ffae00;
+      pointer-events: none;
+      animation: flash 0.45s ease-out forwards;
+      margin-left: -7px; margin-top: -7px; z-index: 2000;
+    }
+  </style>
 </head>
 <body>
 <div id="map"></div>
+<div id="status-bar">
+  <span class="sb" id="sb-coords">-- / --</span>
+  <span class="sb" id="sb-zoom">ZOOM --</span>
+  <span class="sb" id="sb-pois">0 WAYPOINTS</span>
+  <span class="sb-spacer"></span>
+  <span class="sb" style="color:#222222;">&#9658; CLICK TO MARK WAYPOINT</span>
+</div>
+
 <script>
-    const map = L.map('map', { zoomControl: false }).setView([45.5048, -73.5773], 15);
+  // ── Map ───────────────────────────────────────────────────────────────
+  const map = L.map('map', { zoomControl: true }).setView([45.5048, -73.5773], 15);
 
-    let currentTileLayer = L.tileLayer(
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        { maxZoom: 19, attribution: '© Esri' }
-    ).addTo(map);
-
-    window.mapSetTileLayer = function(url, opts) {
-        if (currentTileLayer) { map.removeLayer(currentTileLayer); }
-        currentTileLayer = L.tileLayer(url, opts || { maxZoom: 19 }).addTo(map);
-    };
-
-    // --- Custom icon config (set via mapSetRobotIcon / mapSetPOIIcon) ---
-    let _robotIconUrl = null;
-    let _robotIconSize = [36, 36];
-    let _poiIconUrl = null;
-    let _poiIconSize = [24, 32];
-
-    // --- Robot cursor ---
-    let robotYaw = 0;
-
-    function _robotIconHtml(yaw) {
-        const [w, h] = _robotIconUrl ? _robotIconSize : [36, 36];
-        const inner = _robotIconUrl
-            ? '<img src="' + _robotIconUrl + '" style="width:' + w + 'px;height:' + h + 'px;display:block"/>'
-            : '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="-18 -18 36 36">' +
-              '<circle r="16" fill="rgba(0,0,0,0.35)" stroke="rgba(255,255,255,0.55)" stroke-width="1.5"/>' +
-              '<polygon points="0,-13 -8,7 8,7" fill="#22c55e" stroke="rgba(0,0,0,0.45)" stroke-width="1"/>' +
-              '<circle r="3.5" fill="#ef4444"/>' +
-              '</svg>';
-        return '<div class="robot-cursor-wrap" style="transform:rotate(' + yaw + 'deg);width:' + w + 'px;height:' + h + 'px">' + inner + '</div>';
+  let currentTileLayer = L.tileLayer(
+    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }
+  ).addTo(map);
 
-    const robotIcon = L.divIcon({
-        html: _robotIconHtml(0),
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
-        className: ''
+  window.mapSetTileLayer = function(url, opts) {
+    if (currentTileLayer) map.removeLayer(currentTileLayer);
+    currentTileLayer = L.tileLayer(url, opts || { maxZoom: 19 }).addTo(map);
+  };
+
+  // ── Status bar ────────────────────────────────────────────────────────
+  const sbCoords = document.getElementById('sb-coords');
+  const sbZoom   = document.getElementById('sb-zoom');
+  const sbPois   = document.getElementById('sb-pois');
+
+  function updateZoom() { sbZoom.textContent = 'ZOOM ' + map.getZoom(); }
+  updateZoom();
+  map.on('zoomend', updateZoom);
+  map.on('mousemove', function(e) {
+    sbCoords.textContent = e.latlng.lat.toFixed(6) + ' / ' + e.latlng.lng.toFixed(6);
+  });
+  function updatePoiCount() {
+    const n = Object.keys(pois).length;
+    sbPois.textContent = n + ' WAYPOINT' + (n !== 1 ? 'S' : '');
+  }
+
+  // ── Icon config ────────────────────────────────────────────────────────
+  let _robotIconUrl = null, _robotIconSize = [36, 36];
+  let _poiIconUrl   = null, _poiIconSize   = [24, 32];
+  let robotYaw = 0;
+
+  function _robotIconHtml(yaw) {
+    const [w, h] = _robotIconUrl ? _robotIconSize : [36, 36];
+    const inner = _robotIconUrl
+      ? '<img src="' + _robotIconUrl + '" style="width:' + w + 'px;height:' + h + 'px;display:block"/>'
+      : '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="-18 -18 36 36">' +
+        '<circle r="16" fill="rgba(0,0,0,0.55)" stroke="#ffae00" stroke-width="1.5"/>' +
+        '<polygon points="0,-13 -7,7 7,7" fill="#ffae00" stroke="rgba(0,0,0,0.4)" stroke-width="1"/>' +
+        '<circle r="3" fill="#ffae00"/></svg>';
+    return '<div class="robot-cursor-wrap" style="transform:rotate(' + yaw + 'deg);width:' + w + 'px;height:' + h + 'px">' + inner + '</div>';
+  }
+
+  const robotMarker = L.marker([45.5048, -73.5773], {
+    icon: L.divIcon({ html: _robotIconHtml(0), iconSize: [36,36], iconAnchor: [18,18], className: '' }),
+    zIndexOffset: 1000
+  });
+  let robotVisible = false;
+
+  const pois = {};
+  let poiCounter = 0;
+
+  // ── Navigation ────────────────────────────────────────────────────────
+  const PAN_PX = 100;
+  window.mapPanLeft  = () => map.panBy([-PAN_PX, 0]);
+  window.mapPanRight = () => map.panBy([ PAN_PX, 0]);
+  window.mapPanUp    = () => map.panBy([0, -PAN_PX]);
+  window.mapPanDown  = () => map.panBy([0,  PAN_PX]);
+  window.mapZoomIn   = () => map.zoomIn();
+  window.mapZoomOut  = () => map.zoomOut();
+
+  window.mapSetView = function(lat, lng, zoom) {
+    map.setView([lat, lng], zoom !== undefined ? zoom : map.getZoom());
+  };
+
+  // ── Robot ─────────────────────────────────────────────────────────────
+  window.mapSetRobotPosition = function(lat, lng) {
+    robotMarker.setLatLng([lat, lng]);
+    if (!robotVisible) { robotMarker.addTo(map); robotVisible = true; }
+  };
+  window.mapSetRobotYaw = function(yaw_deg) {
+    robotYaw = yaw_deg;
+    const el = robotMarker.getElement();
+    if (el) {
+      const wrap = el.querySelector('.robot-cursor-wrap');
+      if (wrap) wrap.style.transform = 'rotate(' + yaw_deg + 'deg)';
+    }
+  };
+  window.mapSetRobotIcon = function(url, w, h) {
+    _robotIconUrl = url;
+    if (w && h) _robotIconSize = [w, h];
+    const [iw, ih] = _robotIconSize;
+    robotMarker.setIcon(L.divIcon({
+      html: _robotIconHtml(robotYaw),
+      iconSize: [iw, ih], iconAnchor: [iw/2, ih/2], className: ''
+    }));
+  };
+  window.mapSetPOIIcon = function(url, w, h) {
+    _poiIconUrl = url;
+    if (w && h) _poiIconSize = [w, h];
+  };
+
+  // ── POI ───────────────────────────────────────────────────────────────
+  function _poiMarkerIcon() {
+    if (_poiIconUrl) {
+      const [iw, ih] = _poiIconSize;
+      return L.icon({ iconUrl: _poiIconUrl, iconSize: [iw,ih], iconAnchor: [iw/2,ih] });
+    }
+    return L.divIcon({
+      html: '<div style="width:10px;height:10px;background:#ffae00;transform:rotate(45deg);border:1px solid rgba(255,255,255,0.25);margin:-5px 0 0 -5px;"></div>',
+      iconSize: [0,0], iconAnchor: [0,0], className: ''
     });
-    const robotMarker = L.marker([45.5048, -73.5773], { icon: robotIcon });
-    let robotVisible = false;
+  }
 
-    const pois = {};
-    let poiCounter = 0;
+  window.mapAddPOI = function(lat, lng, label, poiId) {
+    const id = (poiId && poiId !== '') ? poiId : ('poi_' + (++poiCounter));
+    const safeLabel = label || id;
+    const latStr = parseFloat(lat).toFixed(6);
+    const lngStr = parseFloat(lng).toFixed(6);
+    const marker = L.marker([lat, lng], { icon: _poiMarkerIcon(), zIndexOffset: 500 }).addTo(map);
+    marker.bindPopup(
+      '<div class="tac-popup">' +
+      '<div class="tac-label">&#9670; ' + safeLabel + '</div>' +
+      '<div class="tac-coords">' + latStr + ' / ' + lngStr + '</div>' +
+      '<div id="photo_' + id + '"></div></div>'
+    );
+    pois[id] = { marker, label: safeLabel, photo: null };
+    updatePoiCount();
+    return id;
+  };
 
-    const PAN_PX = 100;
+  window.mapRemovePOI = function(id) {
+    if (!pois[id]) return;
+    map.removeLayer(pois[id].marker);
+    delete pois[id];
+    updatePoiCount();
+  };
 
-    // --- Navigation ---
-    window.mapPanLeft  = function() { map.panBy([-PAN_PX, 0]); };
-    window.mapPanRight = function() { map.panBy([ PAN_PX, 0]); };
-    window.mapPanUp    = function() { map.panBy([0, -PAN_PX]); };
-    window.mapPanDown  = function() { map.panBy([0,  PAN_PX]); };
-    window.mapZoomIn   = function() { map.zoomIn(); };
-    window.mapZoomOut  = function() { map.zoomOut(); };
+  window.mapAttachPhoto = function(id, dataUrl) {
+    const poi = pois[id];
+    if (!poi) return false;
+    poi.photo = dataUrl;
+    const ll = poi.marker.getLatLng();
+    const img = dataUrl ? '<img src="' + dataUrl + '"/>' : '';
+    poi.marker.setPopupContent(
+      '<div class="tac-popup">' +
+      '<div class="tac-label">&#9670; ' + poi.label + '</div>' +
+      '<div class="tac-coords">' + ll.lat.toFixed(6) + ' / ' + ll.lng.toFixed(6) + '</div>' +
+      img + '</div>'
+    );
+    return true;
+  };
 
-    // --- View ---
-    window.mapSetView = function(lat, lng, zoom) {
-        map.setView([lat, lng], zoom !== undefined ? zoom : map.getZoom());
-    };
+  window.mapGetPOIs = function() {
+    return Object.keys(pois).map(function(id) {
+      const ll = pois[id].marker.getLatLng();
+      return { id, lat: ll.lat, lng: ll.lng, label: pois[id].label, hasPhoto: !!pois[id].photo };
+    });
+  };
 
-    // --- Robot position ---
-    window.mapSetRobotPosition = function(lat, lng) {
-        robotMarker.setLatLng([lat, lng]);
-        if (!robotVisible) {
-            robotMarker.addTo(map);
-            robotVisible = true;
-        }
-    };
+  // ── Click → waypoint ──────────────────────────────────────────────────
+  map.on('click', function(e) {
+    const lat = e.latlng.lat;
+    const lng = e.latlng.lng;
+    poiCounter++;
+    const poiId = 'wp_' + poiCounter;
+    const label = 'WP' + String(poiCounter).padStart(3, '0');
 
-    // --- Robot heading ---
-    window.mapSetRobotYaw = function(yaw_deg) {
-        robotYaw = yaw_deg;
-        const el = robotMarker.getElement();
-        if (el) {
-            const wrap = el.querySelector('.robot-cursor-wrap');
-            if (wrap) wrap.style.transform = 'rotate(' + yaw_deg + 'deg)';
-        }
-    };
+    window.mapAddPOI(lat, lng, label, poiId);
 
-    // --- Set custom robot icon (called from Python after map loads) ---
-    window.mapSetRobotIcon = function(url, w, h) {
-        _robotIconUrl = url;
-        if (w && h) _robotIconSize = [w, h];
-        const [iw, ih] = _robotIconSize;
-        robotMarker.setIcon(L.divIcon({
-            html: _robotIconHtml(robotYaw),
-            iconSize: [iw, ih],
-            iconAnchor: [iw / 2, ih / 2],
-            className: ''
-        }));
-    };
+    // Click flash animation
+    const pt = map.latLngToContainerPoint(e.latlng);
+    const flash = document.createElement('div');
+    flash.className = 'click-flash';
+    flash.style.left = pt.x + 'px';
+    flash.style.top  = pt.y + 'px';
+    document.getElementById('map').appendChild(flash);
+    setTimeout(function() { if (flash.parentNode) flash.parentNode.removeChild(flash); }, 500);
 
-    // --- Set custom POI icon (used for all future mapAddPOI calls) ---
-    window.mapSetPOIIcon = function(url, w, h) {
-        _poiIconUrl = url;
-        if (w && h) _poiIconSize = [w, h];
-    };
-
-    // --- POI ---
-    window.mapAddPOI = function(lat, lng, label, poiId) {
-        const id = (poiId && poiId !== '') ? poiId : ('poi_' + (++poiCounter));
-        const opts = {};
-        if (_poiIconUrl) {
-            const [iw, ih] = _poiIconSize;
-            opts.icon = L.icon({
-                iconUrl: _poiIconUrl,
-                iconSize: [iw, ih],
-                iconAnchor: [iw / 2, ih]
-            });
-        }
-        const marker = L.marker([lat, lng], opts).addTo(map);
-        const safeLabel = label || id;
-        marker.bindPopup('<div class="poi-popup"><b>' + safeLabel + '</b><div id="photo_' + id + '"></div></div>');
-        pois[id] = { marker: marker, label: safeLabel, photo: null };
-        return id;
-    };
-
-    window.mapRemovePOI = function(id) {
-        if (!pois[id]) return;
-        map.removeLayer(pois[id].marker);
-        delete pois[id];
-    };
-
-    window.mapAttachPhoto = function(id, dataUrl) {
-        const poi = pois[id];
-        if (!poi) return false;
-        poi.photo = dataUrl;
-        const img = dataUrl ? '<img src="' + dataUrl + '" />' : '';
-        poi.marker.setPopupContent('<div class="poi-popup"><b>' + poi.label + '</b>' + img + '</div>');
-        return true;
-    };
-
-    window.mapGetPOIs = function() {
-        return Object.keys(pois).map(function(id) {
-            const ll = pois[id].marker.getLatLng();
-            return { id: id, lat: ll.lat, lng: ll.lng, label: pois[id].label, hasPhoto: !!pois[id].photo };
-        });
-    };
+    // Signal Python via console bridge (intercepted by _MapPage)
+    console.log('__mapcb__:' + JSON.stringify({lat: lat, lng: lng, label: label, id: poiId}));
+  });
 </script>
 </body>
 </html>

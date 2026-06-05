@@ -4,6 +4,7 @@ import json
 import tempfile
 from pathlib import Path
 
+import json as _json
 from PySide6.QtCore import QUrl, Signal, Slot
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
@@ -11,15 +12,30 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from src.controller.event_bus import EventBus
 
 
-FALLBACK_HTML = """<!DOCTYPE html><html><body>Missing template: src/views/components/html/map.html</body></html>"""
+FALLBACK_HTML = """<!DOCTYPE html><html><body style="background:#080808;color:#4a6880;font-family:monospace">Missing template: src/views/components/html/map.html</body></html>"""
+
+_CB_PREFIX = "__mapcb__:"
 
 
 class _MapPage(QWebEnginePage):
-    def __init__(self, event_bus: EventBus, parent=None):
+    """Custom page that intercepts __mapcb__: console messages for JS→Python bridge."""
+
+    def __init__(self, event_bus: EventBus, on_click, parent=None):
         super().__init__(parent)
         self._event_bus = event_bus
+        self._on_click  = on_click
 
     def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):  # noqa: N802
+        if message and message.startswith(_CB_PREFIX):
+            try:
+                data = _json.loads(message[len(_CB_PREFIX):])
+                self._on_click(
+                    float(data["lat"]), float(data["lng"]),
+                    str(data.get("label", "")), str(data.get("id", ""))
+                )
+            except Exception:
+                pass
+            return  # don't forward internal messages to the log
         if message:
             self._event_bus.publish_sync("log", f"MapWidget JS[{lineNumber}] {message}")
         super().javaScriptConsoleMessage(level, message, lineNumber, sourceID)
@@ -51,14 +67,15 @@ class MapWidget(QWidget):
 
     def build(self) -> None:
         self._view = QWebEngineView()
-        self._view.setPage(_MapPage(self._event_bus, self._view))
+        page = _MapPage(self._event_bus, self._handle_map_click, self._view)
+        self._view.setPage(page)
         self._view.settings().setAttribute(
             QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True
         )
         self._view.loadFinished.connect(self._on_load_finished)
 
-        self._html_file.write_text(self._load_html(), encoding="utf-8")
-        self._view.load(QUrl.fromLocalFile(str(self._html_file)))
+        # Load directly from source so relative paths (leaflet.min.js/css) resolve correctly
+        self._view.load(QUrl.fromLocalFile(str(self._html_template)))
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -197,6 +214,17 @@ class MapWidget(QWidget):
 
             self._event_bus.subscribe(at_topic, _on_poi_at)
             self._event_bus.publish_sync("log", f"MapWidget: add-POI-at bound to '{at_topic}'")
+
+    def _handle_map_click(self, lat: float, lng: float, label: str, poi_id: str) -> None:
+        """Called by JS when user clicks the map. Publishes to configured topics."""
+        click_topic = str(self._config.get("click_topic", "")).strip()
+        poi_topic   = str(self._config.get("poi_topic",   "")).strip()
+        if click_topic:
+            self._event_bus.publish_sync(click_topic, {"lat": lat, "lng": lng})
+        if poi_topic:
+            self._event_bus.publish_sync(
+                poi_topic, {"lat": lat, "lng": lng, "label": label, "poi_id": poi_id}
+            )
 
     @Slot(str)
     def _exec_js(self, script: str) -> None:

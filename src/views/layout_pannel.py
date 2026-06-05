@@ -1,6 +1,51 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QGridLayout, QVBoxLayout, QLabel
-from PySide6.QtCore import QRect
+from PySide6.QtCore import QRect, Qt
 from typing import List
+from src.views import theme
+
+
+def _tac_wrap(widget: QWidget, label: str) -> QWidget:
+    """Wrap a widget in a tactical label bar container."""
+    container = QWidget()
+    container.setObjectName("tac-panel")
+    container.setStyleSheet(
+        f"QWidget#tac-panel {{ background: {theme.BG_PANEL}; border: 1px solid {theme.BORDER_DIM}; }}"
+    )
+    outer = QVBoxLayout(container)
+    outer.setContentsMargins(0, 0, 0, 0)
+    outer.setSpacing(0)
+
+    bar = QWidget()
+    bar.setObjectName("tac-bar")
+    bar.setFixedHeight(22)
+    bar.setStyleSheet(
+        f"QWidget#tac-bar {{ background: {theme.BG_DARK}; "
+        f"border-bottom: 1px solid {theme.BORDER_DIM}; }}"
+    )
+    bar_layout = QHBoxLayout(bar)
+    bar_layout.setContentsMargins(8, 0, 8, 0)
+    bar_layout.setSpacing(6)
+
+    dot = QLabel("▸")
+    dot.setStyleSheet(
+        f"color: {theme.CYAN}; font-size: 9px; background: transparent; border: none;"
+    )
+    dot.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
+    title = QLabel(label.upper())
+    title.setStyleSheet(
+        f"color: {theme.TEXT_DIM}; font-size: 10px; font-family: 'Courier New'; "
+        f"letter-spacing: 1px; background: transparent; border: none;"
+    )
+    title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
+    bar_layout.addWidget(dot)
+    bar_layout.addWidget(title)
+    bar_layout.addStretch()
+
+    outer.addWidget(bar)
+    outer.addWidget(widget, 1)
+    return container
 
 from .web_camera_view import WebCameraView
 from .camera_widget import CameraWidget
@@ -39,6 +84,8 @@ class AbsoluteContainer(QWidget):
 
     @staticmethod
     def _resolve(value, parent_dim: int) -> int:
+        if value == "auto":
+            return -1  # sentinel: use widget sizeHint
         if isinstance(value, str) and value.endswith("%"):
             return int(parent_dim * float(value[:-1]) / 100)
         return int(value)
@@ -47,18 +94,30 @@ class AbsoluteContainer(QWidget):
         pw, ph = self.width(), self.height()
         for widget, style in self._layers:
             margin = int(style.get("margin", 0))
-            w = self._resolve(style.get("width", "100%"), pw) - 2 * margin
-            h = self._resolve(style.get("height", "100%"), ph) - 2 * margin
+
+            raw_w = self._resolve(style.get("width",  "100%"), pw)
+            raw_h = self._resolve(style.get("height", "100%"), ph)
+            hint  = widget.sizeHint()
+            w = (hint.width()  if raw_w < 0 else raw_w) - 2 * margin
+            h = (hint.height() if raw_h < 0 else raw_h) - 2 * margin
 
             if "right" in style:
                 x = pw - self._resolve(style["right"], pw) - w - margin
+            elif style.get("x") == "center":
+                x = (pw - w) // 2
             else:
                 x = self._resolve(style.get("x", 0), pw) + margin
 
             if "bottom" in style:
                 y = ph - self._resolve(style["bottom"], ph) - h - margin
+            elif style.get("y") == "center":
+                y = (ph - h) // 2
             else:
                 y = self._resolve(style.get("y", 0), ph) + margin
+
+            # Clear any fixed-size constraints so setGeometry always takes effect
+            widget.setMinimumSize(0, 0)
+            widget.setMaximumSize(16_777_215, 16_777_215)
 
             padding = int(style.get("padding", 0))
             if padding:
@@ -181,7 +240,14 @@ class LayoutPanel:
         return self._merge_dicts(parent_data, child_data)
 
     def _make_child_widget(self, child_cfg: dict) -> QWidget:
-        """Create a lightweight widget for a child view config."""
+        """Create widget for a child config, optionally wrapped with a label bar."""
+        w = self._create_child(child_cfg)
+        label = str(child_cfg.get("label", "")).strip()
+        if label:
+            w = _tac_wrap(w, label)
+        return w
+
+    def _create_child(self, child_cfg: dict) -> QWidget:
         vtype = str(child_cfg.get("type", "")).strip().lower()
         name = child_cfg.get("name", "unnamed")
         data = self._resolve_child_data(child_cfg)

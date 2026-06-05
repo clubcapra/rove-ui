@@ -4,23 +4,43 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget,
 )
 from src.controller.event_bus import EventBus
+from src.views import theme
 
-_BTN = """
-QPushButton {
-    background: #292928; color: #e0e0e0;
-    border: 1px solid #3a3a38; border-radius: 4px;
-    font-size: 12px; font-weight: 600; padding: 4px 16px;
-}
-QPushButton:hover   { background: #3a3a38; border-color: #555; }
-QPushButton:pressed { background: #444; }
+_BTN = f"""
+QPushButton {{
+    background: {theme.BG_SURFACE};
+    color: {theme.TEXT_DIM};
+    border: 1px solid {theme.BORDER_DIM};
+    border-radius: 0;
+    font-family: {theme.FONT_MONO};
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 4px 18px;
+}}
+QPushButton:hover {{
+    background: {theme.BG_PANEL};
+    border-color: {theme.BORDER};
+    color: {theme.TEXT};
+}}
+QPushButton:pressed {{
+    background: {theme.BG_DARK};
+    border-color: {theme.BORDER_BRIGHT};
+}}
 """
 
-_BTN_ACTIVE = """
-QPushButton {
-    background: #2a1410; color: #eb4034;
-    border: 1px solid #eb4034; border-radius: 4px;
-    font-size: 12px; font-weight: 700; padding: 4px 16px;
-}
+_BTN_ACTIVE = f"""
+QPushButton {{
+    background: {theme.BG_PANEL};
+    color: {theme.CYAN};
+    border: 1px solid {theme.CYAN};
+    border-radius: 0;
+    font-family: {theme.FONT_MONO};
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 4px 18px;
+}}
 """
 
 
@@ -32,12 +52,6 @@ class ButtonBar(QWidget):
       label        — optional text label shown before the buttons
       height       — fixed height in px (default: 44)
       buttons      — list of { label, event, value, active_topic? }
-
-    Each button config:
-      label        — button text
-      event        — event name to publish on click
-      value        — payload sent with the event
-      active_topic — optional topic to subscribe to for syncing active state
     """
 
     def __init__(self, config: dict, event_bus: EventBus | None = None, parent=None):
@@ -50,22 +64,31 @@ class ButtonBar(QWidget):
 
     def _build(self) -> None:
         orientation = self.config.get("orientation", "horizontal")
-        bar_label = self.config.get("label")
-        fixed_h = int(self.config.get("height", 44))
+        bar_label   = self.config.get("label")
+        fixed_h     = int(self.config.get("height", 44))
 
         self.setFixedHeight(fixed_h)
-        self.setStyleSheet("background: #1c1c1b; border-top: 1px solid #3a3a38;")
+        self.setAttribute(
+            __import__("PySide6.QtCore", fromlist=["Qt"]).Qt.WidgetAttribute.WA_StyledBackground,
+            True,
+        )
+        self.setStyleSheet(
+            f"background: {theme.BG_DARK}; border: 1px solid {theme.BORDER};"
+        )
 
         if orientation == "vertical":
             layout = QVBoxLayout(self)
         else:
             layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 4, 10, 4)
-        layout.setSpacing(8)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(6)
 
         if bar_label:
-            lbl = QLabel(bar_label)
-            lbl.setStyleSheet("color: #888; font-size: 11px; background: transparent;")
+            lbl = QLabel(bar_label.upper())
+            lbl.setStyleSheet(
+                f"color: {theme.TEXT_MUTED}; font-size: 10px; "
+                f"letter-spacing: 2px; background: transparent;"
+            )
             layout.addWidget(lbl)
 
         for cfg in self.config.get("buttons", []):

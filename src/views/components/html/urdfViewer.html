@@ -7,9 +7,27 @@
     *, *::before, *::after { box-sizing: border-box; }
     html, body {
       margin: 0; padding: 0; width: 100%; height: 100%;
-      overflow: hidden; background: #111827;
+      overflow: hidden; background: #080808;
     }
-    #c { display: block; width: 100%; height: 100%; }
+    #c { display: block; width: 100%; height: calc(100% - 28px); }
+
+    /* ── thermal bar ────────────────────────────────────────────── */
+    #thermal-bar {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 28px;
+      background: #080808;
+      border-top: 1px solid #222;
+      display: flex; align-items: center;
+      padding: 0 8px; gap: 6px;
+      font-family: 'Courier New', monospace; font-size: 9px;
+    }
+    .tb-sep { color: #222; flex-shrink: 0; }
+    .tb-motor { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; }
+    .tb-lbl { color: #484848; width: 18px; flex-shrink: 0; font-weight: 700; }
+    .tb-track {
+      flex: 1; height: 3px; background: #1e1e1e; overflow: hidden;
+    }
+    .tb-fill { height: 100%; width: 0%; background: #1a6fff; transition: width 0.35s ease, background-color 0.35s ease; }
+    .tb-val { width: 30px; text-align: right; flex-shrink: 0; color: #484848; transition: color 0.35s; }
 
     /* ── overlay UI ─────────────────────────────────────────────── */
     #ui {
@@ -20,11 +38,11 @@
     /* loading bar */
     #loading {
       position: absolute; top: 0; left: 0; right: 0; height: 3px;
-      background: #1f2937;
+      background: #222222;
     }
     #loading-bar {
       height: 100%; width: 0%;
-      background: linear-gradient(90deg, #3b82f6, #60a5fa);
+      background: linear-gradient(90deg, #ffae00, #ffc840);
       transition: width 0.25s;
     }
 
@@ -33,36 +51,36 @@
       position: absolute; bottom: 10px; left: 10px;
       max-width: 220px; max-height: 55vh;
       overflow-y: auto;
-      background: rgba(17,24,39,0.82);
-      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(15,15,15,0.92);
+      border: 1px solid rgba(255,255,255,0.07);
       border-radius: 8px;
       padding: 8px 10px;
       font: 11px/1.5 "Segoe UI", monospace;
-      color: #9ca3af;
+      color: #505050;
       pointer-events: auto;
     }
     #joint-panel::-webkit-scrollbar { width: 4px; }
-    #joint-panel::-webkit-scrollbar-thumb { background: #374151; border-radius: 2px; }
-    .jp-title { font-weight: 700; color: #e5e7eb; margin-bottom: 6px; font-size: 12px; }
+    #joint-panel::-webkit-scrollbar-thumb { background: #222222; border-radius: 2px; }
+    .jp-title { font-weight: 700; color: #d0d8e0; margin-bottom: 6px; font-size: 12px; }
     .jp-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
     .jp-dot {
       width: 7px; height: 7px; border-radius: 50%;
-      flex-shrink: 0; background: #374151;
+      flex-shrink: 0; background: #222222;
       transition: background 0.2s;
     }
-    .jp-dot.active { background: #3b82f6; }
+    .jp-dot.active { background: #ffae00; }
     .jp-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .jp-val { color: #60a5fa; font-family: monospace; min-width: 44px; text-align: right; }
+    .jp-val { color: #ffc840; font-family: monospace; min-width: 44px; text-align: right; }
 
     /* info top-right */
     #info {
       position: absolute; top: 10px; right: 10px;
-      background: rgba(17,24,39,0.72);
+      background: rgba(15,15,15,0.85);
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 6px; padding: 6px 10px;
-      font: 11px "Segoe UI", sans-serif; color: #6b7280;
+      font: 11px "Segoe UI", sans-serif; color: #505050;
     }
-    #info b { color: #d1d5db; }
+    #info b { color: #d0d8e0; }
   </style>
 
   <!-- URDF data injected by Python -->
@@ -70,6 +88,7 @@
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="thermal-bar"></div>
 <div id="ui">
   <div id="loading"><div id="loading-bar"></div></div>
   <div id="joint-panel">
@@ -101,8 +120,8 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x111827);
-scene.fog = new THREE.FogExp2(0x111827, 0.05);
+scene.background = new THREE.Color(0x080808);
+scene.fog = new THREE.FogExp2(0x080808, 0.05);
 
 // ── camera & controls ─────────────────────────────────────────────────────────
 const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 100);
@@ -137,14 +156,14 @@ fill.position.set(-3, 2, -3);
 scene.add(fill);
 
 // ── ground ────────────────────────────────────────────────────────────────────
-const gridHelper = new THREE.GridHelper(8, 32, 0x1f2937, 0x1f2937);
+const gridHelper = new THREE.GridHelper(8, 32, 0x222222, 0x222222);
 gridHelper.material.opacity = 0.45;
 gridHelper.material.transparent = true;
 scene.add(gridHelper);
 
 const groundMesh = new THREE.Mesh(
   new THREE.PlaneGeometry(8, 8),
-  new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95, transparent: true, opacity: 0.4 })
+  new THREE.MeshStandardMaterial({ color: 0x0f0f0f, roughness: 0.95, transparent: true, opacity: 0.4 })
 );
 groundMesh.rotation.x = -Math.PI / 2;
 groundMesh.receiveShadow = true;
@@ -372,6 +391,71 @@ window.resetJoints = function () {
 window.setRobotRoll  = (r) => { _roll  = r; _updatePose(); };
 window.setRobotPitch = (p) => { _pitch = p; _updatePose(); };
 window.setRobotYaw   = (y) => { _yaw   = y; _updatePose(); };
+
+window.setLinkColor = function(name, hex) {
+  const group = linkGroups[name];
+  if (!group) return;
+  const color = new THREE.Color(hex);
+  group.traverse(function(child) {
+    if (!child.isMesh) return;
+    const recolor = function(mat) {
+      const m = mat.clone();
+      m.color.set(color);
+      return m;
+    };
+    child.material = Array.isArray(child.material)
+      ? child.material.map(recolor)
+      : recolor(child.material);
+  });
+};
+
+if (window.URDF_DATA && window.URDF_DATA.hide_joint_panel) {
+  const panel = document.getElementById('joint-panel');
+  if (panel) panel.style.display = 'none';
+}
+
+// ── thermal bar setup ────────────────────────────────────────────────────────
+(function() {
+  const thermalLinks = (window.URDF_DATA && window.URDF_DATA.thermal_links) || [];
+  const bar = document.getElementById('thermal-bar');
+
+  if (thermalLinks.length === 0) {
+    bar.style.display = 'none';
+    canvas.style.height = '100%';
+    return;
+  }
+
+  function shortName(link) {
+    return link.replace('Drum', '').replace('Flipper', '');
+  }
+
+  thermalLinks.forEach(function(tl, i) {
+    if (i > 0) {
+      const sep = document.createElement('span');
+      sep.className = 'tb-sep';
+      sep.textContent = '|';
+      bar.appendChild(sep);
+    }
+    const motor = document.createElement('div');
+    motor.className = 'tb-motor';
+    motor.innerHTML =
+      '<span class="tb-lbl">' + shortName(tl.link) + '</span>' +
+      '<div class="tb-track"><div class="tb-fill" id="tbf-' + tl.link + '"></div></div>' +
+      '<span class="tb-val" id="tbv-' + tl.link + '">--°</span>';
+    bar.appendChild(motor);
+  });
+})();
+
+window.setThermalBar = function(link, temp, minTemp, maxTemp, hex) {
+  const fill = document.getElementById('tbf-' + link);
+  const val  = document.getElementById('tbv-' + link);
+  if (!fill || !val) return;
+  const ratio = Math.max(0, Math.min(1, (temp - minTemp) / Math.max(maxTemp - minTemp, 1)));
+  fill.style.width = (ratio * 100) + '%';
+  fill.style.backgroundColor = hex;
+  val.textContent = temp.toFixed(1) + '°';
+  val.style.color = hex;
+};
 
 // ── resize & render ───────────────────────────────────────────────────────────
 function resize() {

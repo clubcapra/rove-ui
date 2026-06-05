@@ -1,34 +1,46 @@
-from PySide6.QtWidgets import QTextEdit
+from datetime import datetime
+
 from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QTextEdit
+
 from src.controller.event_bus import EventBus
+from src.views import theme
+
 
 class DebugConsole(QTextEdit):
-    """Simple debug console widget.
-
-    High-level: this widget should subscribe to the application's EventBus
-    and append human-readable log lines for incoming events. The actual
-    subscription and asyncio/Qt coordination will be implemented later.
-    """
-
     append_requested = Signal(str)
+
+    _STYLE = f"""
+        QTextEdit {{
+            background: {theme.BG_DEEP};
+            color: {theme.TEXT};
+            font-family: {theme.FONT_MONO};
+            font-size: 11px;
+            border: none;
+            padding: 6px 10px;
+        }}
+    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setReadOnly(True)
+        self.setStyleSheet(self._STYLE)
         self.event_bus = EventBus()
-        self.append_requested.connect(self._append_log_on_ui_thread)
+        self.append_requested.connect(self._do_append)
         self.event_bus.subscribe("log", self.append_log)
-        
 
-    def append_log(self, message: str):
-        self.append_requested.emit(message)
+    def append_log(self, message: str) -> None:
+        self.append_requested.emit(str(message))
 
-    def _append_log_on_ui_thread(self, message: str):
-        """Append a log message to the console."""
-        formatted_text = f"[{self.get_current_time()}] {message}"
-        self.append(formatted_text)
-
-    def get_current_time(self) -> str:
-        """Utility to get current time as a string for log timestamps."""
-        from datetime import datetime
-        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    def _do_append(self, message: str) -> None:
+        ts   = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        # Escape HTML special chars
+        msg  = message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        line = (
+            f'<span style="color:{theme.AMBER};font-weight:700;">[{ts}]</span>'
+            f'&nbsp;<span style="color:{theme.TEXT};">{msg}</span>'
+        )
+        self.append(line)
+        # Auto-scroll to bottom
+        sb = self.verticalScrollBar()
+        sb.setValue(sb.maximum())
