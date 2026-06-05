@@ -239,6 +239,8 @@ class MapWidget(QWidget):
             return
         self._js_queue.emit(script)
 
+    def recenter(self) -> None: self.run_js("window.mapRecenter();")
+
     # Navigation
     def pan_left(self)  -> None: self.run_js("window.mapPanLeft();")
     def pan_right(self) -> None: self.run_js("window.mapPanRight();")

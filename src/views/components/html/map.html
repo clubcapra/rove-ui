@@ -75,10 +75,32 @@
       animation: flash 0.45s ease-out forwards;
       margin-left: -7px; margin-top: -7px; z-index: 2000;
     }
+
+    /* Recenter button */
+    #btn-recenter {
+      position: absolute;
+      top: 80px; left: 10px;
+      z-index: 1000;
+      width: 26px; height: 26px;
+      background: #161616;
+      border: 1px solid #2e2e2e;
+      color: #505050;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    #btn-recenter:hover {
+      background: #1e1e1e;
+      border-color: #ffae00;
+      color: #ffae00;
+    }
+    #btn-recenter:active { background: #080808; }
   </style>
 </head>
 <body>
 <div id="map"></div>
+<button id="btn-recenter" title="Recentrer sur le robot">⊕</button>
 <div id="status-bar">
   <span class="sb" id="sb-coords">-- / --</span>
   <span class="sb" id="sb-zoom">ZOOM --</span>
@@ -92,11 +114,8 @@
   const map = L.map('map', { zoomControl: true }).setView([45.5048, -73.5773], 15);
 
   let currentTileLayer = L.tileLayer(
-    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    }
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { maxZoom: 19, attribution: '&copy; Esri' }
   ).addTo(map);
 
   window.mapSetTileLayer = function(url, opts) {
@@ -136,6 +155,8 @@
     return '<div class="robot-cursor-wrap" style="transform:rotate(' + yaw + 'deg);width:' + w + 'px;height:' + h + 'px">' + inner + '</div>';
   }
 
+  let _lastRobotLat = null, _lastRobotLng = null;
+
   const robotMarker = L.marker([45.5048, -73.5773], {
     icon: L.divIcon({ html: _robotIconHtml(0), iconSize: [36,36], iconAnchor: [18,18], className: '' }),
     zIndexOffset: 1000
@@ -158,8 +179,21 @@
     map.setView([lat, lng], zoom !== undefined ? zoom : map.getZoom());
   };
 
+  window.mapRecenter = function() {
+    if (_lastRobotLat !== null && _lastRobotLng !== null) {
+      map.setView([_lastRobotLat, _lastRobotLng], map.getZoom());
+    }
+  };
+
+  document.getElementById('btn-recenter').addEventListener('click', function(e) {
+    e.stopPropagation();
+    window.mapRecenter();
+  });
+
   // ── Robot ─────────────────────────────────────────────────────────────
   window.mapSetRobotPosition = function(lat, lng) {
+    _lastRobotLat = lat;
+    _lastRobotLng = lng;
     robotMarker.setLatLng([lat, lng]);
     if (!robotVisible) { robotMarker.addTo(map); robotVisible = true; }
   };
