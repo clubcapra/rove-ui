@@ -18,9 +18,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QIcon
 from pathlib import Path
 
-# Import view skeletons (high-level)
-from src.views.console_view import DebugConsole
-from src.views.rtsp_view import RTSPView
 from src.views.layout_pannel import LayoutPanel
 from src.controller.event_bus import EventBus
 from src.views.components.header import Header
@@ -30,36 +27,32 @@ from src.clients.ros2_client import ROS2Client
 
 
 class Widget(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, event_bus: EventBus | None = None):
         super().__init__(parent)
         self.setWindowTitle("Rove - UI")
+
+        self.event_bus = event_bus or EventBus()
 
         self._header = Header(parent=self)
         self._nav = NavBar(self)
         self._central = QWidget(self)
         self._central_layout = QVBoxLayout(self._central)
         self._central_layout.setContentsMargins(0, 0, 0, 0)
-        # stacked widget for top-level pages (dashboard, logs, ...)
         self._stack = QStackedWidget(self._central)
         self._central_layout.addWidget(self._stack)
-        self.event_bus = EventBus()
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        layout.addWidget(self._header)
-        layout.addWidget(self._nav)
-        layout.addWidget(self._central)
-        #layout.addWidget(self._console)
+        self._main_layout = QVBoxLayout(self)
+        self._main_layout.setContentsMargins(0, 0, 0, 0)
+        self._main_layout.setSpacing(0)
+        self._main_layout.addWidget(self._header)
+        self._main_layout.addWidget(self._nav)
+        self._main_layout.addWidget(self._central)
 
         self._views: list[Any] = []
         self._pages: dict[str, int] = {}
         self._udp_clients: list[UDPClient] = []
         self._ros2_clients: list[ROS2Client] = []
-
-
-        # Application-wide EventBus (can be shared or passed to orchestrator)
-        self.event_bus = EventBus()
+        self._bottom_bar: QWidget | None = None
 
 
     def load_config(self, configFile):
@@ -109,8 +102,19 @@ class Widget(QWidget):
             self._stack.setCurrentIndex(0)
             self._nav.activate_first()
 
+        self._rebuild_bottom_bar(config.get("bottom_bar"))
         self._restart_udp_clients(config.get("udp_clients", []))
         self._restart_ros2_clients(config.get("ros2_clients", []))
+
+    def _rebuild_bottom_bar(self, bar_cfg: dict | None) -> None:
+        if self._bottom_bar is not None:
+            self._main_layout.removeWidget(self._bottom_bar)
+            self._bottom_bar.deleteLater()
+            self._bottom_bar = None
+        if bar_cfg:
+            from src.views.components.button_bar import ButtonBar
+            self._bottom_bar = ButtonBar(bar_cfg, event_bus=self.event_bus)
+            self._main_layout.addWidget(self._bottom_bar)
 
     def update_header_time(self, time_value: str):
         self._header.update_time(time_value)
@@ -179,7 +183,7 @@ if __name__ == "__main__":
     # Si il  y a un config window 2 existe, on affiche un autre window pour le second écran
     # (ex: config_window2.json)
     if os.path.exists("./config/config_window2.json"):
-        window2 = Widget()
+        window2 = Widget(event_bus=window.event_bus)
         if _app_icon:
             window2.setWindowIcon(_app_icon)
         window2.buildInterface("./config/config_window2.json")

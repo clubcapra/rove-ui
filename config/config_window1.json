@@ -111,6 +111,23 @@
   ],
   "ros2_clients": [],
   "console": true,
+  "bottom_bar": {
+    "label": "Caméras →",
+    "buttons": [
+      {
+        "label": "REAR CAM",
+        "event": "camera.select",
+        "value": "REAR_CAM",
+        "active_topic": "camera.select"
+      },
+      {
+        "label": "ARM CAM",
+        "event": "camera.select",
+        "value": "ARM_CAM",
+        "active_topic": "camera.select"
+      }
+    ]
+  },
   "views": {
     "dashboard": {
       "type": "layout",

@@ -84,6 +84,8 @@ class CameraWidget:
         self._cameras: list[dict] = list(config.get("cameras", []))
         self._vtx_host: str = str(config.get("vtx_host", "192.168.2.2"))
         self._vtx_port: int = int(config.get("vtx_port", 5540))
+        self._hide_controls: bool = bool(config.get("hide_controls", False))
+        self._select_topic: str | None = config.get("select_topic")
 
         self._ping_dots: list[QLabel] = []
         self._cam_buttons: list[QPushButton] = []
@@ -119,11 +121,19 @@ class CameraWidget:
             self._stack = QStackedWidget(self._widget)
             layout.addWidget(self._stack, 1)
         else:
-            # ── Multi-camera mode: sidebar + viewer ───────────────────────
+            # ── Multi-camera mode: sidebar (optional) + viewer ────────────
             root = QHBoxLayout(self._widget)
             root.setContentsMargins(0, 0, 0, 0)
             root.setSpacing(0)
-            root.addWidget(self._build_sidebar())
+
+            if not self._hide_controls:
+                root.addWidget(self._build_sidebar())
+            else:
+                # Still start ping watchers for auto-fallback even without UI
+                for idx, cam in enumerate(self._cameras):
+                    rtsp_ip = str(cam.get("rtsp_ip", ""))
+                    if rtsp_ip:
+                        self._start_ping_watcher(idx, rtsp_ip)
 
             right = QWidget()
             right_layout = QVBoxLayout(right)
@@ -156,6 +166,8 @@ class CameraWidget:
         self.event_bus.publish_sync("log", f"CameraWidget[{self.name}] ready (mode: {mode})")
 
         self.event_bus.subscribe("camera.snapshot_request", self._do_snapshot)
+        if self._select_topic:
+            self.event_bus.subscribe(self._select_topic, self._on_select_event)
 
     # ── Sidebar ───────────────────────────────────────────────────────────
 
@@ -290,6 +302,14 @@ class CameraWidget:
             self._set_mode("webcamera", force_rebuild=False)
 
     # ── Camera selection ──────────────────────────────────────────────────
+
+    def _on_select_event(self, value) -> None:
+        """Select camera by name received from an EventBus event."""
+        name = str(value)
+        for idx, cam in enumerate(self._cameras):
+            if str(cam.get("name", "")) == name:
+                self._select_camera(idx)
+                return
 
     def _select_camera(self, idx: int) -> None:
         if idx >= len(self._cameras):

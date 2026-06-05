@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QGridLayout, QVBoxLayout, QLabel
+from PySide6.QtCore import QRect
 from typing import List
 
 from .web_camera_view import WebCameraView
@@ -9,6 +10,70 @@ from src.controller.event_bus import EventBus
 # Import known view wrappers for high-level composition
 from .rtsp_view import RTSPView
 from .console_view import DebugConsole
+
+
+class AbsoluteContainer(QWidget):
+    """Container that positions children with absolute coordinates.
+
+    Each layer is defined by (widget, style) where style supports:
+      x, y        — position in px or "N%" relative to container
+      width, height — size in px or "N%" (default: "100%")
+      z_index     — stacking order (higher = on top)
+      margin      — uniform outer inset applied to all four sides
+      padding     — inner content margin applied inside the widget area
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._layers: list[tuple[QWidget, dict]] = []
+
+    def add_layer(self, widget: QWidget, style: dict) -> None:
+        widget.setParent(self)
+        self._layers.append((widget, style))
+        # Re-sort by z_index so lower indices are raised first (higher z ends on top)
+        self._layers.sort(key=lambda x: x[1].get("z_index", 0))
+        for w, _ in self._layers:
+            w.raise_()
+        widget.show()
+        self._relayout()
+
+    @staticmethod
+    def _resolve(value, parent_dim: int) -> int:
+        if isinstance(value, str) and value.endswith("%"):
+            return int(parent_dim * float(value[:-1]) / 100)
+        return int(value)
+
+    def _relayout(self) -> None:
+        pw, ph = self.width(), self.height()
+        for widget, style in self._layers:
+            margin = int(style.get("margin", 0))
+            w = self._resolve(style.get("width", "100%"), pw) - 2 * margin
+            h = self._resolve(style.get("height", "100%"), ph) - 2 * margin
+
+            if "right" in style:
+                x = pw - self._resolve(style["right"], pw) - w - margin
+            else:
+                x = self._resolve(style.get("x", 0), pw) + margin
+
+            if "bottom" in style:
+                y = ph - self._resolve(style["bottom"], ph) - h - margin
+            else:
+                y = self._resolve(style.get("y", 0), ph) + margin
+
+            padding = int(style.get("padding", 0))
+            if padding:
+                child_layout = widget.layout()
+                if child_layout is not None:
+                    child_layout.setContentsMargins(padding, padding, padding, padding)
+            widget.setGeometry(QRect(x, y, max(1, w), max(1, h)))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._relayout()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._relayout()
 
 
 class LayoutPanel:
@@ -36,6 +101,15 @@ class LayoutPanel:
             self._widget = QWidget()
 
             pos = self.config.get("diaposition", "horizontal")
+
+            if pos == "absolute":
+                container = AbsoluteContainer()
+                for child_cfg in self.config.get("content", []):
+                    style = child_cfg.get("style", {})
+                    child_widget = self._make_child_widget(child_cfg)
+                    container.add_layer(child_widget, style)
+                self._widget = container
+                return
 
             if pos == "grid":
                 grid_cfg = self.config.get("grid", {})
@@ -112,6 +186,12 @@ class LayoutPanel:
         name = child_cfg.get("name", "unnamed")
         data = self._resolve_child_data(child_cfg)
 
+        if vtype == "layout":
+            nested = LayoutPanel(name, child_cfg, [], event_bus=self.event_bus)
+            nested.build()
+            self._register_child(name, nested)
+            return nested.get_widget()
+
         if vtype == "rtsp":
             rtsp = RTSPView(name, data, event_bus=self.event_bus)
             rtsp.build()
@@ -162,6 +242,12 @@ class LayoutPanel:
             widget.build()
             self._register_child(name, widget)
             return widget
+
+        if vtype == "button_bar":
+            from .components.button_bar import ButtonBar
+            bar = ButtonBar(data, event_bus=self.event_bus)
+            self._register_child(name, bar)
+            return bar
 
         if vtype == "bitmap":
             bitmap = Bitmap(name, data, event_bus=self.event_bus)

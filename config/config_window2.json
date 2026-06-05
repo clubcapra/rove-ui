@@ -45,6 +45,8 @@
           "name": "Camera",
             "data": {
             "mode": "rtsp",
+            "hide_controls": true,
+            "select_topic": "camera.select",
             "vtx_host": "192.168.2.2",
             "vtx_port": 5540,
             "cameras": [
@@ -69,9 +71,7 @@
             "row_span": 1,
             "column_span": 1
             },
-            "controls": {
-
-            }
+            "controls": {}
         }
       ]
     },
