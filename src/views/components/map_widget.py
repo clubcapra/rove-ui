@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
 
 import json as _json
-from PySide6.QtCore import QUrl, Signal, Slot
-from PySide6.QtWidgets import QWidget, QVBoxLayout
+from PySide6.QtCore import QUrl, Signal, Slot, QTimer
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QDialog
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from src.controller.event_bus import EventBus
@@ -14,28 +13,32 @@ from src.controller.event_bus import EventBus
 
 FALLBACK_HTML = """<!DOCTYPE html><html><body style="background:#080808;color:#4a6880;font-family:monospace">Missing template: src/views/components/html/map.html</body></html>"""
 
+
+def _center_dialog(dialog, parent: QWidget) -> None:
+    """Center a dialog over its parent widget."""
+    dialog.adjustSize()
+    center = parent.mapToGlobal(parent.rect().center())
+    dialog.move(center.x() - dialog.width() // 2, center.y() - dialog.height() // 2)
+
 _CB_PREFIX = "__mapcb__:"
 
 
 class _MapPage(QWebEnginePage):
     """Custom page that intercepts __mapcb__: console messages for JS→Python bridge."""
 
-    def __init__(self, event_bus: EventBus, on_click, parent=None):
+    def __init__(self, event_bus: EventBus, on_action, parent=None):
         super().__init__(parent)
         self._event_bus = event_bus
-        self._on_click  = on_click
+        self._on_action = on_action
 
     def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):  # noqa: N802
         if message and message.startswith(_CB_PREFIX):
             try:
                 data = _json.loads(message[len(_CB_PREFIX):])
-                self._on_click(
-                    float(data["lat"]), float(data["lng"]),
-                    str(data.get("label", "")), str(data.get("id", ""))
-                )
+                self._on_action(data)
             except Exception:
                 pass
-            return  # don't forward internal messages to the log
+            return
         if message:
             self._event_bus.publish_sync("log", f"MapWidget JS[{lineNumber}] {message}")
         super().javaScriptConsoleMessage(level, message, lineNumber, sourceID)
@@ -50,13 +53,13 @@ class MapWidget(QWidget):
         self._view: QWebEngineView | None = None
         self._config = config or {}
         self._event_bus = event_bus or EventBus()
-        self._html_file = Path(tempfile.gettempdir()) / "map_widget.html"
         self._html_template = Path(__file__).resolve().parent / "html" / "map.html"
         self._is_ready = False
         self._pending_scripts: list[str] = []
         self._robot_lat: float | None = None
         self._robot_lng: float | None = None
         self._first_center_done = False
+        self._poi_seq = 0
         self._js_queue.connect(self._exec_js)
 
     def _load_html(self) -> str:
@@ -67,7 +70,7 @@ class MapWidget(QWidget):
 
     def build(self) -> None:
         self._view = QWebEngineView()
-        page = _MapPage(self._event_bus, self._handle_map_click, self._view)
+        page = _MapPage(self._event_bus, self._handle_map_action, self._view)
         self._view.setPage(page)
         self._view.settings().setAttribute(
             QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True
@@ -215,16 +218,63 @@ class MapWidget(QWidget):
             self._event_bus.subscribe(at_topic, _on_poi_at)
             self._event_bus.publish_sync("log", f"MapWidget: add-POI-at bound to '{at_topic}'")
 
-    def _handle_map_click(self, lat: float, lng: float, label: str, poi_id: str) -> None:
-        """Called by JS when user clicks the map. Publishes to configured topics."""
-        click_topic = str(self._config.get("click_topic", "")).strip()
-        poi_topic   = str(self._config.get("poi_topic",   "")).strip()
-        if click_topic:
-            self._event_bus.publish_sync(click_topic, {"lat": lat, "lng": lng})
+    def _handle_map_action(self, data: dict) -> None:
+        """Dispatches action-wheel selections from JS."""
+        action = str(data.get("action", "poi"))
+        try:
+            lat = float(data["lat"])
+            lng = float(data["lng"])
+        except (KeyError, TypeError, ValueError):
+            return
+
+        if action == "poi":
+            QTimer.singleShot(0, lambda: self._show_poi_dialog(lat, lng))
+        elif action == "goto":
+            QTimer.singleShot(0, lambda: self._handle_goto(lat, lng))
+
+    def _show_poi_dialog(self, lat: float, lng: float) -> None:
+        from src.views.components.bitmap import _AltitudePicker, _NamePicker
+
+        ocr_url = str(self._config.get("ocr_url", "")).strip()
+        picker = _AltitudePicker(self._event_bus, ocr_url, self)
+        _center_dialog(picker, self)
+        if picker.exec() != QDialog.DialogCode.Accepted:
+            return
+        altitude  = picker.altitude()
+        photo_url = picker.photo_data_url()
+
+        self._poi_seq += 1
+        default_name = f"WP{self._poi_seq:03d}"
+        name_picker = _NamePicker(default_name, self)
+        _center_dialog(name_picker, self)
+        if name_picker.exec() != QDialog.DialogCode.Accepted:
+            self._poi_seq -= 1
+            return
+
+        label  = name_picker.name() or default_name
+        poi_id = f"poi_{self._poi_seq}"
+
+        self.run_js(f"window.mapAddPOI({lat}, {lng}, {json.dumps(label)}, {json.dumps(poi_id)});")
+        if photo_url:
+            self.run_js(f"window.mapAttachPhoto({json.dumps(poi_id)}, {json.dumps(photo_url)});")
+
+        poi_topic = str(self._config.get("poi_topic", "")).strip()
         if poi_topic:
-            self._event_bus.publish_sync(
-                poi_topic, {"lat": lat, "lng": lng, "label": label, "poi_id": poi_id}
-            )
+            payload: dict = {"lat": lat, "lng": lng, "label": label, "alt": altitude, "poi_id": poi_id}
+            if photo_url:
+                payload["photo"] = photo_url
+            self._event_bus.publish_sync(poi_topic, payload)
+
+        self._event_bus.publish_sync(
+            "log",
+            f"[Map] POI {self._poi_seq} «{label}» → GPS=({lat:.6f},{lng:.6f}) alt={altitude:.2f}m",
+        )
+
+    def _handle_goto(self, lat: float, lng: float) -> None:
+        goto_topic = str(self._config.get("goto_topic", "")).strip()
+        if goto_topic:
+            self._event_bus.publish_sync(goto_topic, {"lat": lat, "lng": lng})
+        self._event_bus.publish_sync("log", f"[Map] GOTO → ({lat:.6f},{lng:.6f})")
 
     @Slot(str)
     def _exec_js(self, script: str) -> None:

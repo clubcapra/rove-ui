@@ -19,9 +19,150 @@ from PySide6.QtWidgets import (
 )
 
 from src.controller.event_bus import EventBus
+from src.views.theme import (
+    BG_DEEP, BG_DARK, BG_PANEL, BG_SURFACE,
+    BORDER_DIM, BORDER, BORDER_BRIGHT,
+    CYAN, GREEN, RED, TEXT, TEXT_DIM,
+)
 
-_ACCENT = "#eb4034"
-_PANEL  = "#1c1c1b"
+
+# ── Shared dialog styling ─────────────────────────────────────────────────────
+
+_DIALOG_BASE = f"""
+QDialog {{
+    background: {BG_DEEP};
+    border: 1px solid {CYAN};
+}}
+QLabel {{
+    color: {TEXT};
+    background: transparent;
+    font-family: 'Courier New', monospace;
+}}
+QPushButton {{
+    background: {BG_DARK};
+    color: {TEXT};
+    border: 1px solid {BORDER};
+    border-radius: 0;
+    padding: 7px 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    min-height: 28px;
+}}
+QPushButton:hover {{
+    background: {BG_SURFACE};
+    border-color: {CYAN};
+    color: {CYAN};
+}}
+QPushButton:pressed {{ background: {BG_DEEP}; }}
+QPushButton#ok {{
+    background: {CYAN};
+    color: {BG_DEEP};
+    border: none;
+    font-weight: 700;
+    letter-spacing: 2px;
+}}
+QPushButton#ok:hover {{ background: #ffc840; color: {BG_DEEP}; }}
+QPushButton#cancel:hover {{ border-color: {RED}; color: {RED}; }}
+QSlider::groove:vertical {{
+    background: {BG_SURFACE};
+    width: 4px;
+    border: none;
+    margin: 0 10px;
+}}
+QSlider::handle:vertical {{
+    background: {CYAN};
+    height: 14px; width: 14px;
+    margin: 0 -6px;
+    border-radius: 0;
+    border: 2px solid {BG_DEEP};
+}}
+QSlider::sub-page:vertical {{
+    background: {CYAN};
+    margin: 0 10px;
+    opacity: 0.7;
+}}
+QSlider::add-page:vertical {{
+    background: {BG_DARK};
+    margin: 0 10px;
+}}
+QPushButton#photo {{
+    background: {BG_DARK};
+    color: {TEXT_DIM};
+    border: 1px solid {BORDER_DIM};
+    border-radius: 0;
+    padding: 6px 10px;
+    font-size: 11px;
+    letter-spacing: 1px;
+}}
+QPushButton#photo:hover {{ border-color: {CYAN}; color: {TEXT}; }}
+QPushButton#photo[captured="true"] {{
+    background: rgba(0,230,118,0.05);
+    color: {GREEN};
+    border-color: {GREEN};
+}}
+QPushButton[role="key"] {{
+    background: {BG_DARK};
+    color: {TEXT};
+    border: 1px solid {BORDER_DIM};
+    border-radius: 0;
+    padding: 0;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    font-weight: 600;
+}}
+QPushButton[role="key"]:hover {{
+    background: {BG_SURFACE};
+    border-color: {CYAN};
+    color: {CYAN};
+}}
+QPushButton[role="key"]:pressed {{ background: {BG_DEEP}; }}
+QPushButton#bs {{
+    background: rgba(255,61,61,0.06);
+    color: {RED};
+    border: 1px solid rgba(255,61,61,0.25);
+    border-radius: 0;
+    padding: 0;
+    font-size: 14px;
+}}
+QPushButton#bs:hover {{ background: rgba(255,61,61,0.13); border-color: {RED}; }}
+QPushButton#space {{
+    background: {BG_DARK};
+    color: {TEXT_DIM};
+    border: 1px solid {BORDER_DIM};
+    border-radius: 0;
+    letter-spacing: 2px;
+    font-size: 10px;
+    padding: 0;
+}}
+QPushButton#space:hover {{
+    background: {BG_SURFACE};
+    border-color: {BORDER_BRIGHT};
+    color: {TEXT};
+}}
+"""
+
+
+def _tac_titlebar(text: str) -> QWidget:
+    """Returns a 30px title-bar widget with orange label, used at dialog top."""
+    bar = QWidget()
+    bar.setFixedHeight(30)
+    bar.setStyleSheet(
+        f"background: {BG_PANEL}; border-bottom: 1px solid {BORDER};"
+    )
+    lay = QHBoxLayout(bar)
+    lay.setContentsMargins(10, 0, 8, 0)
+    lay.setSpacing(7)
+    icon = QLabel("◈")
+    icon.setStyleSheet(f"color: {CYAN}; font-size: 11px;")
+    lbl = QLabel(text)
+    lbl.setStyleSheet(
+        f"color: {CYAN}; font-size: 10px; font-weight: 700; letter-spacing: 2px;"
+    )
+    lay.addWidget(icon)
+    lay.addWidget(lbl)
+    lay.addStretch()
+    return bar
 
 
 # ── Altitude picker dialog ─────────────────────────────────────────────────────
@@ -40,140 +181,119 @@ class _AltitudePicker(QDialog):
             | Qt.WindowType.WindowStaysOnTopHint
         )
         self.setModal(True)
-        self.setFixedWidth(224)
+        self.setFixedWidth(248)
         self._altitude = 0.0
         self._photo_data_url: str | None = None
         self._nam_ocr: QNetworkAccessManager | None = None
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
-        self.setStyleSheet(f"""
-            QDialog {{
-                background: {_PANEL};
-                border: 2px solid {_ACCENT};
-                border-radius: 10px;
-            }}
-            QLabel {{ color: #e0e0e0; background: transparent; }}
-            QPushButton {{
-                background: #292928; color: #e0e0e0;
-                border: 1px solid #444; border-radius: 5px;
-                padding: 5px 14px; font-size: 12px;
-            }}
-            QPushButton:hover {{ background: #3a3a38; }}
-            QPushButton#ok {{
-                background: {_ACCENT}; color: #fff;
-                font-weight: 700; border: none;
-            }}
-            QPushButton#ok:hover {{ background: #c93028; }}
-            QPushButton#photo {{
-                background: #292928; color: #e0e0e0;
-                border: 1px solid #555; border-radius: 5px;
-                padding: 5px 8px; font-size: 12px;
-            }}
-            QPushButton#photo:hover {{ background: #3a3a38; color: #fff; }}
-            QPushButton#photo[captured="true"] {{
-                background: #1a3320; color: #86efac;
-                border-color: #22c55e;
-            }}
-            QSlider::groove:vertical {{
-                background: #292928; width: 8px; border-radius: 4px; margin: 0 8px;
-            }}
-            QSlider::handle:vertical {{
-                background: {_ACCENT};
-                height: 20px; width: 20px;
-                margin: 0 -6px;
-                border-radius: 10px;
-                border: 2px solid {_PANEL};
-            }}
-            QSlider::sub-page:vertical {{
-                background: {_ACCENT}; border-radius: 4px; margin: 0 8px;
-            }}
-            QSlider::add-page:vertical {{
-                background: #292928; border-radius: 4px; margin: 0 8px;
-            }}
-        """)
+        self.setStyleSheet(_DIALOG_BASE)
 
+        # Root layout — 0 margins so title bar goes edge to edge
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(16, 16, 16, 16)
-        outer.setSpacing(10)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        outer.addWidget(_tac_titlebar("ALTITUDE — P.O.I."))
 
-        # Title
-        title = QLabel("Altitude du POI")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet(f"font-size: 13px; font-weight: 700; color: {_ACCENT};")
-        outer.addWidget(title)
+        # Content area
+        body = QWidget()
+        body.setStyleSheet("background: transparent;")
+        inner = QVBoxLayout(body)
+        inner.setContentsMargins(14, 12, 14, 14)
+        inner.setSpacing(10)
+        outer.addWidget(body)
 
-        # Big value label
+        # Value readout
         self._val_label = QLabel("0.00 m")
         self._val_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._val_label.setStyleSheet(
-            "font-size: 32px; font-weight: 700; letter-spacing: 1px; padding: 2px 0;"
+            f"font-size: 34px; font-weight: 700; letter-spacing: 1px;"
+            f" color: {CYAN}; padding: 6px 0;"
+            f" background: {BG_DARK}; border: 1px solid {BORDER_DIM};"
         )
-        outer.addWidget(self._val_label)
+        inner.addWidget(self._val_label)
 
-        # Slider area: tick labels + slider side by side
+        # Slider area: tick labels + slider
         slider_row = QHBoxLayout()
-        slider_row.setSpacing(4)
+        slider_row.setSpacing(2)
 
-        # Left tick labels (5→0 top to bottom, 6 equally spaced)
         tick_col = QVBoxLayout()
         tick_col.setContentsMargins(0, 0, 0, 0)
         tick_col.setSpacing(0)
         for txt in ("5", "4", "3", "2", "1", "0"):
             lbl = QLabel(txt)
-            lbl.setStyleSheet("font-size: 9px; color: #888;")
+            lbl.setStyleSheet(
+                f"font-size: 9px; color: {TEXT_DIM}; font-family: 'Courier New', monospace;"
+            )
             lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             tick_col.addWidget(lbl, stretch=1)
         slider_row.addLayout(tick_col)
 
-        lbl_m = QLabel("m")
-        lbl_m.setStyleSheet("font-size: 9px; color: #888;")
+        lbl_m = QLabel(" m")
+        lbl_m.setStyleSheet(f"font-size: 8px; color: {TEXT_DIM};")
         lbl_m.setAlignment(Qt.AlignmentFlag.AlignTop)
         slider_row.addWidget(lbl_m)
 
-        # Vertical slider: 0 = 0.00 m (bottom) → 500 = 5.00 m (top)
         self._slider = QSlider(Qt.Orientation.Vertical)
         self._slider.setRange(0, 500)
         self._slider.setValue(0)
-        self._slider.setMinimumHeight(180)
-        self._slider.setSingleStep(1)    # 0.01 m
-        self._slider.setPageStep(10)     # 0.10 m
-        self._slider.setTickInterval(100)
-        self._slider.setTickPosition(QSlider.TickPosition.TicksLeft)
+        self._slider.setMinimumHeight(160)
+        self._slider.setSingleStep(1)
+        self._slider.setPageStep(10)
+        self._slider.setTickPosition(QSlider.TickPosition.NoTicks)
         self._slider.valueChanged.connect(self._on_slider)
-        slider_row.addWidget(self._slider)
-        outer.addLayout(slider_row)
+        slider_row.addWidget(self._slider, 1)
+        inner.addLayout(slider_row)
 
-        # Precision hint
-        hint = QLabel("← ↑↓ 0.01 m  |  PgUp/Dn 0.10 m")
+        hint = QLabel("↑↓  0.01 m   ·   PgUp/Dn  0.10 m")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        hint.setStyleSheet("font-size: 8px; color: #888;")
-        outer.addWidget(hint)
+        hint.setStyleSheet(f"font-size: 8px; color: {TEXT_DIM}; letter-spacing: 0.5px;")
+        inner.addWidget(hint)
 
-        # Photo capture preview (16:9, 192×108)
-        self._photo_preview = QLabel("Pas de photo")
-        self._photo_preview.setFixedSize(192, 108)
+        # Divider
+        div = QWidget(); div.setFixedHeight(1)
+        div.setStyleSheet(f"background: {BORDER_DIM};")
+        inner.addWidget(div)
+
+        # Photo preview
+        self._photo_preview = QLabel("AUCUNE PHOTO")
+        self._photo_preview.setFixedSize(214, 120)
         self._photo_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._photo_preview.setStyleSheet(
-            "background: #292928; color: #888; border-radius: 4px; font-size: 10px;"
+            f"background: {BG_DARK}; color: {TEXT_DIM};"
+            f" border: 1px solid {BORDER_DIM}; font-size: 9px; letter-spacing: 1.5px;"
         )
-        outer.addWidget(self._photo_preview)
+        inner.addWidget(self._photo_preview)
 
-        self._photo_btn = QPushButton("📷 Capturer photo")
+        self._photo_btn = QPushButton("📷  CAPTURER PHOTO")
         self._photo_btn.setObjectName("photo")
         self._photo_btn.clicked.connect(self._capture_photo)
-        outer.addWidget(self._photo_btn)
+        inner.addWidget(self._photo_btn)
 
-        # Buttons
+        # Divider
+        div2 = QWidget(); div2.setFixedHeight(1)
+        div2.setStyleSheet(f"background: {BORDER_DIM};")
+        inner.addWidget(div2)
+
+        # Action buttons
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
-        cancel_btn = QPushButton("Annuler")
+        cancel_btn = QPushButton("ANNULER")
+        cancel_btn.setObjectName("cancel")
         cancel_btn.clicked.connect(self.reject)
-        ok_btn = QPushButton("✓ OK")
+        ok_btn = QPushButton("◆  CONFIRMER")
         ok_btn.setObjectName("ok")
         ok_btn.setDefault(True)
+        ok_btn.setStyleSheet(
+            f"QPushButton {{ background: {CYAN}; color: #000000; border: none;"
+            f" font-weight: 700; letter-spacing: 2px; padding: 7px 16px;"
+            f" font-family: 'Courier New', monospace; font-size: 11px; }}"
+            f"QPushButton:hover {{ background: #ffc840; color: #000000; }}"
+        )
         ok_btn.clicked.connect(self.accept)
         btn_row.addWidget(cancel_btn)
         btn_row.addWidget(ok_btn)
-        outer.addLayout(btn_row)
+        inner.addLayout(btn_row)
 
     def _on_slider(self, value: int) -> None:
         self._altitude = value / 100.0
@@ -289,53 +409,32 @@ class _NamePicker(QDialog):
         )
         self.setModal(True)
         self._text = default_name
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
-        self.setStyleSheet(f"""
-            QDialog {{
-                background: {_PANEL};
-                border: 2px solid {_ACCENT};
-                border-radius: 10px;
-            }}
-            QLabel {{ color: #e0e0e0; background: transparent; }}
-            QPushButton {{
-                background: #292928; color: #e0e0e0;
-                border: 1px solid #3a3a38; border-radius: 4px;
-                font-size: 11px; font-weight: 600; padding: 0;
-            }}
-            QPushButton:hover  {{ background: #3a3a38; border-color: #666; }}
-            QPushButton:pressed {{ background: #444; }}
-            QPushButton#ok {{
-                background: {_ACCENT}; color: #fff;
-                font-weight: 700; border: none; border-radius: 5px;
-                font-size: 12px; padding: 5px 14px;
-            }}
-            QPushButton#ok:hover {{ background: #c93028; }}
-            QPushButton#cancel {{
-                background: #292928; color: #e0e0e0;
-                border: 1px solid #444; border-radius: 5px;
-                font-size: 12px; padding: 5px 14px;
-            }}
-            QPushButton#cancel:hover {{ background: #3a3a38; }}
-        """)
+        self.setStyleSheet(_DIALOG_BASE)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(14, 14, 14, 14)
-        outer.setSpacing(8)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        outer.addWidget(_tac_titlebar("IDENTIFIANT — P.O.I."))
 
-        title = QLabel("Nom du POI")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet(f"font-size: 13px; font-weight: 700; color: {_ACCENT};")
-        outer.addWidget(title)
+        body = QWidget()
+        body.setStyleSheet("background: transparent;")
+        inner = QVBoxLayout(body)
+        inner.setContentsMargins(12, 12, 12, 14)
+        inner.setSpacing(8)
+        outer.addWidget(body)
 
         self._display = QLabel()
         self._display.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._display.setStyleSheet(
-            "font-size: 18px; font-weight: 700; "
-            "background: #292928; border: 1px solid #555; border-radius: 4px; "
-            "padding: 4px 8px; min-height: 32px; color: #e0e0e0;"
+            f"font-size: 20px; font-weight: 700;"
+            f" background: {BG_DARK}; border: 1px solid {BORDER};"
+            f" padding: 6px 10px; min-height: 36px; color: {CYAN};"
+            f" font-family: 'Courier New', monospace;"
         )
         self._display.setMinimumWidth(280)
-        outer.addWidget(self._display)
+        inner.addWidget(self._display)
         self._refresh_display()
 
         for row_str in self._KB_ROWS:
@@ -344,42 +443,51 @@ class _NamePicker(QDialog):
             row_layout.addStretch()
             for ch in row_str:
                 btn = QPushButton(ch)
+                btn.setProperty("role", "key")
                 btn.setFixedSize(self._KEY_W, self._KEY_H)
                 btn.clicked.connect(lambda _=False, c=ch: self._press(c))
                 row_layout.addWidget(btn)
             row_layout.addStretch()
-            outer.addLayout(row_layout)
+            inner.addLayout(row_layout)
 
         # Space + backspace row
         bot = QHBoxLayout()
         bot.setSpacing(self._KEY_GAP)
         space_btn = QPushButton("ESPACE")
+        space_btn.setObjectName("space")
         space_btn.setFixedHeight(self._KEY_H)
         space_btn.clicked.connect(lambda: self._press(" "))
         bs_btn = QPushButton("⌫")
+        bs_btn.setObjectName("bs")
         bs_btn.setFixedSize(self._KEY_W * 2 + self._KEY_GAP, self._KEY_H)
-        bs_btn.setStyleSheet(
-            "QPushButton { background: #3a2020; color: #f87171; border: 1px solid #6b2020; border-radius: 4px; font-size: 13px; }"
-            "QPushButton:hover { background: #4a2828; }"
-            "QPushButton:pressed { background: #5a3030; }"
-        )
         bs_btn.clicked.connect(self._backspace)
         bot.addWidget(space_btn, 1)
         bot.addWidget(bs_btn)
-        outer.addLayout(bot)
+        inner.addLayout(bot)
+
+        # Divider
+        div = QWidget(); div.setFixedHeight(1)
+        div.setStyleSheet(f"background: {BORDER_DIM};")
+        inner.addWidget(div)
 
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
-        cancel_btn = QPushButton("Annuler")
+        cancel_btn = QPushButton("ANNULER")
         cancel_btn.setObjectName("cancel")
         cancel_btn.clicked.connect(self.reject)
-        ok_btn = QPushButton("✓ OK")
+        ok_btn = QPushButton("◆  CONFIRMER")
         ok_btn.setObjectName("ok")
         ok_btn.setDefault(True)
+        ok_btn.setStyleSheet(
+            f"QPushButton {{ background: {CYAN}; color: #000000; border: none;"
+            f" font-weight: 700; letter-spacing: 2px; padding: 7px 16px;"
+            f" font-family: 'Courier New', monospace; font-size: 11px; }}"
+            f"QPushButton:hover {{ background: #ffc840; color: #000000; }}"
+        )
         ok_btn.clicked.connect(self.accept)
         btn_row.addWidget(cancel_btn)
         btn_row.addWidget(ok_btn)
-        outer.addLayout(btn_row)
+        inner.addLayout(btn_row)
 
     def _press(self, char: str) -> None:
         self._text += char
@@ -470,6 +578,7 @@ class Bitmap:
         layout.addWidget(self._label)
 
         self._register_gps_tracking()
+        self._register_gps_poi_sync()
 
         source = str(self.config.get("source", "")).strip()
         if source:
@@ -510,6 +619,54 @@ class Bitmap:
         self.event_bus.subscribe(lat_topic, _on_lat)
         self.event_bus.subscribe(lng_topic, _on_lng)
         self.event_bus.subscribe(yaw_topic, _on_yaw)
+
+    # ── GPS POI sync (map → costmap) ──────────────────────────────────────────
+
+    def _register_gps_poi_sync(self) -> None:
+        """Subscribe to GPS POI events and project them onto the bitmap."""
+        topic = str(self.config.get("add_poi_gps_topic", "")).strip()
+        if not topic:
+            return
+
+        radius_x = float(self.config.get("cornerPositionWidth",  1.0)) / 2.0
+        radius_y = float(self.config.get("cornerPositionHeight", 1.0)) / 2.0
+
+        def _on_gps_poi(payload) -> None:
+            if not isinstance(payload, dict):
+                return
+            if self._robot_lat is None or self._robot_lng is None:
+                return
+            try:
+                poi_lat = float(payload["lat"])
+                poi_lng = float(payload["lng"])
+            except (KeyError, TypeError, ValueError):
+                return
+
+            label = str(payload.get("label", "POI"))
+            alt   = float(payload.get("alt", 0.0))
+
+            # GPS offset → metres (north/east)
+            north = (poi_lat - self._robot_lat) * 111_111.0
+            east  = (poi_lng - self._robot_lng) * (
+                111_111.0 * math.cos(math.radians(self._robot_lat))
+            )
+
+            # Rotate into robot-local frame (inverse of forward rotation)
+            yaw_rad = math.radians(self._robot_yaw)
+            lx =  east * math.cos(yaw_rad) + north * math.sin(yaw_rad)
+            ly = -east * math.sin(yaw_rad) + north * math.cos(yaw_rad)
+
+            # Local → normalised image coordinates
+            nx = 0.5 + lx / (2.0 * radius_x)
+            ny = 0.5 - ly / (2.0 * radius_y)   # y axis inverted in image
+
+            if not (0.0 <= nx <= 1.0 and 0.0 <= ny <= 1.0):
+                return  # POI is outside the visible bitmap area
+
+            self._pois.append({"nx": nx, "ny": ny, "alt": alt, "label": label})
+            self._update_display()
+
+        self.event_bus.subscribe(topic, _on_gps_poi)
 
     # ── Click → altitude picker → POI ─────────────────────────────────────────
 
@@ -654,8 +811,8 @@ class Bitmap:
         painter.rotate(yaw_deg)
 
         ring_r = int(size * 1.15)
-        painter.setPen(QPen(QColor(255, 255, 255, 150), 2))
-        painter.setBrush(QColor(0, 0, 0, 70))
+        painter.setPen(QPen(QColor(0xff, 0xae, 0x00, 80), 1))
+        painter.setBrush(QColor(0, 0, 0, 80))
         painter.drawEllipse(-ring_r, -ring_r, ring_r * 2, ring_r * 2)
 
         tip_y   = -int(size * 0.85)
@@ -666,13 +823,13 @@ class Bitmap:
             QPointF(-base_hw, base_y),
             QPointF(base_hw,  base_y),
         ])
-        painter.setPen(QPen(QColor(0, 0, 0, 100), 1))
-        painter.setBrush(QColor(34, 197, 94, 230))
+        painter.setPen(QPen(QColor(0, 0, 0, 120), 1))
+        painter.setBrush(QColor(0xff, 0xae, 0x00, 230))
         painter.drawPolygon(arrow)
 
         dot_r = max(3, size // 7)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(239, 68, 68, 240))
+        painter.setBrush(QColor(0x08, 0x08, 0x08, 220))
         painter.drawEllipse(-dot_r, -dot_r, dot_r * 2, dot_r * 2)
 
         painter.restore()
@@ -680,7 +837,7 @@ class Bitmap:
     def _draw_pois(self, painter: QPainter, w: int, h: int) -> None:
         r = max(7, min(w, h) // 40)
         font_size = max(7, min(w, h) // 55)
-        painter.setFont(QFont("Sans Serif", font_size, QFont.Weight.Bold))
+        painter.setFont(QFont("Courier New", font_size, QFont.Weight.Bold))
         poi_pix = self._load_image("poi_image", "_poi_img_tried", "_poi_pixmap")
 
         for poi in self._pois:
@@ -698,26 +855,28 @@ class Bitmap:
                 )
                 painter.drawPixmap(px - scaled.width() // 2, py - scaled.height(), scaled)
             else:
-                # Fallback: golden pin
-                painter.setPen(QPen(QColor("#78350f"), 2))
-                painter.setBrush(QColor(245, 158, 11, 220))
-                painter.drawEllipse(px - r, py - r, r * 2, r * 2)
-
-                stem = max(3, r // 2)
-                painter.setPen(QPen(QColor("#f59e0b"), max(2, stem // 2)))
-                painter.drawLine(px, py + r, px, py + r + stem)
-
+                # Tactical diamond (losange)
+                d = QPolygonF([
+                    QPointF(px,     py - r),
+                    QPointF(px + r, py),
+                    QPointF(px,     py + r),
+                    QPointF(px - r, py),
+                ])
+                painter.setPen(QPen(QColor(0x08, 0x08, 0x08, 200), 1))
+                painter.setBrush(QColor(0xff, 0xae, 0x00, 210))
+                painter.drawPolygon(d)
+                # Inner highlight dot
                 cr = max(2, r // 3)
                 painter.setPen(Qt.PenStyle.NoPen)
-                painter.setBrush(QColor(255, 255, 255, 230))
+                painter.setBrush(QColor(0xff, 0xff, 0xff, 140))
                 painter.drawEllipse(px - cr, py - cr, cr * 2, cr * 2)
 
-            # Label + altitude (shadow then white) — always drawn
-            text = f"{poi['label']}  {poi['alt']:.2f} m"
-            tx, ty = px + r + 3, py + font_size // 2
-            painter.setPen(QPen(QColor(0, 0, 0, 160), 1))
+            # Label: dark shadow + orange text
+            text = f"◆ {poi['label']}  {poi['alt']:.2f}m"
+            tx, ty = px + r + 4, py + font_size // 2
+            painter.setPen(QPen(QColor(0, 0, 0, 180), 1))
             painter.drawText(tx + 1, ty + 1, text)
-            painter.setPen(QPen(QColor("#fef3c7"), 1))
+            painter.setPen(QPen(QColor(0xff, 0xae, 0x00), 1))
             painter.drawText(tx, ty, text)
 
     # ── Placeholder ────────────────────────────────────────────────────────────

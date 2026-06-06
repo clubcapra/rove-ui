@@ -62,7 +62,7 @@
     .tac-coords { color: #505050; font-size: 10px; }
     .tac-popup img { max-width: 200px; max-height: 150px; margin-top: 6px; border: 1px solid #2e2e2e; }
 
-    /* Click feedback */
+    /* Click flash */
     @keyframes flash {
       0%   { opacity: 1; transform: scale(0.4); }
       60%  { opacity: 0.7; transform: scale(1.8); }
@@ -96,6 +96,102 @@
       color: #ffae00;
     }
     #btn-recenter:active { background: #080808; }
+
+    /* ── Action wheel ───────────────────────────────────────────── */
+    #action-wheel {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 3000;
+    }
+    #aw-backdrop {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.30);
+      cursor: default;
+    }
+    #aw-ring {
+      position: absolute;
+      width: 0; height: 0;
+    }
+    /* Coordinates label at center */
+    #aw-coords-box {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      background: #0a0a0a;
+      border: 1px solid #2e2e2e;
+      color: #484848;
+      font-size: 9px;
+      font-family: 'Courier New', monospace;
+      padding: 4px 8px;
+      white-space: nowrap;
+      pointer-events: none;
+      letter-spacing: 0.5px;
+    }
+    /* Radial buttons */
+    .aw-btn {
+      position: absolute;
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: #0f0f0f;
+      border: 1.5px solid #2e2e2e;
+      color: #d0d8e0;
+      font-family: 'Courier New', monospace;
+      cursor: pointer;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 3px;
+      transform: translate(-50%, -50%);
+      transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .aw-btn:hover, .aw-btn:active {
+      background: #1a1a1a;
+      border-color: #ffae00;
+      color: #ffae00;
+      box-shadow: 0 0 16px rgba(255,174,0,0.25);
+    }
+    .aw-btn.aw-goto:hover, .aw-btn.aw-goto:active {
+      border-color: #00e676;
+      color: #00e676;
+      box-shadow: 0 0 16px rgba(0,230,118,0.2);
+    }
+    .aw-btn.aw-cancel:hover, .aw-btn.aw-cancel:active {
+      border-color: #ff3d3d;
+      color: #ff3d3d;
+      box-shadow: 0 0 16px rgba(255,61,61,0.2);
+    }
+    .aw-icon { font-size: 20px; line-height: 1; }
+    .aw-lbl  { font-size: 7px; letter-spacing: 1.5px; font-weight: 700; opacity: 0.85; }
+
+    /* Connector lines from center */
+    #aw-ring svg {
+      position: absolute;
+      overflow: visible;
+      pointer-events: none;
+      left: 0; top: 0;
+    }
+
+    @keyframes aw-pop {
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+      70%  { transform: translate(-50%, -50%) scale(1.08); }
+      100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+    @keyframes aw-pop-coords {
+      0%   { opacity: 0; }
+      40%  { opacity: 0; }
+      100% { opacity: 1; }
+    }
+    #aw-ring.aw-open .aw-btn {
+      animation: aw-pop 0.22s cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
+    }
+    #aw-ring.aw-open #aw-coords-box {
+      animation: aw-pop-coords 0.3s ease forwards;
+    }
+    #aw-btn-poi   { animation-delay: 0ms !important; }
+    #aw-btn-goto  { animation-delay: 30ms !important; }
+    #aw-btn-cancel{ animation-delay: 60ms !important; }
   </style>
 </head>
 <body>
@@ -106,7 +202,28 @@
   <span class="sb" id="sb-zoom">ZOOM --</span>
   <span class="sb" id="sb-pois">0 WAYPOINTS</span>
   <span class="sb-spacer"></span>
-  <span class="sb" style="color:#222222;">&#9658; CLICK TO MARK WAYPOINT</span>
+  <span class="sb" style="color:#222222;">&#9658; TAP TO PLACE ACTION</span>
+</div>
+
+<!-- Action wheel overlay -->
+<div id="action-wheel">
+  <div id="aw-backdrop"></div>
+  <div id="aw-ring">
+    <svg id="aw-lines" width="1" height="1"></svg>
+    <div id="aw-coords-box">-- / --</div>
+    <button class="aw-btn aw-poi"    id="aw-btn-poi">
+      <span class="aw-icon">◆</span>
+      <span class="aw-lbl">P.O.I.</span>
+    </button>
+    <button class="aw-btn aw-goto"   id="aw-btn-goto">
+      <span class="aw-icon">⊕</span>
+      <span class="aw-lbl">GOTO</span>
+    </button>
+    <button class="aw-btn aw-cancel" id="aw-btn-cancel">
+      <span class="aw-icon">✕</span>
+      <span class="aw-lbl">ANNULER</span>
+    </button>
+  </div>
 </div>
 
 <script>
@@ -139,7 +256,7 @@
     sbPois.textContent = n + ' WAYPOINT' + (n !== 1 ? 'S' : '');
   }
 
-  // ── Icon config ────────────────────────────────────────────────────────
+  // ── Icon config ───────────────────────────────────────────────────────
   let _robotIconUrl = null, _robotIconSize = [36, 36];
   let _poiIconUrl   = null, _poiIconSize   = [24, 32];
   let robotYaw = 0;
@@ -219,16 +336,36 @@
     if (w && h) _poiIconSize = [w, h];
   };
 
+  // ── GOTO marker ───────────────────────────────────────────────────────
+  let gotoMarker = null;
+  function _gotoIconHtml() {
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="-14 -14 28 28">' +
+      '<circle r="12" fill="rgba(0,0,0,0.55)" stroke="#00e676" stroke-width="1" stroke-dasharray="3 2"/>' +
+      '<polygon points="0,-8 -5,4 5,4" fill="#00e676" stroke="#080808" stroke-width="0.8"/>' +
+      '<circle r="2" fill="#00e676"/>' +
+      '</svg>';
+  }
+
+  function setGotoMarker(lat, lng) {
+    if (gotoMarker) { map.removeLayer(gotoMarker); }
+    gotoMarker = L.marker([lat, lng], {
+      icon: L.divIcon({ html: _gotoIconHtml(), iconSize: [32,32], iconAnchor: [16,16], className: '' }),
+      zIndexOffset: 900
+    }).addTo(map);
+    gotoMarker.bindPopup(
+      '<div class="tac-popup">' +
+      '<div class="tac-label" style="color:#00e676">⊕ GOTO TARGET</div>' +
+      '<div class="tac-coords">' + lat.toFixed(6) + ' / ' + lng.toFixed(6) + '</div></div>'
+    );
+  }
+
   // ── POI ───────────────────────────────────────────────────────────────
   function _poiMarkerIcon() {
-    if (_poiIconUrl) {
-      const [iw, ih] = _poiIconSize;
-      return L.icon({ iconUrl: _poiIconUrl, iconSize: [iw,ih], iconAnchor: [iw/2,ih] });
-    }
-    return L.divIcon({
-      html: '<div style="width:10px;height:10px;background:#ffae00;transform:rotate(45deg);border:1px solid rgba(255,255,255,0.25);margin:-5px 0 0 -5px;"></div>',
-      iconSize: [0,0], iconAnchor: [0,0], className: ''
-    });
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="-8 -8 16 16">' +
+      '<polygon points="0,-7 7,0 0,7 -7,0" fill="#ffae00" stroke="#080808" stroke-width="1.2"/>' +
+      '<circle r="2" fill="rgba(255,255,255,0.5)"/>' +
+      '</svg>';
+    return L.divIcon({ html: svg, iconSize: [16,16], iconAnchor: [8,8], className: '' });
   }
 
   window.mapAddPOI = function(lat, lng, label, poiId) {
@@ -277,27 +414,121 @@
     });
   };
 
-  // ── Click → waypoint ──────────────────────────────────────────────────
-  map.on('click', function(e) {
-    const lat = e.latlng.lat;
-    const lng = e.latlng.lng;
-    poiCounter++;
-    const poiId = 'wp_' + poiCounter;
-    const label = 'WP' + String(poiCounter).padStart(3, '0');
-
-    window.mapAddPOI(lat, lng, label, poiId);
-
-    // Click flash animation
-    const pt = map.latLngToContainerPoint(e.latlng);
+  // ── Click flash helper ────────────────────────────────────────────────
+  function showClickFlash(pt, color) {
     const flash = document.createElement('div');
     flash.className = 'click-flash';
     flash.style.left = pt.x + 'px';
     flash.style.top  = pt.y + 'px';
+    if (color) flash.style.borderColor = color;
     document.getElementById('map').appendChild(flash);
     setTimeout(function() { if (flash.parentNode) flash.parentNode.removeChild(flash); }, 500);
+  }
 
-    // Signal Python via console bridge (intercepted by _MapPage)
-    console.log('__mapcb__:' + JSON.stringify({lat: lat, lng: lng, label: label, id: poiId}));
+  // ── Action wheel ──────────────────────────────────────────────────────
+  let _awLat = null, _awLng = null;
+
+  // Button positions: angle in degrees (0=right, -90=top)
+  // POI: top (-90°), GOTO: bottom-right (30°), CANCEL: bottom-left (150°)
+  const _AW_RADIUS = 88;
+  const _AW_ANGLES = { 'aw-btn-poi': -90, 'aw-btn-goto': 30, 'aw-btn-cancel': 150 };
+
+  function showActionWheel(lat, lng, containerPoint) {
+    _awLat = lat;
+    _awLng = lng;
+
+    const mapEl = document.getElementById('map');
+    const mw = mapEl.offsetWidth;
+    const mh = mapEl.offsetHeight;
+
+    // Clamp so buttons don't go off-screen
+    const R = _AW_RADIUS + 32;
+    const x = Math.max(R, Math.min(mw - R, containerPoint.x));
+    const y = Math.max(R, Math.min(mh - R - 24, containerPoint.y));
+
+    const ring = document.getElementById('aw-ring');
+    ring.style.left = x + 'px';
+    ring.style.top  = y + 'px';
+
+    document.getElementById('aw-coords-box').textContent =
+      lat.toFixed(6) + ' / ' + lng.toFixed(6);
+
+    // Position each button radially
+    for (const [id, deg] of Object.entries(_AW_ANGLES)) {
+      const rad = deg * Math.PI / 180;
+      const bx = Math.round(Math.cos(rad) * _AW_RADIUS);
+      const by = Math.round(Math.sin(rad) * _AW_RADIUS);
+      const btn = document.getElementById(id);
+      btn.style.left = bx + 'px';
+      btn.style.top  = by + 'px';
+    }
+
+    // Draw connector lines in SVG
+    const svg = document.getElementById('aw-lines');
+    let svgContent = '';
+    for (const deg of Object.values(_AW_ANGLES)) {
+      const rad = deg * Math.PI / 180;
+      const x2 = Math.round(Math.cos(rad) * (_AW_RADIUS - 32));
+      const y2 = Math.round(Math.sin(rad) * (_AW_RADIUS - 32));
+      svgContent += '<line x1="0" y1="0" x2="' + x2 + '" y2="' + y2 +
+        '" stroke="#2e2e2e" stroke-width="1" stroke-dasharray="3 3"/>';
+    }
+    svg.innerHTML = svgContent;
+
+    const wheel = document.getElementById('action-wheel');
+    wheel.style.display = 'block';
+    ring.classList.remove('aw-open');
+    requestAnimationFrame(function() { ring.classList.add('aw-open'); });
+  }
+
+  function hideActionWheel() {
+    document.getElementById('action-wheel').style.display = 'none';
+    document.getElementById('aw-ring').classList.remove('aw-open');
+    _awLat = null;
+    _awLng = null;
+  }
+
+  // Dismiss on backdrop or Escape
+  document.getElementById('aw-backdrop').addEventListener('click', hideActionWheel);
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') hideActionWheel();
+  });
+
+  // WAYPOINT action
+  document.getElementById('aw-btn-poi').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const lat = _awLat, lng = _awLng;
+    hideActionWheel();
+    showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#ffae00');
+    console.log('__mapcb__:' + JSON.stringify({ action: 'poi', lat: lat, lng: lng }));
+  });
+
+  // GOTO action
+  document.getElementById('aw-btn-goto').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const lat = _awLat, lng = _awLng;
+    hideActionWheel();
+    setGotoMarker(lat, lng);
+    showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#00e676');
+    console.log('__mapcb__:' + JSON.stringify({ action: 'goto', lat: lat, lng: lng }));
+  });
+
+  // CANCEL
+  document.getElementById('aw-btn-cancel').addEventListener('click', function(e) {
+    e.stopPropagation();
+    hideActionWheel();
+  });
+
+  // ── Map click → show wheel ────────────────────────────────────────────
+  map.on('click', function(e) {
+    // Don't open wheel if already open — dismiss instead
+    if (document.getElementById('action-wheel').style.display === 'block') {
+      hideActionWheel();
+      return;
+    }
+    const pt = map.latLngToContainerPoint(e.latlng);
+    showClickFlash(pt, '#484848');
+    showActionWheel(e.latlng.lat, e.latlng.lng, pt);
   });
 </script>
 </body>

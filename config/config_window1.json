@@ -103,11 +103,7 @@
             "robot_position_yaw_topic": "gnss.yaw",
             "click_topic":    "map.click",
             "poi_topic":      "map.poi",
-            "add_poi_at_topic": "costmap.poi",
-            "robot_cursor_image": "src/media/icons/robot_icons.png",
-            "robot_cursor_size": [40, 40],
-            "poi_image": "src/media/icons/poi_icons.png",
-            "poi_size":  [24, 32]
+            "add_poi_at_topic": "costmap.poi"
           }
         },
         {
@@ -252,13 +248,10 @@
             "cornerPositionHeight": 8,
             "click_topic": "costmap.click",
             "poi_topic": "costmap.poi",
+            "add_poi_gps_topic": "map.poi",
             "gps_lat_topic": "gnss.latitude",
             "gps_lng_topic": "gnss.longitude",
-            "gps_yaw_topic": "gnss.yaw",
-            "robot_cursor_image": "src/media/icons/robot_icons.png",
-            "robot_cursor_size": [40, 40],
-            "poi_image": "src/media/icons/poi_icons.png",
-            "poi_size": [24, 32]
+            "gps_yaw_topic": "gnss.yaw"
           },
           "grid": { "row": 0, "column": 0 }
         }

@@ -26,9 +26,9 @@ def _tac_wrap(widget: QWidget, label: str) -> QWidget:
     bar_layout.setContentsMargins(8, 0, 8, 0)
     bar_layout.setSpacing(6)
 
-    dot = QLabel("▸")
+    dot = QLabel("◆")
     dot.setStyleSheet(
-        f"color: {theme.CYAN}; font-size: 9px; background: transparent; border: none;"
+        f"color: {theme.CYAN}; font-size: 8px; background: transparent; border: none;"
     )
     dot.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
