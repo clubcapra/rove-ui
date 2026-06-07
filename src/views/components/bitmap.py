@@ -108,7 +108,7 @@ QPushButton[role="key"] {{
     border-radius: 0;
     padding: 0;
     font-family: 'Courier New', monospace;
-    font-size: 12px;
+    font-size: 15px;
     font-weight: 600;
 }}
 QPushButton[role="key"]:hover {{
@@ -123,7 +123,7 @@ QPushButton#bs {{
     border: 1px solid rgba(255,61,61,0.25);
     border-radius: 0;
     padding: 0;
-    font-size: 14px;
+    font-size: 18px;
 }}
 QPushButton#bs:hover {{ background: rgba(255,61,61,0.13); border-color: {RED}; }}
 QPushButton#space {{
@@ -396,9 +396,9 @@ class _NamePicker(QDialog):
         "ASDFGHJKL",
         "ZXCVBNM",
     ]
-    _KEY_W = 26
-    _KEY_H = 30
-    _KEY_GAP = 4
+    _KEY_W = 40
+    _KEY_H = 46
+    _KEY_GAP = 6
 
     def __init__(self, default_name: str = "", parent=None):
         super().__init__(parent)
@@ -433,7 +433,7 @@ class _NamePicker(QDialog):
             f" padding: 6px 10px; min-height: 36px; color: {CYAN};"
             f" font-family: 'Courier New', monospace;"
         )
-        self._display.setMinimumWidth(280)
+        self._display.setMinimumWidth(460)
         inner.addWidget(self._display)
         self._refresh_display()
 
