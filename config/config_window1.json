@@ -95,9 +95,10 @@
           "name": "Carte GPS",
           "style": { "x": 0, "y": 0, "width": "100%", "height": "100%", "z_index": 0 },
           "data": {
-            "initial_lat": 0,
-            "initial_lng": 0,
-            "initial_zoom": 17,
+            "initial_lat": 46.759,
+            "initial_lng": 7.616,
+            "initial_zoom": 15,
+            "tile_source_topic": "map.tile_source",
             "robot_position_lat_topic": "gnss.latitude",
             "robot_position_lng_topic": "gnss.longitude",
             "robot_position_yaw_topic": "gnss.yaw",
@@ -256,6 +257,35 @@
           "grid": { "row": 0, "column": 0 }
         }
       ]
+    },
+
+    "MISSION BUILDER": {
+      "type": "layout",
+      "diaposition": "vertical",
+      "content": [
+        {
+          "type": "mission_builder",
+          "name": "mission_builder",
+          "data": {
+            "manifest_path": "src/media/mission_manifest.json",
+            "send_topic": "mission.send"
+          }
+        }
+      ]
+    },
+
+    "TILES": {
+      "type": "layout",
+      "diaposition": "vertical",
+      "content": [{
+        "type": "tile_downloader",
+        "name": "tile_downloader",
+        "data": {
+          "server_port": 8080,
+          "tiles_dir": "tiles",
+          "tile_source_topic": "map.tile_source"
+        }
+      }]
     },
 
     "LOGS": {

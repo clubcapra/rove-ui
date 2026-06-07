@@ -162,6 +162,28 @@
       color: #ff3d3d;
       box-shadow: 0 0 16px rgba(255,61,61,0.2);
     }
+    .aw-btn.aw-sentinel:hover, .aw-btn.aw-sentinel:active {
+      border-color: #22d3ee; color: #22d3ee;
+      box-shadow: 0 0 16px rgba(34,211,238,0.22);
+    }
+    .aw-btn.aw-orbit:hover, .aw-btn.aw-orbit:active {
+      border-color: #a78bfa; color: #a78bfa;
+      box-shadow: 0 0 16px rgba(167,139,250,0.20);
+    }
+    .aw-btn.aw-relay:hover, .aw-btn.aw-relay:active {
+      border-color: #34d399; color: #34d399;
+      box-shadow: 0 0 16px rgba(52,211,153,0.20);
+    }
+    #sentinel-banner {
+      display: none;
+      position: absolute;
+      top: 50px; left: 50%; transform: translateX(-50%);
+      background: #080808; border: 1px solid #22d3ee;
+      color: #22d3ee; font-family: 'Courier New', monospace;
+      font-size: 10px; letter-spacing: 2px; font-weight: 700;
+      padding: 6px 18px; z-index: 3500; pointer-events: none;
+      white-space: nowrap;
+    }
     .aw-icon { font-size: 20px; line-height: 1; }
     .aw-lbl  { font-size: 7px; letter-spacing: 1.5px; font-weight: 700; opacity: 0.85; }
 
@@ -189,9 +211,49 @@
     #aw-ring.aw-open #aw-coords-box {
       animation: aw-pop-coords 0.3s ease forwards;
     }
-    #aw-btn-poi   { animation-delay: 0ms !important; }
-    #aw-btn-goto  { animation-delay: 30ms !important; }
-    #aw-btn-cancel{ animation-delay: 60ms !important; }
+    #aw-btn-poi      { animation-delay: 0ms   !important; }
+    #aw-btn-goto     { animation-delay: 20ms  !important; }
+    #aw-btn-sentinel { animation-delay: 40ms  !important; }
+    #aw-btn-orbit    { animation-delay: 60ms  !important; }
+    #aw-btn-relay    { animation-delay: 80ms  !important; }
+    #aw-btn-cancel   { animation-delay: 100ms !important; }
+
+    /* Filter panel */
+    #filter-panel {
+      position: absolute;
+      top: 10px; right: 10px;
+      z-index: 1000;
+      background: #0f0f0f;
+      border: 1px solid #2e2e2e;
+      min-width: 100px;
+      font-family: 'Courier New', monospace;
+    }
+    #filter-title {
+      background: #080808;
+      border-bottom: 1px solid #2e2e2e;
+      color: #505050;
+      font-size: 8px;
+      letter-spacing: 1.5px;
+      padding: 4px 8px;
+    }
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 9px;
+      letter-spacing: 1px;
+      border-bottom: 1px solid #161616;
+      color: #a0a0a0;
+      user-select: none;
+      transition: background 0.1s, color 0.1s;
+    }
+    .filter-row:last-child { border-bottom: none; }
+    .filter-row:hover { background: #1a1a1a; color: #d0d8e0; }
+    .filter-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .filter-row.off { color: #383838; }
+    .filter-row.off .filter-dot { opacity: 0.2; }
   </style>
 </head>
 <body>
@@ -201,6 +263,7 @@
   <span class="sb" id="sb-coords">-- / --</span>
   <span class="sb" id="sb-zoom">ZOOM --</span>
   <span class="sb" id="sb-pois">0 WAYPOINTS</span>
+  <span class="sb" id="sb-steps">0 STEPS</span>
   <span class="sb-spacer"></span>
   <span class="sb" style="color:#222222;">&#9658; TAP TO PLACE ACTION</span>
 </div>
@@ -219,10 +282,43 @@
       <span class="aw-icon">⊕</span>
       <span class="aw-lbl">GOTO</span>
     </button>
+    <button class="aw-btn aw-sentinel" id="aw-btn-sentinel">
+      <span class="aw-icon">⇄</span>
+      <span class="aw-lbl">SENTINEL</span>
+    </button>
+    <button class="aw-btn aw-orbit" id="aw-btn-orbit">
+      <span class="aw-icon">◎</span>
+      <span class="aw-lbl">ORBIT</span>
+    </button>
+    <button class="aw-btn aw-relay" id="aw-btn-relay">
+      <span class="aw-icon">⊡</span>
+      <span class="aw-lbl">RELAY</span>
+    </button>
     <button class="aw-btn aw-cancel" id="aw-btn-cancel">
       <span class="aw-icon">✕</span>
       <span class="aw-lbl">ANNULER</span>
     </button>
+  </div>
+</div>
+<div id="sentinel-banner">◆ TAP MAP — SET POINT B</div>
+
+<!-- Layer filter panel -->
+<div id="filter-panel">
+  <div id="filter-title">◆ LAYERS</div>
+  <div class="filter-row" id="fl-poi"      onclick="toggleLayer('poi',this)">
+    <span class="filter-dot" style="background:#ffae00"></span>POI
+  </div>
+  <div class="filter-row" id="fl-goto"     onclick="toggleLayer('goto',this)">
+    <span class="filter-dot" style="background:#00e676"></span>GOTO
+  </div>
+  <div class="filter-row" id="fl-sentinel" onclick="toggleLayer('sentinel',this)">
+    <span class="filter-dot" style="background:#22d3ee"></span>SENTINEL
+  </div>
+  <div class="filter-row" id="fl-relay"    onclick="toggleLayer('relay',this)">
+    <span class="filter-dot" style="background:#34d399"></span>RELAY
+  </div>
+  <div class="filter-row" id="fl-orbit"    onclick="toggleLayer('orbit',this)">
+    <span class="filter-dot" style="background:#a78bfa"></span>ORBIT
   </div>
 </div>
 
@@ -238,6 +334,44 @@
   window.mapSetTileLayer = function(url, opts) {
     if (currentTileLayer) map.removeLayer(currentTileLayer);
     currentTileLayer = L.tileLayer(url, opts || { maxZoom: 19 }).addTo(map);
+  };
+
+  // ── Mission layer groups ──────────────────────────────────────────────
+  const _layers = {
+    poi:      L.layerGroup().addTo(map),
+    goto:     L.layerGroup().addTo(map),
+    sentinel: L.layerGroup().addTo(map),
+    relay:    L.layerGroup().addTo(map),
+    orbit:    L.layerGroup().addTo(map),
+  };
+  const _layerVisible = { poi: true, goto: true, sentinel: true, relay: true, orbit: true };
+  const _missionMarkers = {};
+
+  function _updateMissionCount() {
+    const n = Object.keys(_missionMarkers).length;
+    document.getElementById('sb-steps').textContent = n + ' STEP' + (n !== 1 ? 'S' : '');
+  }
+
+  function toggleLayer(type, el) {
+    const vis = !_layerVisible[type];
+    _layerVisible[type] = vis;
+    const lg = _layers[type];
+    if (lg) {
+      if (vis) { if (!map.hasLayer(lg)) map.addLayer(lg); }
+      else     { if (map.hasLayer(lg))  map.removeLayer(lg); }
+    }
+    el.classList.toggle('off', !vis);
+  }
+
+  window.mapSetLayerVisible = function(type, visible) {
+    _layerVisible[type] = visible;
+    const lg = _layers[type];
+    if (lg) {
+      if (visible) { if (!map.hasLayer(lg)) map.addLayer(lg); }
+      else         { if (map.hasLayer(lg))  map.removeLayer(lg); }
+    }
+    const el = document.getElementById('fl-' + type);
+    if (el) el.classList.toggle('off', !visible);
   };
 
   // ── Status bar ────────────────────────────────────────────────────────
@@ -373,7 +507,8 @@
     const safeLabel = label || id;
     const latStr = parseFloat(lat).toFixed(6);
     const lngStr = parseFloat(lng).toFixed(6);
-    const marker = L.marker([lat, lng], { icon: _poiMarkerIcon(), zIndexOffset: 500 }).addTo(map);
+    const marker = L.marker([lat, lng], { icon: _poiMarkerIcon(), zIndexOffset: 500 });
+    _layers.poi.addLayer(marker);
     marker.bindPopup(
       '<div class="tac-popup">' +
       '<div class="tac-label">&#9670; ' + safeLabel + '</div>' +
@@ -387,7 +522,7 @@
 
   window.mapRemovePOI = function(id) {
     if (!pois[id]) return;
-    map.removeLayer(pois[id].marker);
+    _layers.poi.removeLayer(pois[id].marker);
     delete pois[id];
     updatePoiCount();
   };
@@ -414,6 +549,74 @@
     });
   };
 
+  // ── Mission step markers ──────────────────────────────────────────────
+  window.mapAddMissionStep = function(type, id, lat, lng, label, extra) {
+    extra = extra || {};
+    const lg = _layers[type];
+    if (!lg) return;
+    const items = [];
+
+    if (type === 'goto') {
+      const m = L.circleMarker([lat, lng], {
+        radius: 7, fillColor: '#00e676', color: '#080808',
+        weight: 2, fillOpacity: 0.9
+      });
+      m.bindTooltip(label);
+      items.push(m);
+    } else if (type === 'relay') {
+      const svg =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="-6 -6 12 12">' +
+        '<rect x="-5" y="-5" width="10" height="10" fill="#34d399" stroke="#080808" ' +
+        'stroke-width="1.5" rx="1"/></svg>';
+      const m = L.marker([lat, lng], {
+        icon: L.divIcon({ html: svg, iconSize: [12,12], iconAnchor: [6,6], className: '' }),
+        zIndexOffset: 400
+      });
+      m.bindTooltip(label);
+      items.push(m);
+    } else if (type === 'sentinel') {
+      const latB = extra.lat_b, lngB = extra.lng_b;
+      if (latB === undefined || lngB === undefined) return;
+      const line = L.polyline([[lat, lng], [latB, lngB]], {
+        color: '#22d3ee', weight: 2, dashArray: '6 4', opacity: 0.85
+      });
+      line.bindTooltip(label);
+      const dA = L.circleMarker([lat, lng], {
+        radius: 5, fillColor: '#22d3ee', color: '#080808', weight: 2, fillOpacity: 1
+      });
+      dA.bindTooltip(label + ' — A');
+      const dB = L.circleMarker([latB, lngB], {
+        radius: 5, fillColor: '#22d3ee', color: '#080808', weight: 2, fillOpacity: 0.6
+      });
+      dB.bindTooltip(label + ' — B');
+      items.push(line, dA, dB);
+    } else if (type === 'orbit') {
+      const radius = extra.radius || 10;
+      const center = L.circleMarker([lat, lng], {
+        radius: 5, fillColor: '#a78bfa', color: '#080808', weight: 2, fillOpacity: 1
+      });
+      center.bindTooltip(label + ' (r=' + radius + 'm)');
+      const ring = L.circle([lat, lng], {
+        radius: radius, color: '#a78bfa', weight: 1.5,
+        fillOpacity: 0.06, dashArray: '5 4'
+      });
+      items.push(center, ring);
+    }
+
+    items.forEach(function(item) { lg.addLayer(item); });
+    _missionMarkers[id] = { items: items, type: type };
+    _updateMissionCount();
+  };
+
+  window.mapRemoveMissionStep = function(id) {
+    const entry = _missionMarkers[id];
+    if (!entry) return;
+    const lg = _layers[entry.type];
+    if (lg) entry.items.forEach(function(item) { lg.removeLayer(item); });
+    delete _missionMarkers[id];
+    _updateMissionCount();
+  };
+
   // ── Click flash helper ────────────────────────────────────────────────
   function showClickFlash(pt, color) {
     const flash = document.createElement('div');
@@ -428,10 +631,27 @@
   // ── Action wheel ──────────────────────────────────────────────────────
   let _awLat = null, _awLng = null;
 
-  // Button positions: angle in degrees (0=right, -90=top)
-  // POI: top (-90°), GOTO: bottom-right (30°), CANCEL: bottom-left (150°)
-  const _AW_RADIUS = 88;
-  const _AW_ANGLES = { 'aw-btn-poi': -90, 'aw-btn-goto': 30, 'aw-btn-cancel': 150 };
+  // 6 buttons at 60° intervals
+  const _AW_RADIUS = 96;
+  const _AW_ANGLES = {
+    'aw-btn-poi':      -90,
+    'aw-btn-goto':     -30,
+    'aw-btn-sentinel': -150,
+    'aw-btn-orbit':     30,
+    'aw-btn-relay':     90,
+    'aw-btn-cancel':   150,
+  };
+
+  // ── Sentinel two-tap state ─────────────────────────────────────────────
+  let _sentinelMode = false;
+  let _sentinelLatA = null, _sentinelLngA = null, _sentinelMarkerA = null;
+
+  function _exitSentinelMode() {
+    _sentinelMode = false;
+    _sentinelLatA = null; _sentinelLngA = null;
+    if (_sentinelMarkerA) { map.removeLayer(_sentinelMarkerA); _sentinelMarkerA = null; }
+    document.getElementById('sentinel-banner').style.display = 'none';
+  }
 
   function showActionWheel(lat, lng, containerPoint) {
     _awLat = lat;
@@ -494,41 +714,90 @@
     if (e.key === 'Escape') hideActionWheel();
   });
 
-  // WAYPOINT action
+  // ── Wheel button handlers ─────────────────────────────────────────────
+
+  // lat/lng captured BEFORE hideActionWheel() nulls the globals
+  function _awEmit(action, lat, lng, extra) {
+    const payload = Object.assign({ action: action, lat: lat, lng: lng }, extra || {});
+    console.log('__mapcb__:' + JSON.stringify(payload));
+  }
+
   document.getElementById('aw-btn-poi').addEventListener('click', function(e) {
     e.stopPropagation();
     const lat = _awLat, lng = _awLng;
     hideActionWheel();
     showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#ffae00');
-    console.log('__mapcb__:' + JSON.stringify({ action: 'poi', lat: lat, lng: lng }));
+    _awEmit('poi', lat, lng);
   });
 
-  // GOTO action
   document.getElementById('aw-btn-goto').addEventListener('click', function(e) {
     e.stopPropagation();
     const lat = _awLat, lng = _awLng;
     hideActionWheel();
-    setGotoMarker(lat, lng);
     showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#00e676');
-    console.log('__mapcb__:' + JSON.stringify({ action: 'goto', lat: lat, lng: lng }));
+    _awEmit('mission_goto', lat, lng);
   });
 
-  // CANCEL
+  document.getElementById('aw-btn-sentinel').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const lat = _awLat, lng = _awLng;
+    hideActionWheel();
+    showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#22d3ee');
+    _sentinelLatA = lat; _sentinelLngA = lng;
+    _sentinelMarkerA = L.marker([lat, lng], {
+      icon: L.divIcon({
+        html: '<div style="width:10px;height:10px;background:#22d3ee;border:2px solid #080808;border-radius:50%"></div>',
+        iconSize: [10,10], iconAnchor: [5,5], className: ''
+      })
+    }).addTo(map);
+    _sentinelMode = true;
+    document.getElementById('sentinel-banner').style.display = 'block';
+    _awEmit('mission_sentinel_a', lat, lng);
+  });
+
+  document.getElementById('aw-btn-orbit').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const lat = _awLat, lng = _awLng;
+    hideActionWheel();
+    showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#a78bfa');
+    _awEmit('mission_orbit', lat, lng);
+  });
+
+  document.getElementById('aw-btn-relay').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const lat = _awLat, lng = _awLng;
+    hideActionWheel();
+    showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#34d399');
+    _awEmit('mission_relay', lat, lng);
+  });
+
   document.getElementById('aw-btn-cancel').addEventListener('click', function(e) {
     e.stopPropagation();
     hideActionWheel();
   });
 
-  // ── Map click → show wheel ────────────────────────────────────────────
+  // ── Map click → sentinel B capture OR show wheel ──────────────────────
   map.on('click', function(e) {
-    // Don't open wheel if already open — dismiss instead
+    const lat = e.latlng.lat, lng = e.latlng.lng;
+    const pt  = map.latLngToContainerPoint(e.latlng);
+
+    if (_sentinelMode) {
+      const latA = _sentinelLatA, lngA = _sentinelLngA;
+      _exitSentinelMode();
+      showClickFlash(pt, '#22d3ee');
+      console.log('__mapcb__:' + JSON.stringify({
+        action: 'mission_sentinel_b',
+        lat_a: latA, lng_a: lngA, lat: lat, lng: lng
+      }));
+      return;
+    }
+
     if (document.getElementById('action-wheel').style.display === 'block') {
       hideActionWheel();
       return;
     }
-    const pt = map.latLngToContainerPoint(e.latlng);
     showClickFlash(pt, '#484848');
-    showActionWheel(e.latlng.lat, e.latlng.lng, pt);
+    showActionWheel(lat, lng, pt);
   });
 </script>
 </body>

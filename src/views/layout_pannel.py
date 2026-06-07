@@ -321,6 +321,20 @@ class LayoutPanel:
             self._register_child(name, bitmap)
             return bitmap.get_widget()
 
+        if vtype == "tile_downloader":
+            from .components.tile_downloader import TileDownloader
+            dl = TileDownloader(name, data, event_bus=self.event_bus)
+            dl.build()
+            self._register_child(name, dl)
+            return dl.get_widget()
+
+        if vtype == "mission_builder":
+            from .components.mission_builder import MissionBuilder
+            builder = MissionBuilder(name, data, event_bus=self.event_bus)
+            builder.build()
+            self._register_child(name, builder)
+            return builder.get_widget()
+
         if vtype == "robot":
             from .components.urdf_viewer import URDFViewer
             controls = child_cfg.get("controls")

@@ -1,0 +1,256 @@
+{
+  "schema_version": 1,
+  "firmware_hash": "REPLACE_AT_BUILD_e3b0c44298fc1c14",
+  "loadout": "standard",
+
+  "_doc": "Exported by the robot's behavior-tree node registry at connect-time. The UI builds its command palette and parameter forms from this file and validates a composed mission against it BEFORE serializing to protobuf. 'available'/'requires' gate commands by current loadout (e.g. arm vs cage). firmware_hash must match the value embedded in the mission the UI sends back; mismatch => UI warns/refuses.",
+
+  "variable_types": ["entity", "point", "geometry"],
+
+  "ref_sources": {
+    "map_coordinate": "operator taps the map / enters a coordinate",
+    "variable:entity": "a tracked vision object bound at runtime (e.g. $human)",
+    "variable:point":  "a coordinate captured at runtime (e.g. $point_a)",
+    "vision_object":   "a live object id from the vision stream (e.g. PERSON-01)"
+  },
+
+  "transitions": {
+    "until_done_next": { "label": "until done → next", "needs_count": false, "desc": "run to success, advance to next step" },
+    "until_done_end":  { "label": "until done → end",  "needs_count": false, "desc": "run to success, end the mission" },
+    "until_stopped":   { "label": "until stopped",      "needs_count": false, "desc": "run until operator preempts" },
+    "loop_n":          { "label": "loop N×",            "needs_count": true,  "desc": "repeat count times, then advance" }
+  },
+
+  "vision_classes": ["person", "vehicle", "drone", "robot", "poi"],
+
+  "commands": [
+    {
+      "id": "Await", "category": "flow", "ui": { "icon": "hourglass_top" },
+      "desc": "Wait until a condition is met, then bind the detected entity.",
+      "params": [
+        { "name": "condition", "type": "enum", "required": true,
+          "values": ["human_detected", "human_pose_a", "human_pose_b", "object_vehicle", "comms_regained", "audio_ping"] }
+      ],
+      "produces": { "type": "entity" },
+      "valid_transitions": ["until_done_next"],
+      "available": true
+    },
+
+    {
+      "id": "GoTo", "category": "navigation", "ui": { "icon": "near_me" },
+      "desc": "Drive to a coordinate.",
+      "params": [
+        { "name": "a", "type": "ref", "required": true, "accepts": ["map_coordinate", "variable:point"] }
+      ],
+      "valid_transitions": ["until_done_next", "until_done_end"],
+      "available": true
+    },
+    {
+      "id": "Sentinel", "category": "navigation", "ui": { "icon": "sync_alt" },
+      "desc": "Patrol between two points.",
+      "params": [
+        { "name": "a", "type": "ref", "required": true, "accepts": ["map_coordinate", "variable:point"] },
+        { "name": "b", "type": "ref", "required": true, "accepts": ["map_coordinate", "variable:point"] }
+      ],
+      "valid_transitions": ["until_stopped", "loop_n"],
+      "available": true
+    },
+    {
+      "id": "Waypoint", "category": "navigation", "ui": { "icon": "route" },
+      "desc": "Follow an ordered route.",
+      "params": [
+        { "name": "route", "type": "route", "required": true, "min_points": 2 }
+      ],
+      "valid_transitions": ["until_done_next", "until_done_end"],
+      "available": true
+    },
+    {
+      "id": "Orbit", "category": "navigation", "ui": { "icon": "track_changes" },
+      "desc": "Circle a point of interest.",
+      "params": [
+        { "name": "center", "type": "ref", "required": true, "accepts": ["map_coordinate", "variable:point"] },
+        { "name": "radius", "type": "number", "required": true, "unit": "m", "min": 1, "max": 200, "default": 10 }
+      ],
+      "valid_transitions": ["until_stopped", "loop_n"],
+      "available": true
+    },
+    {
+      "id": "Explore", "category": "navigation", "ui": { "icon": "explore" },
+      "desc": "Cover a perimeter to build a map with POIs.",
+      "params": [
+        { "name": "area", "type": "geometry", "required": true }
+      ],
+      "valid_transitions": ["until_done_next", "until_done_end"],
+      "available": true
+    },
+    {
+      "id": "Retreat", "category": "navigation", "ui": { "icon": "undo" },
+      "desc": "Back up a set distance along the traveled path.",
+      "params": [
+        { "name": "distance", "type": "number", "required": true, "unit": "m", "min": 0.5, "max": 100, "default": 5 }
+      ],
+      "valid_transitions": ["until_done_next"],
+      "available": true
+    },
+    {
+      "id": "ReturnHome", "category": "navigation", "ui": { "icon": "home" },
+      "desc": "Navigate back to deployment origin.",
+      "params": [],
+      "valid_transitions": ["until_done_end"],
+      "available": true
+    },
+    {
+      "id": "BacktrackComm", "category": "navigation", "ui": { "icon": "settings_backup_restore" },
+      "desc": "Retrace path until comms with the station is regained.",
+      "params": [],
+      "valid_transitions": ["until_done_next"],
+      "available": true
+    },
+    {
+      "id": "RelayPosition", "category": "navigation", "ui": { "icon": "cell_tower" },
+      "desc": "Move to a coordinate and hold as a comms relay node.",
+      "params": [
+        { "name": "position", "type": "ref", "required": true, "accepts": ["map_coordinate", "variable:point"] }
+      ],
+      "valid_transitions": ["until_stopped"],
+      "available": true
+    },
+    {
+      "id": "AvoidZone", "category": "navigation", "ui": { "icon": "block" },
+      "desc": "Register a no-go region for the path planner.",
+      "params": [
+        { "name": "zone", "type": "geometry", "required": true }
+      ],
+      "valid_transitions": ["until_done_next"],
+      "available": true
+    },
+
+    {
+      "id": "Follow", "category": "observation", "ui": { "icon": "directions_walk" },
+      "desc": "Follow a target, maintaining standoff.",
+      "params": [
+        { "name": "target", "type": "ref", "required": true, "accepts": ["variable:entity", "vision_object"] },
+        { "name": "until",  "type": "enum", "required": false,
+          "values": ["pose_a", "pose_b", "target_stops", "out_of_range", "timeout", "manual"], "default": "manual" }
+      ],
+      "valid_transitions": ["until_done_next", "until_done_end"],
+      "available": true
+    },
+    {
+      "id": "Intercept", "category": "observation", "ui": { "icon": "my_location" },
+      "desc": "Intercept a moving object based on velocity.",
+      "params": [
+        { "name": "target", "type": "ref", "required": true, "accepts": ["variable:entity", "vision_object"] }
+      ],
+      "valid_transitions": ["until_done_next", "until_done_end"],
+      "available": true
+    },
+    {
+      "id": "Track", "category": "observation", "ui": { "icon": "center_focus_strong" },
+      "desc": "Lock camera on a target without moving the robot.",
+      "params": [
+        { "name": "target", "type": "ref", "required": true, "accepts": ["variable:entity", "vision_object"] },
+        { "name": "until",  "type": "enum", "required": false,
+          "values": ["pose_a", "pose_b", "out_of_range", "timeout", "manual"], "default": "manual" }
+      ],
+      "valid_transitions": ["until_stopped"],
+      "available": true
+    },
+    {
+      "id": "SurveyArea", "category": "observation", "ui": { "icon": "visibility" },
+      "desc": "Wait and sense from the current position.",
+      "params": [],
+      "valid_transitions": ["until_done_next", "until_done_end"],
+      "available": true
+    },
+    {
+      "id": "ListenPing", "category": "observation", "ui": { "icon": "hearing" },
+      "desc": "Motors off, passive audio listening.",
+      "params": [
+        { "name": "duration", "type": "number", "required": true, "unit": "s", "min": 1, "max": 600, "default": 30 }
+      ],
+      "valid_transitions": ["until_done_next"],
+      "available": true
+    },
+    {
+      "id": "MarkPOI", "category": "observation", "ui": { "icon": "push_pin" },
+      "desc": "Drop a labeled pin at the current position; binds a point variable.",
+      "params": [
+        { "name": "tag", "type": "string", "required": false }
+      ],
+      "produces": { "type": "point" },
+      "valid_transitions": ["until_done_next"],
+      "available": true
+    },
+    {
+      "id": "Inspect", "category": "observation", "ui": { "icon": "search" },
+      "desc": "Move arm camera close to an object for detail.",
+      "params": [
+        { "name": "target", "type": "ref", "required": true, "accepts": ["variable:entity", "vision_object"] }
+      ],
+      "valid_transitions": ["until_done_next"],
+      "requires": ["arm"],
+      "available": true
+    },
+    {
+      "id": "DisplayStatus", "category": "observation", "ui": { "icon": "lightbulb" },
+      "desc": "Show robot status visually.",
+      "params": [],
+      "valid_transitions": ["until_done_next"],
+      "available": true
+    },
+    {
+      "id": "SignalOperator", "category": "observation", "ui": { "icon": "campaign" },
+      "desc": "Actively draw attention (victim-facing).",
+      "params": [
+        { "name": "signal", "type": "enum", "required": true, "values": ["visual", "audio", "both"], "default": "both" }
+      ],
+      "valid_transitions": ["until_done_next"],
+      "available": true
+    },
+
+    {
+      "id": "ArmStow", "category": "arm", "ui": { "icon": "precision_manufacturing" },
+      "desc": "Tuck the arm to travel position.",
+      "params": [],
+      "valid_transitions": ["until_done_next"],
+      "requires": ["arm"],
+      "available": true
+    },
+
+    {
+      "id": "Calibrate", "category": "system", "ui": { "icon": "tune" },
+      "desc": "Flipper calibration sweep, arm homing.",
+      "params": [],
+      "valid_transitions": ["until_done_next"],
+      "available": true
+    },
+    {
+      "id": "Reset", "category": "system", "ui": { "icon": "restart_alt" },
+      "desc": "Return flippers and arm to default state.",
+      "params": [],
+      "valid_transitions": ["until_done_next"],
+      "available": true
+    },
+    {
+      "id": "HoldPosition", "category": "system", "ui": { "icon": "pan_tool" },
+      "desc": "Full stop, hold ground.",
+      "params": [],
+      "valid_transitions": ["until_stopped"],
+      "available": true
+    },
+
+    {
+      "id": "Dance", "category": "fun", "ui": { "icon": "celebration" },
+      "params": [], "valid_transitions": ["until_done_end"], "requires": ["arm"], "available": true
+    },
+    {
+      "id": "HelloWorld", "category": "fun", "ui": { "icon": "waving_hand" },
+      "params": [], "valid_transitions": ["until_done_end"], "requires": ["arm"], "available": true
+    },
+    {
+      "id": "Worm", "category": "fun", "ui": { "icon": "gesture" },
+      "params": [], "valid_transitions": ["until_done_end"], "available": true
+    }
+  ]
+}

@@ -60,6 +60,7 @@ class MapWidget(QWidget):
         self._robot_lng: float | None = None
         self._first_center_done = False
         self._poi_seq = 0
+        self._mission_seq = 0
         self._js_queue.connect(self._exec_js)
 
     def _load_html(self) -> str:
@@ -86,6 +87,7 @@ class MapWidget(QWidget):
 
         self._register_position_tracking()
         self._register_poi_button()
+        self._register_tile_source()
 
     def _on_load_finished(self, ok: bool) -> None:
         self._is_ready = bool(ok)
@@ -133,6 +135,14 @@ class MapWidget(QWidget):
                 size = self._config.get("poi_size", [24, 32])
                 w, h = (size[0], size[1]) if isinstance(size, list) and len(size) >= 2 else (24, 32)
                 self.run_js(f"window.mapSetPOIIcon({json.dumps(url)}, {w}, {h});")
+
+    def _register_tile_source(self) -> None:
+        topic = str(self._config.get("tile_source_topic", "")).strip()
+        if not topic:
+            return
+        def _on_tile_source(url: str) -> None:
+            self.run_js(f"window.mapSetTileLayer({json.dumps(str(url))});")
+        self._event_bus.subscribe(topic, _on_tile_source)
 
     def _register_position_tracking(self) -> None:
         lat_topic = str(self._config.get("robot_position_lat_topic", "")).strip()
@@ -231,6 +241,29 @@ class MapWidget(QWidget):
             QTimer.singleShot(0, lambda: self._show_poi_dialog(lat, lng))
         elif action == "goto":
             QTimer.singleShot(0, lambda: self._handle_goto(lat, lng))
+        elif action == "mission_goto":
+            self._publish_step("GoTo", {"a": {"lat": lat, "lng": lng, "alt": 0.0}})
+            self._add_mission_marker("goto", lat, lng)
+        elif action == "mission_relay":
+            self._publish_step("RelayPosition", {"position": {"lat": lat, "lng": lng, "alt": 0.0}})
+            self._add_mission_marker("relay", lat, lng)
+        elif action == "mission_sentinel_a":
+            self._event_bus.publish_sync(
+                "log", f"[Map] Sentinel A ({lat:.6f},{lng:.6f}) — tap map for point B"
+            )
+        elif action == "mission_sentinel_b":
+            try:
+                lat_a = float(data["lat_a"])
+                lng_a = float(data["lng_a"])
+            except (KeyError, TypeError, ValueError):
+                return
+            self._publish_step("Sentinel", {
+                "a": {"lat": lat_a, "lng": lng_a, "alt": 0.0},
+                "b": {"lat": lat,   "lng": lng,   "alt": 0.0},
+            })
+            self._add_mission_marker("sentinel", lat_a, lng_a, extra={"lat_b": lat, "lng_b": lng})
+        elif action == "mission_orbit":
+            QTimer.singleShot(0, lambda: self._handle_orbit(lat, lng))
 
     def _show_poi_dialog(self, lat: float, lng: float) -> None:
         from src.views.components.bitmap import _AltitudePicker, _NamePicker
@@ -275,6 +308,34 @@ class MapWidget(QWidget):
         if goto_topic:
             self._event_bus.publish_sync(goto_topic, {"lat": lat, "lng": lng})
         self._event_bus.publish_sync("log", f"[Map] GOTO → ({lat:.6f},{lng:.6f})")
+
+    def _handle_orbit(self, lat: float, lng: float) -> None:
+        from PySide6.QtWidgets import QInputDialog
+        radius, ok = QInputDialog.getDouble(
+            self, "Orbit — Rayon", "Rayon (m) :", 10.0, 1.0, 200.0, 1
+        )
+        if ok:
+            self._publish_step("Orbit", {
+                "center": {"lat": lat, "lng": lng, "alt": 0.0},
+                "radius": radius,
+            })
+            self._add_mission_marker("orbit", lat, lng, extra={"radius": radius})
+
+    def _add_mission_marker(self, mtype: str, lat: float, lng: float, extra: dict | None = None) -> None:
+        self._mission_seq += 1
+        step_id = f"ms_{self._mission_seq}"
+        label = f"{mtype.upper()} #{self._mission_seq}"
+        extra_js = json.dumps(extra or {})
+        self.run_js(
+            f"window.mapAddMissionStep("
+            f"{json.dumps(mtype)},{json.dumps(step_id)},{lat},{lng},"
+            f"{json.dumps(label)},{extra_js});"
+        )
+
+    def _publish_step(self, command: str, params: dict) -> None:
+        topic = str(self._config.get("mission_step_topic", "mission.step_request")).strip()
+        self._event_bus.publish_sync(topic, {"command": command, "params": params})
+        self._event_bus.publish_sync("log", f"[Map] → mission queue: {command}")
 
     @Slot(str)
     def _exec_js(self, script: str) -> None:

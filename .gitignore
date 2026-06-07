@@ -63,3 +63,4 @@ __pycache__/
 Testing/
 test_results/
 .claude/*
+/tiles/*
