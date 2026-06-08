@@ -281,7 +281,7 @@
         "type": "tile_downloader",
         "name": "tile_downloader",
         "data": {
-          "server_port": 8080,
+          "server_port": 8181,
           "tiles_dir": "tiles",
           "tile_source_topic": "map.tile_source"
         }

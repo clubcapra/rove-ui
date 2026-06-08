@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import math
-import subprocess
-import sys
+import threading
 import time
+from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal, Qt
@@ -128,6 +128,42 @@ class _Worker(QThread):
         self.finished.emit(True)
 
 
+# ── In-process tile HTTP server ────────────────────────────────────────────────
+
+class _TileHandler(SimpleHTTPRequestHandler):
+    """Static file handler that adds CORS + cache headers and suppresses access logs."""
+
+    def end_headers(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "max-age=3600")
+        super().end_headers()
+
+    def log_message(self, *_args) -> None:
+        pass
+
+
+class _TileServer(threading.Thread):
+    def __init__(self, root: Path, port: int):
+        super().__init__(daemon=True)
+        self._root = root
+        self._port = port
+        self._httpd: HTTPServer | None = None
+        self.error: str = ""
+
+    def run(self) -> None:
+        try:
+            handler = lambda *a, **kw: _TileHandler(*a, directory=str(self._root), **kw)
+            self._httpd = HTTPServer(("", self._port), handler)
+            self._httpd.serve_forever()
+        except OSError as exc:
+            self.error = str(exc)
+
+    def stop(self) -> None:
+        if self._httpd:
+            self._httpd.shutdown()
+            self._httpd = None
+
+
 # ── Shared style fragments ─────────────────────────────────────────────────────
 
 def _btn_style(color: str = theme.CYAN) -> str:
@@ -169,8 +205,8 @@ class TileDownloader:
         self._bus        = event_bus or EventBus()
         self._widget: QWidget | None = None
         self._worker: _Worker | None = None
-        self._server_proc            = None
-        self._port       = int(config.get("server_port", 8080))
+        self._tile_server: _TileServer | None = None
+        self._port       = int(config.get("server_port", 8181))
         self._tiles_dir  = _PROJECT_ROOT / str(config.get("tiles_dir", "tiles"))
         self._tile_topic = str(config.get("tile_source_topic", "")).strip()
 
@@ -407,30 +443,29 @@ class TileDownloader:
     # ── Tile server ────────────────────────────────────────────────────────────
 
     def _toggle_server(self) -> None:
-        if self._server_proc and self._server_proc.poll() is None:
-            self._server_proc.terminate()
-            self._server_proc = None
+        if self._tile_server and self._tile_server.is_alive():
+            self._tile_server.stop()
+            self._tile_server = None
             if self._btn_server:
                 self._btn_server.setText(f"▶  START  (:{self._port})")
             if self._lbl_server:
                 self._lbl_server.setText("● STOPPED")
                 self._lbl_server.setStyleSheet(f"color: {theme.RED}; font-size: 10px;")
         else:
-            try:
-                self._server_proc = subprocess.Popen(
-                    [sys.executable, "-m", "http.server", str(self._port)],
-                    cwd=str(_PROJECT_ROOT),
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                if self._btn_server:
-                    self._btn_server.setText(f"■  STOP   (:{self._port})")
-                if self._lbl_server:
-                    self._lbl_server.setText(f"● RUNNING :{self._port}")
-                    self._lbl_server.setStyleSheet(f"color: {theme.GREEN}; font-size: 10px;")
-                self._log_line(f"Tile server started  :{self._port}  →  {_PROJECT_ROOT}")
-            except Exception as exc:
-                self._log_line(f"Failed to start server: {exc}")
+            srv = _TileServer(_PROJECT_ROOT, self._port)
+            srv.start()
+            # Give the server 200 ms to bind or fail
+            srv.join(0.2)
+            if srv.error:
+                self._log_line(f"Server error: {srv.error}  (port {self._port} already in use?)")
+                return
+            self._tile_server = srv
+            if self._btn_server:
+                self._btn_server.setText(f"■  STOP   (:{self._port})")
+            if self._lbl_server:
+                self._lbl_server.setText(f"● RUNNING :{self._port}")
+                self._lbl_server.setStyleSheet(f"color: {theme.GREEN}; font-size: 10px;")
+            self._log_line(f"Tile server started  :{self._port}  →  {_PROJECT_ROOT}")
 
     # ── Map source switch ──────────────────────────────────────────────────────
 
