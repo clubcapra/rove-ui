@@ -26,7 +26,8 @@
 - [x] réception et traitement des protobufs
 
 # TODO - 12 Juin
-- [ ] Setup la barre de bouton supplémentaire
-- [ ] Changer l'Affordance pour setup la hauteur des POIs en la rendant tactile friendly
-- [ ] Mettre des claviers pour tout les inputs textes
-- [ ] augmenter un peu la taille des boutons
+- [x] Setup la barre de bouton supplémentaire
+- [x] Changer l'Affordance pour setup la hauteur des POIs en la rendant tactile friendly
+- [x] Mettre des claviers pour tout les inputs textes
+- [x] augmenter un peu la taille des boutons
+- [x] regarder pour le glitchy load sur la map (lourd)

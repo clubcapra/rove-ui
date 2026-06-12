@@ -132,6 +132,30 @@
                 "event": "camera.select",
                 "value": "ARM_CAM",
                 "active_topic": "camera.select"
+              },
+              {
+                "label": "NORTH CAM",
+                "event": "camera.select",
+                "value": "NORTH_CAM",
+                "active_topic": "camera.select"
+              },
+              {
+                "label": "SOUTH CAM",
+                "event": "camera.select",
+                "value": "SOUTH_CAM",
+                "active_topic": "camera.select"
+              },
+              {
+                "label": "EAST CAM",
+                "event": "camera.select",
+                "value": "EAST_CAM",
+                "active_topic": "camera.select"
+              },
+              {
+                "label": "WEST CAM",
+                "event": "camera.select",
+                "value": "WEST_CAM",
+                "active_topic": "camera.select"
               }
             ]
           }

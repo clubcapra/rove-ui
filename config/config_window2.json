@@ -46,8 +46,13 @@
             "vtx_host": "192.168.2.2",
             "vtx_port": 5540,
             "cameras": [
-              {"name": "REAR_CAM", "udp_vtx_id": 0, "rtsp_ip": "192.168.2.30"},
-              {"name": "ARM_CAM",  "udp_vtx_id": 4, "rtsp_ip": "192.168.2.34"}
+              {"name": "ARM_CAM", "udp_vtx_id": 0, "rtsp_ip": "192.168.2.30"},
+              {"name": "REAR_CAM",  "udp_vtx_id": 4, "rtsp_ip": "192.168.2.31"},
+              {"name": "NORTH_CAM", "udp_vtx_id": 0, "rtsp_ip": "192.168.2.32"},
+              {"name": "SOUTH_CAM", "udp_vtx_id": 0, "rtsp_ip": "192.168.2.33"},
+              {"name": "EAST_CAM", "udp_vtx_id": 0, "rtsp_ip": "192.168.2.34"},
+              {"name": "WEST_CAM", "udp_vtx_id": 0, "rtsp_ip": "192.168.2.35"}
+
             ],
             "rtsp":      { "source": "rtsp://192.168.2.30:554/", "source_type": "rtsp" },
             "webcamera": {
