@@ -46,7 +46,7 @@
             "vtx_host": "192.168.2.2",
             "vtx_port": 5540,
             "cameras": [
-              {"name": "ARM_CAM", "udp_vtx_id": 0, "rtsp_ip": "192.168.2.30"},
+              {"name": "ARM_CAM", "udp_vtx_id": 0, "rtsp_ip": "192.168.2.36"},
               {"name": "REAR_CAM",  "udp_vtx_id": 1, "rtsp_ip": "192.168.2.31"},
               {"name": "LEFT_CAM", "udp_vtx_id": 2, "rtsp_ip": "192.168.2.32"},
               {"name": "RIGHT_CAM", "udp_vtx_id": 3, "rtsp_ip": "192.168.2.33"},
