@@ -50,7 +50,12 @@ class DeviceManager:
     def _start_device(self, dev_cfg: dict) -> None:
         from src.controller.device_worker import DeviceWorker
         alias = dev_cfg.get("alias", "unknown")
-        worker = DeviceWorker(dev_cfg, on_joy=self._on_joy, on_status=self._on_status)
+        worker = DeviceWorker(
+            dev_cfg,
+            on_joy=self._on_joy,
+            on_status=self._on_status,
+            on_log=lambda msg: self.event_bus.publish_sync("log", msg),
+        )
         worker.start()
         self.workers[alias] = worker
 

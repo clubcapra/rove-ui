@@ -46,6 +46,16 @@
       "available": true
     },
     {
+      "id": "Pathway", "category": "navigation", "ui": { "icon": "polyline" },
+      "desc": "Navigate through an ordered sequence of coordinates.",
+      "params": [
+        { "name": "points", "type": "point_list", "required": true, "min_points": 2,
+          "accepts": ["map_coordinate", "variable:point"] }
+      ],
+      "valid_transitions": ["until_done_next", "until_done_end"],
+      "available": true
+    },
+    {
       "id": "Sentinel", "category": "navigation", "ui": { "icon": "sync_alt" },
       "desc": "Patrol between two points.",
       "params": [

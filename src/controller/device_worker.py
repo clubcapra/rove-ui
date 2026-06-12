@@ -8,6 +8,22 @@ from typing import Callable
 from evdev import InputDevice, list_devices
 
 
+def _axis_bar(val: float) -> str:
+    """e.g. val=+0.75 → '────────►        '  val=-1.0 → '◄────────────────'"""
+    width = 10
+    mid = width // 2
+    pos = int(round((val + 1.0) / 2.0 * width))
+    pos = max(0, min(width, pos))
+    bar = ["-"] * width
+    if pos < mid:
+        bar[pos] = "◄"
+    elif pos > mid:
+        bar[pos - 1] = "►"
+    else:
+        bar[mid] = "│"
+    return "[" + "".join(bar) + "]"
+
+
 class DeviceWorker(threading.Thread):
     """Reads evdev events from one gamepad and fires callbacks with normalized state."""
 
@@ -16,17 +32,23 @@ class DeviceWorker(threading.Thread):
         config: dict,
         on_joy: Callable[[str, list, list, bool], None],
         on_status: Callable[[str, bool, str], None] | None = None,
+        on_log: Callable[[str], None] | None = None,
     ) -> None:
         super().__init__(daemon=True)
         self.config = config
         self._on_joy = on_joy
         self._on_status = on_status
+        self._on_log = on_log
         self.running = True
         self.device: InputDevice | None = None
         self.is_connected = False
+        self._alias = config.get("alias", "unknown")
 
         self._axes: list[float] = [0.0] * 12
         self._buttons: list[int] = [0] * 24
+        self._prev_buttons: list[int] = [0] * 24
+        # Last axis value that triggered a log — only log on significant change
+        self._prev_axes_logged: list[float] = [0.0] * 12
 
         mapping = config.get("mapping", {})
         # evdev_code → joy_index (inverted from YAML)
@@ -84,19 +106,47 @@ class DeviceWorker(threading.Thread):
             if self.config.get("sanitize", False):
                 if abs(val) < self.config.get("deadzone", 0.0):
                     val = 0.0
-            self._axes[self.axis_map[event.code]] = val
+            joy_idx = self.axis_map[event.code]
+            self._axes[joy_idx] = val
+            self._log_axis(joy_idx, val)
+
             for e in self.axes_as_buttons:
                 if e["axis_code"] != event.code:
                     continue
                 t = e["threshold"]
-                if e["neg_button"] >= 0:
-                    self._buttons[e["neg_button"]] = 1 if val < -t else 0
-                if e["pos_button"] >= 0:
-                    self._buttons[e["pos_button"]] = 1 if val > t else 0
+                for btn_idx, fired in (
+                    (e["neg_button"], val < -t),
+                    (e["pos_button"], val > t),
+                ):
+                    if btn_idx >= 0:
+                        new = 1 if fired else 0
+                        self._buttons[btn_idx] = new
+                        self._log_button(btn_idx, new)
 
         elif event.type == 1:  # EV_KEY — buttons
             if event.code in self.btn_map:
-                self._buttons[self.btn_map[event.code]] = 1 if event.value > 0 else 0
+                joy_idx = self.btn_map[event.code]
+                new = 1 if event.value > 0 else 0
+                self._buttons[joy_idx] = new
+                self._log_button(joy_idx, new)
+
+    def _log_button(self, joy_idx: int, new: int) -> None:
+        if not self._on_log or new == self._prev_buttons[joy_idx]:
+            return
+        self._prev_buttons[joy_idx] = new
+        self._on_log(
+            f"[{self._alias}] BTN {joy_idx:2d}  {'▼ PRESSED' if new else '▲ released'}"
+        )
+
+    def _log_axis(self, joy_idx: int, val: float) -> None:
+        if not self._on_log:
+            return
+        prev = self._prev_axes_logged[joy_idx]
+        # Log when crossing ±0.4 from center, or returning near zero
+        if (abs(prev) < 0.4 and abs(val) >= 0.4) or (abs(prev) >= 0.4 and abs(val) < 0.1):
+            self._prev_axes_logged[joy_idx] = val
+            bar = _axis_bar(val)
+            self._on_log(f"[{self._alias}] AXIS {joy_idx:2d}  {val:+.2f} {bar}")
 
     # ------------------------------------------------------------------
 

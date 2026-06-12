@@ -235,9 +235,26 @@ class MapWidget(QWidget):
             self._event_bus.subscribe(at_topic, _on_poi_at)
             self._event_bus.publish_sync("log", f"MapWidget: add-POI-at bound to '{at_topic}'")
 
+        def _on_marker_remove(payload):
+            marker_id = str(payload.get("id", "")) if isinstance(payload, dict) else str(payload)
+            if marker_id:
+                self.run_js(f"window.mapRemoveMissionStep({json.dumps(marker_id)});")
+
+        self._event_bus.subscribe("mission.marker_remove", _on_marker_remove)
+
     def _handle_map_action(self, data: dict) -> None:
         """Dispatches action-wheel selections from JS."""
         action = str(data.get("action", "poi"))
+
+        if action == "remove_poi":
+            poi_id = str(data.get("poi_id", ""))
+            if poi_id:
+                self.run_js(f"window.mapRemovePOI({json.dumps(poi_id)});")
+                poi_topic = str(self._config.get("poi_remove_topic", "")).strip()
+                if poi_topic:
+                    self._event_bus.publish_sync(poi_topic, {"poi_id": poi_id})
+            return
+
         try:
             lat = float(data["lat"])
             lng = float(data["lng"])
@@ -249,11 +266,13 @@ class MapWidget(QWidget):
         elif action == "goto":
             QTimer.singleShot(0, lambda: self._handle_goto(lat, lng))
         elif action == "mission_goto":
-            self._publish_step("GoTo", {"a": {"lat": lat, "lng": lng, "alt": 0.0}})
-            self._add_mission_marker("goto", lat, lng)
+            sid = self._next_step_id()
+            self._publish_step("GoTo", {"a": {"lat": lat, "lng": lng, "alt": 0.0}}, sid)
+            self._add_mission_marker("goto", lat, lng, sid)
         elif action == "mission_relay":
-            self._publish_step("RelayPosition", {"position": {"lat": lat, "lng": lng, "alt": 0.0}})
-            self._add_mission_marker("relay", lat, lng)
+            sid = self._next_step_id()
+            self._publish_step("RelayPosition", {"position": {"lat": lat, "lng": lng, "alt": 0.0}}, sid)
+            self._add_mission_marker("relay", lat, lng, sid)
         elif action == "mission_sentinel_a":
             self._event_bus.publish_sync(
                 "log", f"[Map] Sentinel A ({lat:.6f},{lng:.6f}) — tap map for point B"
@@ -264,13 +283,25 @@ class MapWidget(QWidget):
                 lng_a = float(data["lng_a"])
             except (KeyError, TypeError, ValueError):
                 return
+            sid = self._next_step_id()
             self._publish_step("Sentinel", {
                 "a": {"lat": lat_a, "lng": lng_a, "alt": 0.0},
                 "b": {"lat": lat,   "lng": lng,   "alt": 0.0},
-            })
-            self._add_mission_marker("sentinel", lat_a, lng_a, extra={"lat_b": lat, "lng_b": lng})
+            }, sid)
+            self._add_mission_marker("sentinel", lat_a, lng_a, sid, extra={"lat_b": lat, "lng_b": lng})
         elif action == "mission_orbit":
             QTimer.singleShot(0, lambda: self._handle_orbit(lat, lng))
+        elif action == "mission_pathway":
+            points = data.get("points", [])
+            if len(points) >= 2:
+                sid = self._next_step_id()
+                self._publish_step("Pathway", {"points": [
+                    {"lat": float(p["lat"]), "lon": float(p["lng"]), "alt": 0.0}
+                    for p in points
+                ]}, sid)
+                self._add_mission_marker("pathway", lat, lng, sid, extra={"points": [
+                    {"lat": float(p["lat"]), "lng": float(p["lng"])} for p in points
+                ]})
 
     def _show_poi_dialog(self, lat: float, lng: float) -> None:
         from src.views.components.bitmap import _AltitudePicker, _NamePicker
@@ -323,15 +354,20 @@ class MapWidget(QWidget):
         if picker.exec() != QDialog.DialogCode.Accepted:
             return
         radius = picker.radius()
+        sid = self._next_step_id()
         self._publish_step("Orbit", {
             "center": {"lat": lat, "lng": lng, "alt": 0.0},
             "radius": radius,
-        })
-        self._add_mission_marker("orbit", lat, lng, extra={"radius": radius})
+        }, sid)
+        self._add_mission_marker("orbit", lat, lng, sid, extra={"radius": radius})
 
-    def _add_mission_marker(self, mtype: str, lat: float, lng: float, extra: dict | None = None) -> None:
+    def _next_step_id(self) -> str:
         self._mission_seq += 1
-        step_id = f"ms_{self._mission_seq}"
+        return f"ms_{self._mission_seq}"
+
+    def _add_mission_marker(
+        self, mtype: str, lat: float, lng: float, step_id: str, extra: dict | None = None
+    ) -> None:
         label = f"{mtype.upper()} #{self._mission_seq}"
         extra_js = json.dumps(extra or {})
         self.run_js(
@@ -340,9 +376,11 @@ class MapWidget(QWidget):
             f"{json.dumps(label)},{extra_js});"
         )
 
-    def _publish_step(self, command: str, params: dict) -> None:
+    def _publish_step(self, command: str, params: dict, map_marker_id: str = "") -> None:
         topic = str(self._config.get("mission_step_topic", "mission.step_request")).strip()
-        self._event_bus.publish_sync(topic, {"command": command, "params": params})
+        self._event_bus.publish_sync(topic, {
+            "command": command, "params": params, "map_marker_id": map_marker_id,
+        })
         self._event_bus.publish_sync("log", f"[Map] → mission queue: {command}")
 
     @Slot(str)

@@ -61,6 +61,13 @@
     .tac-label { color: #ffae00; font-weight: 700; letter-spacing: 1px; }
     .tac-coords { color: #505050; font-size: 10px; }
     .tac-popup img { max-width: 200px; max-height: 150px; margin-top: 6px; border: 1px solid #2e2e2e; }
+    .tac-rm-btn {
+      margin-top: 4px; padding: 4px 10px;
+      background: transparent; border: 1px solid #ff3d3d;
+      color: #ff3d3d; font-family: 'Courier New', monospace;
+      font-size: 10px; letter-spacing: 1.5px; cursor: pointer;
+    }
+    .tac-rm-btn:hover { background: rgba(255,61,61,0.12); }
 
     /* Click flash */
     @keyframes flash {
@@ -174,6 +181,10 @@
       border-color: #34d399; color: #34d399;
       box-shadow: 0 0 16px rgba(52,211,153,0.20);
     }
+    .aw-btn.aw-pathway:hover, .aw-btn.aw-pathway:active {
+      border-color: #f7d412; color: #f7d412;
+      box-shadow: 0 0 16px rgba(251,146,60,0.22);
+    }
     #sentinel-banner {
       display: none;
       position: absolute;
@@ -184,6 +195,25 @@
       padding: 6px 18px; z-index: 3500; pointer-events: none;
       white-space: nowrap;
     }
+    #pathway-banner {
+      display: none;
+      position: absolute;
+      top: 50px; left: 50%; transform: translateX(-50%);
+      background: #080808; border: 1px solid #f7d412;
+      color: #f7d412; font-family: 'Courier New', monospace;
+      font-size: 10px; letter-spacing: 2px; font-weight: 700;
+      padding: 6px 14px 6px 18px; z-index: 3500;
+      white-space: nowrap; display: none;
+      align-items: center; gap: 14px;
+    }
+    #pathway-count { opacity: 0.6; font-weight: 400; }
+    #pathway-done-btn, #pathway-cancel-btn {
+      background: transparent; border: 1px solid currentColor;
+      color: inherit; font: inherit; letter-spacing: 2px;
+      padding: 2px 10px; cursor: pointer;
+    }
+    #pathway-cancel-btn { color: #f7d412; border-color: #f7d412; }
+    #pathway-done-btn:disabled { opacity: 0.35; cursor: default; }
     .aw-icon { font-size: 20px; line-height: 1; }
     .aw-lbl  { font-size: 7px; letter-spacing: 1.5px; font-weight: 700; opacity: 0.85; }
 
@@ -217,6 +247,7 @@
     #aw-btn-orbit    { animation-delay: 60ms  !important; }
     #aw-btn-relay    { animation-delay: 80ms  !important; }
     #aw-btn-cancel   { animation-delay: 100ms !important; }
+    #aw-btn-pathway  { animation-delay: 120ms !important; }
 
     /* Filter panel */
     #filter-panel {
@@ -294,6 +325,10 @@
       <span class="aw-icon">⊡</span>
       <span class="aw-lbl">RELAY</span>
     </button>
+    <button class="aw-btn aw-pathway" id="aw-btn-pathway">
+      <span class="aw-icon">⤳</span>
+      <span class="aw-lbl">PATHWAY</span>
+    </button>
     <button class="aw-btn aw-cancel" id="aw-btn-cancel">
       <span class="aw-icon">✕</span>
       <span class="aw-lbl">ANNULER</span>
@@ -301,6 +336,12 @@
   </div>
 </div>
 <div id="sentinel-banner">◆ TAP MAP — SET POINT B</div>
+<div id="pathway-banner">
+  <span>◆ PATHWAY</span>
+  <span id="pathway-count">0 PTS</span>
+  <button id="pathway-cancel-btn">CANCEL</button>
+  <button id="pathway-done-btn" disabled>DONE</button>
+</div>
 
 <!-- Layer filter panel -->
 <div id="filter-panel">
@@ -319,6 +360,9 @@
   </div>
   <div class="filter-row" id="fl-orbit"    onclick="toggleLayer('orbit',this)">
     <span class="filter-dot" style="background:#a78bfa"></span>ORBIT
+  </div>
+  <div class="filter-row" id="fl-pathway"  onclick="toggleLayer('pathway',this)">
+    <span class="filter-dot" style="background:#fb923c"></span>PATHWAY
   </div>
 </div>
 
@@ -354,8 +398,9 @@
     sentinel: L.layerGroup().addTo(map),
     relay:    L.layerGroup().addTo(map),
     orbit:    L.layerGroup().addTo(map),
+    pathway:  L.layerGroup().addTo(map),
   };
-  const _layerVisible = { poi: true, goto: true, sentinel: true, relay: true, orbit: true };
+  const _layerVisible = { poi: true, goto: true, sentinel: true, relay: true, orbit: true, pathway: true };
   const _missionMarkers = {};
 
   function _updateMissionCount() {
@@ -517,6 +562,19 @@
     return L.divIcon({ html: svg, iconSize: [16,16], iconAnchor: [8,8], className: '' });
   }
 
+  function _poiPopupHtml(id, label, latStr, lngStr, imgHtml) {
+    return '<div class="tac-popup">' +
+      '<div class="tac-label">&#9670; ' + label + '</div>' +
+      '<div class="tac-coords">' + latStr + ' / ' + lngStr + '</div>' +
+      (imgHtml || '') +
+      '<button class="tac-rm-btn" onclick="mapRemovePOIEmit(\'' + id + '\')">&#10005; RETIRER</button>' +
+      '</div>';
+  }
+
+  window.mapRemovePOIEmit = function(id) {
+    console.log('__mapcb__:' + JSON.stringify({ action: 'remove_poi', poi_id: id }));
+  };
+
   window.mapAddPOI = function(lat, lng, label, poiId) {
     const id = (poiId && poiId !== '') ? poiId : ('poi_' + (++poiCounter));
     const safeLabel = label || id;
@@ -524,12 +582,7 @@
     const lngStr = parseFloat(lng).toFixed(6);
     const marker = L.marker([lat, lng], { icon: _poiMarkerIcon(), zIndexOffset: 500 });
     _layers.poi.addLayer(marker);
-    marker.bindPopup(
-      '<div class="tac-popup">' +
-      '<div class="tac-label">&#9670; ' + safeLabel + '</div>' +
-      '<div class="tac-coords">' + latStr + ' / ' + lngStr + '</div>' +
-      '<div id="photo_' + id + '"></div></div>'
-    );
+    marker.bindPopup(_poiPopupHtml(id, safeLabel, latStr, lngStr, ''));
     pois[id] = { marker, label: safeLabel, photo: null };
     updatePoiCount();
     return id;
@@ -549,10 +602,7 @@
     const ll = poi.marker.getLatLng();
     const img = dataUrl ? '<img src="' + dataUrl + '"/>' : '';
     poi.marker.setPopupContent(
-      '<div class="tac-popup">' +
-      '<div class="tac-label">&#9670; ' + poi.label + '</div>' +
-      '<div class="tac-coords">' + ll.lat.toFixed(6) + ' / ' + ll.lng.toFixed(6) + '</div>' +
-      img + '</div>'
+      _poiPopupHtml(id, poi.label, ll.lat.toFixed(6), ll.lng.toFixed(6), img)
     );
     return true;
   };
@@ -616,6 +666,25 @@
         fillOpacity: 0.06, dashArray: '5 4'
       });
       items.push(center, ring);
+    } else if (type === 'pathway') {
+      const pts = (extra.points || []).map(function(p) { return [p.lat, p.lng]; });
+      if (pts.length < 2) return;
+      const line = L.polyline(pts, {
+        color: '#fb923c', weight: 2.5, dashArray: '7 4', opacity: 0.85
+      });
+      line.bindTooltip(label + ' (' + pts.length + ' pts)');
+      items.push(line);
+      pts.forEach(function(ll, i) {
+        const dot = L.circleMarker(ll, {
+          radius: i === 0 || i === pts.length - 1 ? 6 : 4,
+          fillColor: '#fb923c', color: '#080808',
+          weight: i === 0 || i === pts.length - 1 ? 2 : 1.5,
+          fillOpacity: i === 0 ? 1 : 0.7
+        });
+        if (i === 0) dot.bindTooltip(label + ' — START');
+        if (i === pts.length - 1) dot.bindTooltip(label + ' — END');
+        items.push(dot);
+      });
     }
 
     items.forEach(function(item) { lg.addLayer(item); });
@@ -646,15 +715,16 @@
   // ── Action wheel ──────────────────────────────────────────────────────
   let _awLat = null, _awLng = null;
 
-  // 6 buttons at 60° intervals
+  // 7 buttons at ~51° intervals
   const _AW_RADIUS = 96;
   const _AW_ANGLES = {
     'aw-btn-poi':      -90,
-    'aw-btn-goto':     -30,
-    'aw-btn-sentinel': -150,
-    'aw-btn-orbit':     30,
-    'aw-btn-relay':     90,
-    'aw-btn-cancel':   150,
+    'aw-btn-goto':     -38,
+    'aw-btn-pathway':   14,
+    'aw-btn-orbit':     66,
+    'aw-btn-relay':    118,
+    'aw-btn-cancel':   170,
+    'aw-btn-sentinel': -142,
   };
 
   // ── Sentinel two-tap state ─────────────────────────────────────────────
@@ -667,6 +737,56 @@
     if (_sentinelMarkerA) { map.removeLayer(_sentinelMarkerA); _sentinelMarkerA = null; }
     document.getElementById('sentinel-banner').style.display = 'none';
   }
+
+  // ── Pathway multi-tap state ────────────────────────────────────────────
+  let _pathwayMode = false;
+  let _pathwayPoints = [];
+  let _pathwayPolyline = null;
+  let _pathwayDots = [];
+  let _pathwayClickTimer = null;
+
+  function _exitPathwayMode() {
+    _pathwayMode = false;
+    _pathwayPoints = [];
+    if (_pathwayPolyline) { map.removeLayer(_pathwayPolyline); _pathwayPolyline = null; }
+    _pathwayDots.forEach(function(d) { map.removeLayer(d); });
+    _pathwayDots = [];
+    if (_pathwayClickTimer) { clearTimeout(_pathwayClickTimer); _pathwayClickTimer = null; }
+    document.getElementById('pathway-banner').style.display = 'none';
+  }
+
+  function _pathwayAddPoint(lat, lng) {
+    _pathwayPoints.push({ lat: lat, lng: lng });
+    const lls = _pathwayPoints.map(function(p) { return [p.lat, p.lng]; });
+    if (_pathwayPolyline) {
+      _pathwayPolyline.setLatLngs(lls);
+    } else {
+      _pathwayPolyline = L.polyline(lls, {
+        color: '#fb923c', weight: 2.5, dashArray: '7 4', opacity: 0.9
+      }).addTo(map);
+    }
+    const dot = L.circleMarker([lat, lng], {
+      radius: 5, fillColor: '#fb923c', color: '#080808', weight: 1.5, fillOpacity: 1
+    }).addTo(map);
+    _pathwayDots.push(dot);
+    const n = _pathwayPoints.length;
+    document.getElementById('pathway-count').textContent = n + ' PT' + (n !== 1 ? 'S' : '');
+    document.getElementById('pathway-done-btn').disabled = n < 2;
+  }
+
+  function _finishPathway() {
+    if (_pathwayPoints.length < 2) { _exitPathwayMode(); return; }
+    const points = _pathwayPoints.slice();
+    _exitPathwayMode();
+    _awEmit('mission_pathway', points[0].lat, points[0].lng, { points: points });
+  }
+
+  document.getElementById('pathway-done-btn').addEventListener('click', function() {
+    _finishPathway();
+  });
+  document.getElementById('pathway-cancel-btn').addEventListener('click', function() {
+    _exitPathwayMode();
+  });
 
   function showActionWheel(lat, lng, containerPoint) {
     _awLat = lat;
@@ -786,15 +906,45 @@
     _awEmit('mission_relay', lat, lng);
   });
 
+  document.getElementById('aw-btn-pathway').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const lat = _awLat, lng = _awLng;
+    hideActionWheel();
+    showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#fb923c');
+    _pathwayMode = true;
+    _pathwayAddPoint(lat, lng);
+    const banner = document.getElementById('pathway-banner');
+    banner.style.display = 'flex';
+  });
+
   document.getElementById('aw-btn-cancel').addEventListener('click', function(e) {
     e.stopPropagation();
     hideActionWheel();
   });
 
-  // ── Map click → sentinel B capture OR show wheel ──────────────────────
+  // ── Map click → pathway / sentinel B capture OR show wheel ───────────
+  map.on('dblclick', function(e) {
+    if (_pathwayMode && _pathwayPoints.length >= 2) {
+      if (_pathwayClickTimer) { clearTimeout(_pathwayClickTimer); _pathwayClickTimer = null; }
+      _finishPathway();
+      L.DomEvent.stopPropagation(e);
+    }
+  });
+
   map.on('click', function(e) {
     const lat = e.latlng.lat, lng = e.latlng.lng;
     const pt  = map.latLngToContainerPoint(e.latlng);
+
+    if (_pathwayMode) {
+      // Debounce to filter out the first click of a double-click
+      if (_pathwayClickTimer) { clearTimeout(_pathwayClickTimer); _pathwayClickTimer = null; }
+      _pathwayClickTimer = setTimeout(function() {
+        _pathwayClickTimer = null;
+        showClickFlash(pt, '#fb923c');
+        _pathwayAddPoint(lat, lng);
+      }, 220);
+      return;
+    }
 
     if (_sentinelMode) {
       const latA = _sentinelLatA, lngA = _sentinelLngA;

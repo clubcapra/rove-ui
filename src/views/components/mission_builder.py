@@ -228,6 +228,111 @@ def _make_param_editor(
         lbl.setStyleSheet(f"color: {theme.TEXT_DIM}; font-size: 9px;")
         return lbl, lambda: None
 
+    # ── point_list ────────────────────────────────────────────────────────────
+    if ptype == "point_list":
+        outer = QWidget()
+        outer.setStyleSheet("background: transparent;")
+        outer_lay = QVBoxLayout(outer)
+        outer_lay.setContentsMargins(0, 0, 0, 0)
+        outer_lay.setSpacing(3)
+
+        rows_container = QWidget()
+        rows_container.setStyleSheet("background: transparent;")
+        rows_lay = QVBoxLayout(rows_container)
+        rows_lay.setContentsMargins(0, 0, 0, 0)
+        rows_lay.setSpacing(3)
+
+        # (row_widget, idx_label, lat_spinbox, lon_spinbox)
+        rows_data: list[tuple[QWidget, QLabel, QDoubleSpinBox, QDoubleSpinBox]] = []
+
+        def _renumber() -> None:
+            for i, (_, lbl, _, _) in enumerate(rows_data):
+                lbl.setText(f"P{i + 1}")
+
+        def _remove_row(row_w: QWidget, lat_sp: QDoubleSpinBox, lon_sp: QDoubleSpinBox) -> None:
+            for i, (rw, _, l, o) in enumerate(rows_data):
+                if rw is row_w:
+                    rows_data.pop(i)
+                    rows_lay.removeWidget(row_w)
+                    row_w.setParent(None)  # type: ignore[call-overload]
+                    row_w.deleteLater()
+                    break
+            _renumber()
+
+        def _add_row(lat_val: float = 0.0, lon_val: float = 0.0) -> None:
+            row_w = QWidget()
+            row_w.setStyleSheet(
+                f"background: {theme.BG_DARK}; border: 1px solid {theme.BORDER_DIM}; border-radius: 2px;"
+            )
+            row_lay = QHBoxLayout(row_w)
+            row_lay.setContentsMargins(6, 3, 3, 3)
+            row_lay.setSpacing(4)
+
+            idx_lbl = QLabel(f"P{len(rows_data) + 1}")
+            idx_lbl.setFixedWidth(24)
+            idx_lbl.setStyleSheet(
+                f"color: {theme.CYAN}; font-size: 10px; font-weight: 700; "
+                f"font-family: 'Courier New'; background: transparent; border: none;"
+            )
+
+            lat_sp = QDoubleSpinBox()
+            lon_sp = QDoubleSpinBox()
+            for sp, pfx, lo, hi in ((lat_sp, "lat ", -90, 90), (lon_sp, "lon ", -180, 180)):
+                sp.setStyleSheet(f"QDoubleSpinBox {{ {_INPUT} }}")
+                sp.setRange(lo, hi)
+                sp.setDecimals(6)
+                sp.setPrefix(pfx)
+            lat_sp.setValue(lat_val)
+            lon_sp.setValue(lon_val)
+
+            rm_btn = QPushButton("✕")
+            rm_btn.setFixedSize(22, 22)
+            rm_btn.setStyleSheet(
+                f"QPushButton {{ background: transparent; color: {theme.TEXT_DIM}; "
+                f"border: none; font-size: 11px; padding: 0; }}"
+                f"QPushButton:hover {{ color: #ff4444; }}"
+            )
+            rm_btn.clicked.connect(
+                lambda _=False, rw=row_w, l=lat_sp, o=lon_sp: _remove_row(rw, l, o)
+            )
+
+            row_lay.addWidget(idx_lbl)
+            row_lay.addWidget(lat_sp, 1)
+            row_lay.addWidget(lon_sp, 1)
+            row_lay.addWidget(rm_btn)
+
+            rows_data.append((row_w, idx_lbl, lat_sp, lon_sp))
+            rows_lay.addWidget(row_w)
+
+        # Populate from current value (list of dicts) or start with 2 empty points
+        init_pts = current_value if isinstance(current_value, list) else []
+        for pt in init_pts:
+            if isinstance(pt, dict):
+                _add_row(float(pt.get("lat", 0.0)), float(pt.get("lon", 0.0)))
+        while len(rows_data) < 2:
+            _add_row()
+
+        add_btn = QPushButton("＋  ADD POINT")
+        add_btn.setStyleSheet(
+            f"QPushButton {{ background: {theme.BG_DARK}; color: {theme.CYAN}; "
+            f"border: 1px dashed {theme.BORDER_DIM}; border-radius: 2px; "
+            f"font-size: 10px; font-family: 'Courier New'; padding: 5px; }}"
+            f"QPushButton:hover {{ border-color: {theme.CYAN}; }}"
+            f"QPushButton:pressed {{ background: {theme.BG_PANEL}; }}"
+        )
+        add_btn.clicked.connect(lambda: _add_row())
+
+        outer_lay.addWidget(rows_container)
+        outer_lay.addWidget(add_btn)
+
+        def _get_points() -> list:
+            return [
+                {"lat": l.value(), "lon": o.value(), "alt": 0.0}
+                for _, _, l, o in rows_data
+            ]
+
+        return outer, _get_points
+
     # ── route / geometry ──────────────────────────────────────────────────────
     if ptype in ("route", "geometry"):
         lbl = QLabel(f"({ptype}: define via map — not yet editable here)")
@@ -901,6 +1006,12 @@ class MissionBuilder:
     def _on_remove_step(self) -> None:
         row = self._step_list.currentRow()  # type: ignore[union-attr]
         if row >= 0:
+            item = self._step_list.item(row)  # type: ignore[union-attr]
+            if item:
+                step = item.data(Qt.ItemDataRole.UserRole) or {}
+                marker_id = step.get("map_marker_id", "")
+                if marker_id:
+                    self.event_bus.publish_sync("mission.marker_remove", {"id": marker_id})
             self._step_list.takeItem(row)  # type: ignore[union-attr]
             self._edit_title.setText("SELECT A STEP TO CONFIGURE")  # type: ignore[union-attr]
             self._remove_btn.setVisible(False)  # type: ignore[union-attr]
@@ -1012,14 +1123,15 @@ class MissionBuilder:
 
         incoming_params = payload.get("params", {})
         step: dict = {
-            "command":    command,
-            "params":     {
+            "command":       command,
+            "params":        {
                 **{p["name"]: p.get("default") for p in cmd_def.get("params", [])},
                 **incoming_params,
             },
-            "transition": (cmd_def.get("valid_transitions") or ["until_done_next"])[0],
-            "loop_count": 3,
-            "binds":      "",
+            "transition":    (cmd_def.get("valid_transitions") or ["until_done_next"])[0],
+            "loop_count":    3,
+            "binds":         "",
+            "map_marker_id": str(payload.get("map_marker_id", "")),
         }
         item = QListWidgetItem()
         item.setData(Qt.ItemDataRole.UserRole, step)
