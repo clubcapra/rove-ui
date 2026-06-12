@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import json as _json
@@ -58,6 +59,7 @@ class MapWidget(QWidget):
         self._pending_scripts: list[str] = []
         self._robot_lat: float | None = None
         self._robot_lng: float | None = None
+        self._last_position_push: float = 0.0
         self._first_center_done = False
         self._poi_seq = 0
         self._mission_seq = 0
@@ -152,11 +154,16 @@ class MapWidget(QWidget):
             return
 
         def _push():
-            if self._robot_lat is not None and self._robot_lng is not None:
-                self.run_js(f"window.mapSetRobotPosition({self._robot_lat}, {self._robot_lng});")
-                if not self._first_center_done:
-                    self._first_center_done = True
-                    self.run_js(f"window.mapSetView({self._robot_lat}, {self._robot_lng});")
+            if self._robot_lat is None or self._robot_lng is None:
+                return
+            now = time.monotonic()
+            if now - self._last_position_push < 0.05:  # throttle to ~20 fps
+                return
+            self._last_position_push = now
+            self.run_js(f"window.mapSetRobotPosition({self._robot_lat}, {self._robot_lng});")
+            if not self._first_center_done:
+                self._first_center_done = True
+                self.run_js(f"window.mapSetView({self._robot_lat}, {self._robot_lng});")
 
         if lat_topic:
             def _on_lat(v):
@@ -310,16 +317,17 @@ class MapWidget(QWidget):
         self._event_bus.publish_sync("log", f"[Map] GOTO → ({lat:.6f},{lng:.6f})")
 
     def _handle_orbit(self, lat: float, lng: float) -> None:
-        from PySide6.QtWidgets import QInputDialog
-        radius, ok = QInputDialog.getDouble(
-            self, "Orbit — Rayon", "Rayon (m) :", 10.0, 1.0, 200.0, 1
-        )
-        if ok:
-            self._publish_step("Orbit", {
-                "center": {"lat": lat, "lng": lng, "alt": 0.0},
-                "radius": radius,
-            })
-            self._add_mission_marker("orbit", lat, lng, extra={"radius": radius})
+        from src.views.components.bitmap import _RadiusPicker
+        picker = _RadiusPicker(10.0, self)
+        _center_dialog(picker, self)
+        if picker.exec() != QDialog.DialogCode.Accepted:
+            return
+        radius = picker.radius()
+        self._publish_step("Orbit", {
+            "center": {"lat": lat, "lng": lng, "alt": 0.0},
+            "radius": radius,
+        })
+        self._add_mission_marker("orbit", lat, lng, extra={"radius": radius})
 
     def _add_mission_marker(self, mtype: str, lat: float, lng: float, extra: dict | None = None) -> None:
         self._mission_seq += 1

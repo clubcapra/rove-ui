@@ -132,6 +132,39 @@
               }
             ]
           }
+        },
+        {
+          "type": "button_bar",
+          "name": "action_bar",
+          "style": {
+            "x": "center", "bottom": 62,
+            "width": "auto", "height": 40,
+            "z_index": 1
+          },
+          "data": {
+            "height": 40,
+            "buttons": [
+              {
+                "label": "⬛ E-STOP",
+                "event": "estop_status",
+                "value": "1",
+                "color": "#ff3d3d",
+                "active_topic": "estop_status"
+              },
+              {
+                "label": "START MAPPING",
+                "event": "mapping.start",
+                "value": "1",
+                "color": "#00e676"
+              },
+              {
+                "label": "MAPPING BUILD",
+                "event": "mapping.build",
+                "value": "1",
+                "color": "#ffae00"
+              }
+            ]
+          }
         }
       ]
     },

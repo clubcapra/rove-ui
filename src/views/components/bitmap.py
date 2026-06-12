@@ -43,11 +43,11 @@ QPushButton {{
     color: {TEXT};
     border: 1px solid {BORDER};
     border-radius: 0;
-    padding: 7px 16px;
+    padding: 10px 16px;
     font-family: 'Courier New', monospace;
     font-size: 11px;
     letter-spacing: 1.5px;
-    min-height: 28px;
+    min-height: 44px;
 }}
 QPushButton:hover {{
     background: {BG_SURFACE};
@@ -64,28 +64,60 @@ QPushButton#ok {{
 }}
 QPushButton#ok:hover {{ background: #ffc840; color: {BG_DEEP}; }}
 QPushButton#cancel:hover {{ border-color: {RED}; color: {RED}; }}
-QSlider::groove:vertical {{
+QSlider::groove:horizontal {{
     background: {BG_SURFACE};
-    width: 4px;
+    height: 4px;
     border: none;
-    margin: 0 10px;
+    margin: 14px 0;
 }}
-QSlider::handle:vertical {{
+QSlider::handle:horizontal {{
     background: {CYAN};
-    height: 14px; width: 14px;
-    margin: 0 -6px;
+    width: 36px; height: 36px;
+    margin: -16px 0;
     border-radius: 0;
     border: 2px solid {BG_DEEP};
 }}
-QSlider::sub-page:vertical {{
+QSlider::sub-page:horizontal {{
     background: {CYAN};
-    margin: 0 10px;
-    opacity: 0.7;
+    margin: 14px 0;
 }}
-QSlider::add-page:vertical {{
+QSlider::add-page:horizontal {{
     background: {BG_DARK};
-    margin: 0 10px;
+    margin: 14px 0;
 }}
+QPushButton[role="step"] {{
+    background: {BG_SURFACE};
+    color: {TEXT};
+    border: 1px solid {BORDER};
+    border-radius: 0;
+    font-size: 13px;
+    font-weight: 700;
+    min-height: 54px;
+    padding: 0 10px;
+}}
+QPushButton[role="step"]:hover {{
+    background: {BG_PANEL};
+    border-color: {CYAN};
+    color: {CYAN};
+}}
+QPushButton[role="step"]:pressed {{ background: {BG_DEEP}; }}
+QPushButton[role="preset"] {{
+    background: {BG_SURFACE};
+    color: {TEXT_DIM};
+    border: 1px solid {BORDER_DIM};
+    border-radius: 0;
+    font-size: 10px;
+    font-weight: 700;
+    min-height: 42px;
+    padding: 0;
+    letter-spacing: 1px;
+}}
+QPushButton[role="preset"]:hover {{
+    background: {BG_PANEL};
+    border-color: {CYAN};
+    color: {CYAN};
+}}
+QPushButton[role="preset"]:pressed {{ background: {BG_DEEP}; }}
 QPushButton#photo {{
     background: {BG_DARK};
     color: {TEXT_DIM};
@@ -181,7 +213,7 @@ class _AltitudePicker(QDialog):
             | Qt.WindowType.WindowStaysOnTopHint
         )
         self.setModal(True)
-        self.setFixedWidth(248)
+        self.setFixedWidth(360)
         self._altitude = 0.0
         self._photo_data_url: str | None = None
         self._nam_ocr: QNetworkAccessManager | None = None
@@ -189,17 +221,15 @@ class _AltitudePicker(QDialog):
 
         self.setStyleSheet(_DIALOG_BASE)
 
-        # Root layout — 0 margins so title bar goes edge to edge
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
         outer.addWidget(_tac_titlebar("ALTITUDE — P.O.I."))
 
-        # Content area
         body = QWidget()
         body.setStyleSheet("background: transparent;")
         inner = QVBoxLayout(body)
-        inner.setContentsMargins(14, 12, 14, 14)
+        inner.setContentsMargins(14, 14, 14, 14)
         inner.setSpacing(10)
         outer.addWidget(body)
 
@@ -207,48 +237,42 @@ class _AltitudePicker(QDialog):
         self._val_label = QLabel("0.00 m")
         self._val_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._val_label.setStyleSheet(
-            f"font-size: 34px; font-weight: 700; letter-spacing: 1px;"
-            f" color: {CYAN}; padding: 6px 0;"
+            f"font-size: 42px; font-weight: 700; letter-spacing: 2px;"
+            f" color: {CYAN}; padding: 8px 0;"
             f" background: {BG_DARK}; border: 1px solid {BORDER_DIM};"
         )
         inner.addWidget(self._val_label)
 
-        # Slider area: tick labels + slider
-        slider_row = QHBoxLayout()
-        slider_row.setSpacing(2)
+        # Step buttons row  (-0.5 | -0.1 | +0.1 | +0.5)
+        step_row = QHBoxLayout()
+        step_row.setSpacing(6)
+        for delta, lbl_txt in [(-0.5, "−0.5"), (-0.1, "−0.1"), (+0.1, "+0.1"), (+0.5, "+0.5")]:
+            btn = QPushButton(lbl_txt)
+            btn.setProperty("role", "step")
+            btn.clicked.connect(lambda _=False, d=delta: self._adjust(d))
+            step_row.addWidget(btn)
+        inner.addLayout(step_row)
 
-        tick_col = QVBoxLayout()
-        tick_col.setContentsMargins(0, 0, 0, 0)
-        tick_col.setSpacing(0)
-        for txt in ("5", "4", "3", "2", "1", "0"):
-            lbl = QLabel(txt)
-            lbl.setStyleSheet(
-                f"font-size: 9px; color: {TEXT_DIM}; font-family: 'Courier New', monospace;"
-            )
-            lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            tick_col.addWidget(lbl, stretch=1)
-        slider_row.addLayout(tick_col)
-
-        lbl_m = QLabel(" m")
-        lbl_m.setStyleSheet(f"font-size: 8px; color: {TEXT_DIM};")
-        lbl_m.setAlignment(Qt.AlignmentFlag.AlignTop)
-        slider_row.addWidget(lbl_m)
-
-        self._slider = QSlider(Qt.Orientation.Vertical)
+        # Horizontal slider (fine adjustment)
+        self._slider = QSlider(Qt.Orientation.Horizontal)
         self._slider.setRange(0, 500)
         self._slider.setValue(0)
-        self._slider.setMinimumHeight(160)
+        self._slider.setFixedHeight(56)
         self._slider.setSingleStep(1)
         self._slider.setPageStep(10)
         self._slider.setTickPosition(QSlider.TickPosition.NoTicks)
         self._slider.valueChanged.connect(self._on_slider)
-        slider_row.addWidget(self._slider, 1)
-        inner.addLayout(slider_row)
+        inner.addWidget(self._slider)
 
-        hint = QLabel("↑↓  0.01 m   ·   PgUp/Dn  0.10 m")
-        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        hint.setStyleSheet(f"font-size: 8px; color: {TEXT_DIM}; letter-spacing: 0.5px;")
-        inner.addWidget(hint)
+        # Quick preset row
+        preset_row = QHBoxLayout()
+        preset_row.setSpacing(6)
+        for val in (0.0, 0.5, 1.0, 1.5, 2.0, 3.0):
+            pb = QPushButton(f"{val:.1f}m")
+            pb.setProperty("role", "preset")
+            pb.clicked.connect(lambda _=False, v=val: self._set_alt(v))
+            preset_row.addWidget(pb)
+        inner.addLayout(preset_row)
 
         # Divider
         div = QWidget(); div.setFixedHeight(1)
@@ -298,6 +322,17 @@ class _AltitudePicker(QDialog):
     def _on_slider(self, value: int) -> None:
         self._altitude = value / 100.0
         self._val_label.setText(f"{self._altitude:.2f} m")
+
+    def _adjust(self, delta: float) -> None:
+        self._set_alt(self._altitude + delta)
+
+    def _set_alt(self, value: float) -> None:
+        value = max(0.0, min(5.0, round(value, 2)))
+        self._altitude = value
+        self._slider.blockSignals(True)
+        self._slider.setValue(int(value * 100))
+        self._slider.blockSignals(False)
+        self._val_label.setText(f"{value:.2f} m")
 
     def _capture_photo(self) -> None:
         captured: list[QPixmap | None] = [None]
@@ -385,6 +420,106 @@ class _AltitudePicker(QDialog):
         return self._photo_data_url
 
 
+# ── Orbit radius picker dialog ────────────────────────────────────────────────
+
+class _RadiusPicker(QDialog):
+    """Modal popup to pick orbit radius (1–200 m)."""
+
+    def __init__(self, default_radius: float = 10.0, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Orbit — Rayon")
+        self.setWindowFlags(
+            Qt.WindowType.Dialog
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+        )
+        self.setModal(True)
+        self.setFixedWidth(360)
+        self._radius = float(max(1.0, min(200.0, default_radius)))
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet(_DIALOG_BASE)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        outer.addWidget(_tac_titlebar("ORBIT — RAYON"))
+
+        body = QWidget()
+        body.setStyleSheet("background: transparent;")
+        inner = QVBoxLayout(body)
+        inner.setContentsMargins(14, 14, 14, 14)
+        inner.setSpacing(10)
+        outer.addWidget(body)
+
+        self._val_label = QLabel(f"{self._radius:.0f} m")
+        self._val_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._val_label.setStyleSheet(
+            f"font-size: 42px; font-weight: 700; letter-spacing: 2px;"
+            f" color: {CYAN}; padding: 8px 0;"
+            f" background: {BG_DARK}; border: 1px solid {BORDER_DIM};"
+        )
+        inner.addWidget(self._val_label)
+
+        step_row = QHBoxLayout()
+        step_row.setSpacing(6)
+        for delta, lbl_txt in [(-10, "−10"), (-1, "−1"), (+1, "+1"), (+10, "+10")]:
+            btn = QPushButton(lbl_txt)
+            btn.setProperty("role", "step")
+            btn.clicked.connect(lambda _=False, d=delta: self._adjust(d))
+            step_row.addWidget(btn)
+        inner.addLayout(step_row)
+
+        self._slider = QSlider(Qt.Orientation.Horizontal)
+        self._slider.setRange(1, 200)
+        self._slider.setValue(int(self._radius))
+        self._slider.setFixedHeight(56)
+        self._slider.setSingleStep(1)
+        self._slider.setPageStep(10)
+        self._slider.setTickPosition(QSlider.TickPosition.NoTicks)
+        self._slider.valueChanged.connect(self._on_slider)
+        inner.addWidget(self._slider)
+
+        preset_row = QHBoxLayout()
+        preset_row.setSpacing(6)
+        for val in (5, 10, 20, 50, 100, 150):
+            pb = QPushButton(f"{val}m")
+            pb.setProperty("role", "preset")
+            pb.clicked.connect(lambda _=False, v=val: self._set_radius(v))
+            preset_row.addWidget(pb)
+        inner.addLayout(preset_row)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+        cancel_btn = QPushButton("ANNULER")
+        cancel_btn.setObjectName("cancel")
+        cancel_btn.clicked.connect(self.reject)
+        ok_btn = QPushButton("◆  CONFIRMER")
+        ok_btn.setObjectName("ok")
+        ok_btn.setDefault(True)
+        ok_btn.clicked.connect(self.accept)
+        btn_row.addWidget(cancel_btn)
+        btn_row.addWidget(ok_btn)
+        inner.addLayout(btn_row)
+
+    def _on_slider(self, value: int) -> None:
+        self._radius = float(value)
+        self._val_label.setText(f"{value} m")
+
+    def _adjust(self, delta: float) -> None:
+        self._set_radius(self._radius + delta)
+
+    def _set_radius(self, value: float) -> None:
+        value = float(max(1.0, min(200.0, round(value))))
+        self._radius = value
+        self._slider.blockSignals(True)
+        self._slider.setValue(int(value))
+        self._slider.blockSignals(False)
+        self._val_label.setText(f"{value:.0f} m")
+
+    def radius(self) -> float:
+        return self._radius
+
+
 # ── Virtual keyboard dialog ───────────────────────────────────────────────────
 
 class _NamePicker(QDialog):
@@ -396,8 +531,8 @@ class _NamePicker(QDialog):
         "ASDFGHJKL",
         "ZXCVBNM",
     ]
-    _KEY_W = 40
-    _KEY_H = 46
+    _KEY_W = 44
+    _KEY_H = 52
     _KEY_GAP = 6
 
     def __init__(self, default_name: str = "", parent=None):

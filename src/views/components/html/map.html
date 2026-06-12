@@ -225,14 +225,14 @@
       z-index: 1000;
       background: #0f0f0f;
       border: 1px solid #2e2e2e;
-      min-width: 100px;
+      min-width: 200px;
       font-family: 'Courier New', monospace;
     }
     #filter-title {
       background: #080808;
       border-bottom: 1px solid #2e2e2e;
       color: #505050;
-      font-size: 8px;
+      font-size: 16px;
       letter-spacing: 1.5px;
       padding: 4px 8px;
     }
@@ -242,7 +242,7 @@
       gap: 6px;
       padding: 4px 8px;
       cursor: pointer;
-      font-size: 9px;
+      font-size: 16px;
       letter-spacing: 1px;
       border-bottom: 1px solid #161616;
       color: #a0a0a0;
@@ -251,7 +251,7 @@
     }
     .filter-row:last-child { border-bottom: none; }
     .filter-row:hover { background: #1a1a1a; color: #d0d8e0; }
-    .filter-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .filter-dot { width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0; }
     .filter-row.off { color: #383838; }
     .filter-row.off .filter-dot { opacity: 0.2; }
   </style>
@@ -324,16 +324,27 @@
 
 <script>
   // ── Map ───────────────────────────────────────────────────────────────
-  const map = L.map('map', { zoomControl: true }).setView([45.5048, -73.5773], 15);
+  const map = L.map('map', {
+    zoomControl: true,
+    preferCanvas: true,
+    zoomSnap: 0.5,
+  }).setView([45.5048, -73.5773], 15);
 
   let currentTileLayer = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    { maxZoom: 19, attribution: '&copy; Esri' }
+    {
+      maxZoom: 19,
+      attribution: '&copy; Esri',
+      updateWhenIdle: true,
+      updateWhenZooming: false,
+      keepBuffer: 2,
+    }
   ).addTo(map);
 
+  const _tileDefaults = { maxZoom: 19, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 2 };
   window.mapSetTileLayer = function(url, opts) {
     if (currentTileLayer) map.removeLayer(currentTileLayer);
-    currentTileLayer = L.tileLayer(url, opts || { maxZoom: 19 }).addTo(map);
+    currentTileLayer = L.tileLayer(url, Object.assign({}, _tileDefaults, opts || {})).addTo(map);
   };
 
   // ── Mission layer groups ──────────────────────────────────────────────
@@ -382,7 +393,11 @@
   function updateZoom() { sbZoom.textContent = 'ZOOM ' + map.getZoom(); }
   updateZoom();
   map.on('zoomend', updateZoom);
+  let _mmThrottle = 0;
   map.on('mousemove', function(e) {
+    const now = Date.now();
+    if (now - _mmThrottle < 80) return;
+    _mmThrottle = now;
     sbCoords.textContent = e.latlng.lat.toFixed(6) + ' / ' + e.latlng.lng.toFixed(6);
   });
   function updatePoiCount() {

@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QDoubleSpinBox, QFrame,
-    QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+    QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
     QPushButton, QScrollArea, QSizePolicy, QSpinBox,
     QStackedWidget, QStyledItemDelegate, QStyle, QStyleOptionViewItem,
     QVBoxLayout, QWidget,
@@ -82,6 +82,45 @@ def _divider() -> QWidget:
     return w
 
 
+# ── Touch-friendly keyboard text input ───────────────────────────────────────
+
+class _TouchText(QPushButton):
+    """Input-styled button that opens the virtual keyboard on tap."""
+
+    def __init__(self, value: str = "", placeholder: str = "", parent=None):
+        super().__init__(parent)
+        self._value = value
+        self._placeholder = placeholder
+        self._refresh()
+        self.clicked.connect(self._open_kb)
+
+    def _refresh(self) -> None:
+        dim = not bool(self._value)
+        display = self._value if not dim else (self._placeholder or "TAP TO ENTER")
+        super().setText(display)
+        c = theme.TEXT_DIM if dim else theme.TEXT
+        self.setStyleSheet(
+            f"QPushButton {{ {_INPUT} color: {c}; text-align: left; }}"
+            f"QPushButton:hover {{ border-color: {theme.CYAN}; }}"
+            f"QPushButton:pressed {{ background: {theme.BG_PANEL}; }}"
+        )
+
+    def _open_kb(self) -> None:
+        from src.views.components.bitmap import _NamePicker
+        from PySide6.QtWidgets import QDialog
+        kb = _NamePicker(self._value, self.window())
+        if kb.exec() == QDialog.DialogCode.Accepted:
+            self._value = kb.name()
+            self._refresh()
+
+    def text(self) -> str:
+        return self._value
+
+    def setValue(self, v: str) -> None:
+        self._value = v
+        self._refresh()
+
+
 # ── Param editor factory ──────────────────────────────────────────────────────
 
 def _make_param_editor(
@@ -124,11 +163,10 @@ def _make_param_editor(
 
     # ── string ────────────────────────────────────────────────────────────────
     if ptype == "string":
-        le = QLineEdit()
-        le.setStyleSheet(f"QLineEdit {{ {_INPUT} }}")
-        le.setPlaceholderText(param_def.get("name", ""))
-        if current_value:
-            le.setText(str(current_value))
+        le = _TouchText(
+            str(current_value) if current_value else "",
+            placeholder=param_def.get("name", ""),
+        )
         return le, le.text
 
     # ── ref ───────────────────────────────────────────────────────────────────
@@ -197,10 +235,7 @@ def _make_param_editor(
         return lbl, lambda: current_value
 
     # ── fallback string ───────────────────────────────────────────────────────
-    le = QLineEdit()
-    le.setStyleSheet(f"QLineEdit {{ {_INPUT} }}")
-    if current_value:
-        le.setText(str(current_value))
+    le = _TouchText(str(current_value) if current_value else "")
     return le, le.text
 
 
@@ -419,7 +454,7 @@ class MissionBuilder:
         self._edit_inner:    QWidget | None      = None
         self._edit_title:    QLabel | None       = None
         self._remove_btn:    QPushButton | None  = None
-        self._name_input:    QLineEdit | None    = None
+        self._name_input:    _TouchText | None   = None
         self._param_getters: dict[str, "callable[[], Any]"] = {}
         self._tr_combo:      QComboBox | None    = None
         self._loop_spin:     QSpinBox | None     = None
@@ -575,14 +610,9 @@ class MissionBuilder:
 
         hdr_lay.addStretch()
 
-        self._name_input = QLineEdit("Mission 1")
+        self._name_input = _TouchText("Mission 1")
         self._name_input.setFixedHeight(22)
         self._name_input.setFixedWidth(160)
-        self._name_input.setStyleSheet(
-            f"QLineEdit {{ background: {theme.BG_SURFACE}; color: {theme.TEXT}; "
-            f"border: 1px solid {theme.BORDER}; padding: 0 8px; "
-            f"font-family: 'Courier New'; font-size: 10px; }}"
-        )
         hdr_lay.addWidget(self._name_input)
 
         send_btn = QPushButton("◆  SEND MISSION")
@@ -731,9 +761,7 @@ class MissionBuilder:
             lbl.setStyleSheet(
                 f"color: {theme.TEXT_DIM}; font-size: 10px; font-family: 'Courier New'; background: transparent;"
             )
-            binds_le = QLineEdit(step.get("binds", ""))
-            binds_le.setPlaceholderText(f"$my_{vtype}")
-            binds_le.setStyleSheet(f"QLineEdit {{ {_INPUT} }}")
+            binds_le = _TouchText(step.get("binds", ""), placeholder=f"$my_{vtype}")
             self._param_getters["__binds__"] = binds_le.text
             row.addWidget(lbl)
             row.addWidget(binds_le, 1)

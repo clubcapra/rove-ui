@@ -6,7 +6,10 @@ from PySide6.QtWidgets import (
 from src.controller.event_bus import EventBus
 from src.views import theme
 
-_BTN = f"""
+def _btn_style(color: str | None = None) -> str:
+    c = color or theme.TEXT
+    b = color or theme.BORDER
+    return f"""
 QPushButton {{
     background: {theme.BG_SURFACE};
     color: {theme.TEXT_DIM};
@@ -20,20 +23,22 @@ QPushButton {{
 }}
 QPushButton:hover {{
     background: {theme.BG_PANEL};
-    border-color: {theme.BORDER};
-    color: {theme.TEXT};
+    border-color: {b};
+    color: {c};
 }}
 QPushButton:pressed {{
     background: {theme.BG_DARK};
-    border-color: {theme.BORDER_BRIGHT};
+    border-color: {b};
 }}
 """
 
-_BTN_ACTIVE = f"""
+def _btn_active_style(color: str | None = None) -> str:
+    c = color or theme.CYAN
+    return f"""
 QPushButton {{
     background: {theme.BG_PANEL};
-    color: {theme.CYAN};
-    border: 1px solid {theme.CYAN};
+    color: {c};
+    border: 1px solid {c};
     border-radius: 0;
     font-family: {theme.FONT_MONO};
     font-size: 11px;
@@ -42,6 +47,9 @@ QPushButton {{
     padding: 4px 18px;
 }}
 """
+
+_BTN        = _btn_style()
+_BTN_ACTIVE = _btn_active_style()
 
 
 class ButtonBar(QWidget):
@@ -92,10 +100,11 @@ class ButtonBar(QWidget):
             layout.addWidget(lbl)
 
         for cfg in self.config.get("buttons", []):
-            label = str(cfg.get("label", ""))
+            label  = str(cfg.get("label", ""))
+            color  = cfg.get("color") or None
             btn = QPushButton(label)
             btn.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-            btn.setStyleSheet(_BTN)
+            btn.setStyleSheet(_btn_style(color))
             btn.clicked.connect(lambda _=False, c=cfg: self._on_click(c))
             layout.addWidget(btn)
             self._buttons.append(btn)
@@ -106,8 +115,8 @@ class ButtonBar(QWidget):
                 expected = cfg.get("value")
                 self.event_bus.subscribe(
                     active_topic,
-                    lambda v, b=btn, e=expected: b.setStyleSheet(
-                        _BTN_ACTIVE if str(v) == str(e) else _BTN
+                    lambda v, b=btn, e=expected, col=color: b.setStyleSheet(
+                        _btn_active_style(col) if str(v) == str(e) else _btn_style(col)
                     ),
                 )
 
@@ -125,5 +134,6 @@ class ButtonBar(QWidget):
 
     def _sync_active(self, value) -> None:
         for btn, cfg in zip(self._buttons, self._button_cfgs):
+            color  = cfg.get("color") or None
             active = str(cfg.get("value", "")) == str(value)
-            btn.setStyleSheet(_BTN_ACTIVE if active else _BTN)
+            btn.setStyleSheet(_btn_active_style(color) if active else _btn_style(color))

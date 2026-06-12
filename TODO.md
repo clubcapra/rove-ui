@@ -25,5 +25,8 @@
 - [x] Pour le endpoint UDP, on envoie "0x01" au port udp afficher et l'api retourne la data au port mirroir sur mon device
 - [x] réception et traitement des protobufs
 
-# TODO - 16 Mai
-- [ ] 
+# TODO - 12 Juin
+- [ ] Setup la barre de bouton supplémentaire
+- [ ] Changer l'Affordance pour setup la hauteur des POIs en la rendant tactile friendly
+- [ ] Mettre des claviers pour tout les inputs textes
+- [ ] augmenter un peu la taille des boutons
