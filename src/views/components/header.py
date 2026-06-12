@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-import re
-import subprocess
+import glob
+import socket
+import time as _time
 from datetime import datetime
+from pathlib import Path
 from threading import Thread
 
 from PySide6.QtCore import Qt, QTimer, Signal, Slot
@@ -11,21 +13,33 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QWidget
 from src.views import theme
 
 
-def _ping_ms(host: str, timeout_s: int = 1) -> float | None:
+def _read_system_battery() -> float | None:
     try:
-        result = subprocess.run(
-            ["ping", "-c", "1", "-W", str(timeout_s), host],
-            capture_output=True, text=True, timeout=timeout_s + 1,
-        )
-        m = re.search(r"time=(\d+(?:\.\d+)?)\s*ms", result.stdout)
-        return float(m.group(1)) if m else None
+        import psutil
+        b = psutil.sensors_battery()
+        return b.percent if b else None
+    except Exception:
+        pass
+    for cap in glob.glob("/sys/class/power_supply/BAT*/capacity"):
+        try:
+            return float(Path(cap).read_text().strip())
+        except Exception:
+            pass
+    return None
+
+
+def _ping_ms(host: str, timeout_s: float = 1.0) -> float | None:
+    try:
+        t0 = _time.perf_counter()
+        with socket.create_connection((host, 80), timeout=timeout_s):
+            pass
+        return (_time.perf_counter() - t0) * 1000
     except Exception:
         return None
 
 
-
 class Header(QWidget):
-    _battery_signal: Signal = Signal(float)
+    _battery_signal: Signal = Signal(int, float)
     _ping_signal:    Signal = Signal(int, str, object)
     _estop_signal:   Signal = Signal(bool)
 
@@ -95,14 +109,28 @@ class Header(QWidget):
             f"font-family: {theme.FONT_MONO}; letter-spacing: 3px; background: transparent;"
         )
 
-        # ── RIGHT: battery ────────────────────────────────────────────────
+        # ── RIGHT: batteries ──────────────────────────────────────────────
         right = QHBoxLayout()
         right.setContentsMargins(0, 0, 0, 0)
-        right.setSpacing(0)
+        right.setSpacing(18)
         right.addStretch()
-        self._battery_label = QLabel("🔋  --V")
-        self._battery_label.setStyleSheet(f"color: {theme.TEXT_DIM};")
-        right.addWidget(self._battery_label)
+
+        # Build battery list — support legacy single `battery_topic` or new `batteries` list
+        batteries_cfg: list[dict] = list(settings.get("batteries", []))
+        legacy_topic = str(settings.get("battery_topic", "")).strip()
+        if not batteries_cfg and legacy_topic:
+            batteries_cfg = [{"name": "BAT", "topic": legacy_topic, "unit": "V"}]
+
+        self._battery_labels: list[QLabel] = []
+        self._battery_units:  list[str]    = []
+        for bat in batteries_cfg:
+            name = str(bat.get("name", "BAT")).upper()
+            unit = str(bat.get("unit", "V"))
+            lbl  = QLabel(f"🔋 {name}  --{unit}")
+            lbl.setStyleSheet(f"color: {theme.TEXT_DIM};")
+            right.addWidget(lbl)
+            self._battery_labels.append(lbl)
+            self._battery_units.append(unit)
 
         right_w = QWidget()
         right_w.setLayout(right)
@@ -141,30 +169,62 @@ class Header(QWidget):
         if event_bus:
             estop_topic = estop_cfg.get("topic", "estop_status")
             event_bus.subscribe(estop_topic, self.update_estop)
-            battery_topic = str(settings.get("battery_topic", "")).strip()
-            if battery_topic:
-                event_bus.subscribe(battery_topic, self.update_battery)
+            for bat_idx, bat in enumerate(batteries_cfg):
+                topic = str(bat.get("topic", "")).strip()
+                if not topic:
+                    continue
+                if bat.get("source") == "system":
+                    interval = int(bat.get("poll_interval_s", 30))
+                    def _sys_loop(t=topic, iv=interval, eb=event_bus):
+                        import time
+                        while True:
+                            v = _read_system_battery()
+                            if v is not None:
+                                eb.publish_sync(t, v)
+                            time.sleep(iv)
+                    Thread(target=_sys_loop, daemon=True).start()
+                    event_bus.subscribe(topic, lambda v, i=bat_idx: self._on_battery(i, v))
+                else:
+                    event_bus.subscribe(
+                        topic,
+                        lambda v, i=bat_idx: self._on_battery(i, v),
+                    )
+
+    def _on_battery(self, idx: int, value) -> None:
+        try:
+            self._battery_signal.emit(idx, float(value))
+        except (TypeError, ValueError):
+            pass
+
+    def update_estop(self, active) -> None:
+        try:
+            is_active = bool(int(active))
+        except (TypeError, ValueError):
+            is_active = bool(active)
+        self._estop_signal.emit(is_active)
+
+    def update_time(self, time_value: str) -> None:
+        self._center_time.setText(time_value)
 
     @staticmethod
     def _current_time() -> str:
         return datetime.now().strftime("%H:%M:%S")
 
-    def update_battery(self, value) -> None:
+    @Slot(int, float)
+    def _do_update_battery(self, idx: int, value: float) -> None:
+        if not (0 <= idx < len(self._battery_labels)):
+            return
+        lbl  = self._battery_labels[idx]
+        unit = self._battery_units[idx]
+        fmt  = f"{value:.0f}" if unit == "%" else f"{value:.1f}"
+        lbl.setText(f"🔋 {self._bat_name(idx)}  {fmt}{unit}")
+        lbl.setStyleSheet(f"color: {theme.TEXT};")
+
+    def _bat_name(self, idx: int) -> str:
         try:
-            self._battery_signal.emit(float(value))
-        except (TypeError, ValueError):
-            pass
-
-    def update_estop(self, active) -> None:
-        self._estop_signal.emit(bool(active))
-
-    def update_time(self, time_value: str) -> None:
-        self._center_time.setText(time_value)
-
-    @Slot(float)
-    def _do_update_battery(self, value: float) -> None:
-        self._battery_label.setText(f"🔋  {value:.1f}V")
-        self._battery_label.setStyleSheet(f"color: {theme.TEXT};")
+            return self._battery_labels[idx].text().split()[1]
+        except (IndexError, AttributeError):
+            return "BAT"
 
     @Slot(int, str, object)
     def _do_update_ping(self, idx: int, name: str, ms) -> None:

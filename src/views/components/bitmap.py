@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 
 from PySide6.QtCore import QDateTime, QPointF, Qt, QTimer, QUrl
-from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap, QPolygonF
+from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap, QPolygonF, QRegion
 from PySide6.QtNetwork import (
     QHttpMultiPart, QHttpPart,
     QNetworkAccessManager, QNetworkReply, QNetworkRequest,
@@ -664,6 +664,28 @@ class _ClickableLabel(QLabel):
 
 # ── Bitmap widget ──────────────────────────────────────────────────────────────
 
+class _CircularWidget(QWidget):
+    """QWidget clipped to a circle with a cyan border ring."""
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        s = min(self.width(), self.height())
+        x = (self.width()  - s) // 2
+        y = (self.height() - s) // 2
+        self.setMask(QRegion(x, y, s, s, QRegion.RegionType.Ellipse))
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        s = min(self.width(), self.height())
+        x = (self.width()  - s) // 2
+        y = (self.height() - s) // 2
+        p.setPen(QPen(QColor(CYAN), 2))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawEllipse(x + 1, y + 1, s - 2, s - 2)
+
+
 class Bitmap:
     def __init__(self, name: str, config: dict | None = None, event_bus: EventBus | None = None):
         self.name = name
@@ -699,8 +721,12 @@ class Bitmap:
         if self._widget is not None:
             return
 
-        self._widget = QWidget()
-        self._widget.setMinimumSize(320, 220)
+        if self.config.get("round"):
+            self._widget = _CircularWidget()
+            self._widget.setMinimumSize(160, 160)
+        else:
+            self._widget = QWidget()
+            self._widget.setMinimumSize(320, 220)
         self._widget.setCursor(Qt.CursorShape.CrossCursor)
 
         layout = QVBoxLayout(self._widget)
@@ -714,6 +740,7 @@ class Bitmap:
 
         self._register_gps_tracking()
         self._register_gps_poi_sync()
+        self._register_matrix_feed()
 
         source = str(self.config.get("source", "")).strip()
         if source:
@@ -802,6 +829,88 @@ class Bitmap:
             self._update_display()
 
         self.event_bus.subscribe(topic, _on_gps_poi)
+
+    # ── Matrix costmap feed ────────────────────────────────────────────────────
+
+    def _register_matrix_feed(self) -> None:
+        topic = str(self.config.get("data_topic", "")).strip()
+        if not topic:
+            return
+        def _on_matrix(mat) -> None:
+            pix = self._render_matrix(mat)
+            if pix is not None:
+                self._raw_pixmap = pix
+                self._update_display()
+        self.event_bus.subscribe(topic, _on_matrix)
+        self._raw_pixmap = self._make_placeholder_pixmap(200, 200)
+        self._update_display()
+
+    @staticmethod
+    def _render_matrix(matrix) -> "QPixmap | None":
+        from PySide6.QtGui import QImage
+        try:
+            import numpy as np
+            arr = np.asarray(matrix, dtype=np.float32)
+            if arr.ndim != 2:
+                return None
+            h, w = arr.shape
+
+            rgba = np.zeros((h, w, 4), dtype=np.uint8)
+
+            # -1  unknown → dark gray, semi-opaque
+            u = arr < 0
+            rgba[u] = (70, 70, 70, 180)
+
+            # 0   free    → fully transparent
+            f = arr == 0
+            rgba[f] = (0, 0, 0, 0)
+
+            # 1-99 cost   → green→yellow→red heatmap
+            c = (arr > 0) & (arr < 100)
+            t = (arr[c] / 99.0).clip(0.0, 1.0)
+            rgba[c, 0] = (t * 255).astype(np.uint8)
+            rgba[c, 1] = ((1.0 - t) * 220).astype(np.uint8)
+            rgba[c, 2] = np.zeros(t.shape, np.uint8)
+            rgba[c, 3] = (120 + t * 135).astype(np.uint8)
+
+            # 100 lethal  → bright red, fully opaque
+            lo = arr >= 100
+            rgba[lo] = (255, 40, 40, 255)
+
+            img = QImage(rgba.tobytes(), w, h, w * 4, QImage.Format.Format_RGBA8888)
+            return QPixmap.fromImage(img)
+
+        except ImportError:
+            pass
+
+        # ── Pure-Python fallback (no numpy) ──────────────────────────────
+        try:
+            rows = list(matrix)
+            h = len(rows)
+            if h == 0:
+                return None
+            w = len(rows[0])
+            buf = bytearray(w * h * 4)
+            for y, row in enumerate(rows):
+                base = y * w * 4
+                for x, val in enumerate(row):
+                    i = base + x * 4
+                    if val < 0:
+                        buf[i:i+4] = (70, 70, 70, 180)
+                    elif val == 0:
+                        buf[i:i+4] = (0, 0, 0, 0)
+                    elif val < 100:
+                        t = val / 99.0
+                        buf[i]   = int(t * 255)
+                        buf[i+1] = int((1.0 - t) * 220)
+                        buf[i+2] = 0
+                        buf[i+3] = int(120 + t * 135)
+                    else:
+                        buf[i:i+4] = (255, 40, 40, 255)
+            img = QImage(bytes(buf), w, h, w * 4, QImage.Format.Format_RGBA8888)
+            return QPixmap.fromImage(img)
+        except Exception:
+            return None
 
     # ── Click → altitude picker → POI ─────────────────────────────────────────
 

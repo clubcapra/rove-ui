@@ -4,12 +4,15 @@
       {"name": "MicroHard", "host": "192.168.2.10"}
     ],
     "ping_interval_s": 2,
-    "battery_topic": "battery.percentage",
+    "batteries": [
+      {"name": "ROVE",   "topic": "battery.percentage", "unit": "V"},
+      {"name": "STATION",     "topic": "system.battery",     "unit": "%", "source": "system", "poll_interval_s": 30}
+    ],
     "E-Stop": {
       "active_color":   "#ff3d3d",
       "inactive_color": "#00e676",
       "topic": "estop_status"
-    }
+    } 
   },
 
   "udp_clients": [
@@ -51,6 +54,24 @@
               "device_path": "/dev/video0",
               "responsive":  { "aspect_ratio": "4:3", "overflow_anchor": "center" }
             }
+          }
+        },
+        {
+          "type": "bitmap",
+          "name": "costmap_overlay",
+          "style": {
+            "right": 14, "bottom": 14,
+            "width": 220, "height": 220,
+            "z_index": 2
+          },
+          "data": {
+            "data_topic": "costmap.grid",
+            "round": true,
+            "cornerPositionWidth": 8,
+            "cornerPositionHeight": 8,
+            "gps_lat_topic": "gnss.latitude",
+            "gps_lng_topic": "gnss.longitude",
+            "gps_yaw_topic": "gnss.yaw"
           }
         },
         {

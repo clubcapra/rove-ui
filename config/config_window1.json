@@ -4,7 +4,10 @@
       {"name": "MicroHard", "host": "192.168.2.10"}
     ],
     "ping_interval_s": 2,
-    "battery_topic": "battery.percentage",
+    "batteries": [
+      {"name": "ROVE",   "topic": "battery.percentage", "unit": "V"},
+      {"name": "STATION",     "topic": "system.battery",     "unit": "%", "source": "system", "poll_interval_s": 30}
+    ],
     "E-Stop": {
       "active_color":   "#ff3d3d",
       "inactive_color": "#00e676",
@@ -145,11 +148,12 @@
             "height": 40,
             "buttons": [
               {
-                "label": "⬛ E-STOP",
+                "label": "E-STOP",
                 "event": "estop_status",
                 "value": "1",
-                "color": "#ff3d3d",
-                "active_topic": "estop_status"
+                "off_value": "0",
+                "toggle": true,
+                "color": "#ff3d3d"
               },
               {
                 "label": "START MAPPING",
@@ -163,6 +167,7 @@
                 "value": "1",
                 "color": "#ffae00"
               }
+
             ]
           }
         }

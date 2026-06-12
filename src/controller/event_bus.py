@@ -23,20 +23,44 @@ class EventBus:
     def subscribe(self, event_type: str, handler: Callback) -> None:
         self._subscribers[event_type].append(handler)
 
+    def unsubscribe(self, event_type: str, handler: Callback) -> None:
+        handlers = self._subscribers.get(event_type, [])
+        try:
+            handlers.remove(handler)
+        except ValueError:
+            pass
+
     async def publish(self, event_type: str, *args: Any) -> None:
-        if handlers := self._subscribers.get(event_type, []):
-            for handler in handlers:
+        handlers = self._subscribers.get(event_type)
+        if not handlers:
+            return
+        dead: list[int] = []
+        for i, handler in enumerate(handlers):
+            try:
                 result = handler(*args)
                 if isawaitable(result):
                     create_task(result)
+            except RuntimeError:
+                dead.append(i)
+        for i in reversed(dead):
+            handlers.pop(i)
 
     def publish_sync(self, event_type: str, *args: Any) -> None:
-        if handlers := self._subscribers.get(event_type, []):
-            for handler in handlers:
+        handlers = self._subscribers.get(event_type)
+        if not handlers:
+            return
+        dead: list[int] = []
+        for i, handler in enumerate(handlers):
+            try:
                 result = handler(*args)
                 if isawaitable(result):
                     try:
                         loop = get_running_loop()
                     except RuntimeError:
-                        continue
-                    loop.create_task(result)
+                        pass
+                    else:
+                        loop.create_task(result)
+            except RuntimeError:
+                dead.append(i)
+        for i in reversed(dead):
+            handlers.pop(i)
