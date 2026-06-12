@@ -346,6 +346,12 @@ class LayoutPanel:
             self._register_child(name, viewer)
             return viewer
 
+        if vtype == "input_manager":
+            from .components.input_manager_widget import InputManagerWidget
+            widget = InputManagerWidget(data, event_bus=self.event_bus)
+            self._register_child(name, widget)
+            return widget
+
         # Placeholder for other view types (table, map, point_cloud, etc.)
         lbl = QLabel(f"Placeholder {vtype}: {name}")
         return lbl

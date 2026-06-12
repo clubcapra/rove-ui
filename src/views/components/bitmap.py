@@ -227,7 +227,6 @@ class _AltitudePicker(QDialog):
         outer.addWidget(_tac_titlebar("ALTITUDE — P.O.I."))
 
         body = QWidget()
-        body.setStyleSheet("background: transparent;")
         inner = QVBoxLayout(body)
         inner.setContentsMargins(14, 14, 14, 14)
         inner.setSpacing(10)
@@ -445,7 +444,6 @@ class _RadiusPicker(QDialog):
         outer.addWidget(_tac_titlebar("ORBIT — RAYON"))
 
         body = QWidget()
-        body.setStyleSheet("background: transparent;")
         inner = QVBoxLayout(body)
         inner.setContentsMargins(14, 14, 14, 14)
         inner.setSpacing(10)
@@ -554,7 +552,6 @@ class _NamePicker(QDialog):
         outer.addWidget(_tac_titlebar("IDENTIFIANT — P.O.I."))
 
         body = QWidget()
-        body.setStyleSheet("background: transparent;")
         inner = QVBoxLayout(body)
         inner.setContentsMargins(12, 12, 12, 14)
         inner.setSpacing(8)

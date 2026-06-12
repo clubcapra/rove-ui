@@ -140,7 +140,23 @@
           }
         }
       ]
+    },
+    "INPUT MANAGER": {
+      "type": "layout",
+      "diaposition": "vertical",
+      "content": [
+        {
+          "type": "input_manager",
+          "name": "gamepad",
+          "data": {
+            "default_config": "config/input_config.yml",
+            "udp_host": "192.168.2.2",
+            "udp_port": 9000
+          }
+        }
+      ]
     }
+
   },
 
   "controls": {}
