@@ -134,27 +134,27 @@
                 "active_topic": "camera.select"
               },
               {
-                "label": "NORTH CAM",
+                "label": "LEFT CAM",
                 "event": "camera.select",
-                "value": "NORTH_CAM",
+                "value": "LEFT_CAM",
                 "active_topic": "camera.select"
               },
               {
-                "label": "SOUTH CAM",
+                "label": "RIGHT CAM",
                 "event": "camera.select",
-                "value": "SOUTH_CAM",
+                "value": "RIGHT_CAM",
                 "active_topic": "camera.select"
               },
               {
-                "label": "EAST CAM",
+                "label": "BACK CAM",
                 "event": "camera.select",
-                "value": "EAST_CAM",
+                "value": "BACK_CAM",
                 "active_topic": "camera.select"
               },
               {
-                "label": "WEST CAM",
+                "label": "FRONT CAM",
                 "event": "camera.select",
-                "value": "WEST_CAM",
+                "value": "FRONT_CAM",
                 "active_topic": "camera.select"
               }
             ]
