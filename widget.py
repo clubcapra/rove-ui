@@ -25,6 +25,7 @@ from src.views.components.header import Header
 from src.views.components.nav_bar import NavBar
 from src.clients.udp_client import UDPClient
 from src.clients.ros2_client import ROS2Client
+from src.clients.http_client import HttpClient
 
 
 class Widget(QWidget):
@@ -53,6 +54,7 @@ class Widget(QWidget):
         self._pages: dict[str, int] = {}
         self._udp_clients: list[UDPClient] = []
         self._ros2_clients: list[ROS2Client] = []
+        self._http_clients: list[HttpClient] = []
         self._bottom_bar: QWidget | None = None
 
 
@@ -108,6 +110,7 @@ class Widget(QWidget):
         self._rebuild_bottom_bar(config.get("bottom_bar"))
         self._restart_udp_clients(config.get("udp_clients", []))
         self._restart_ros2_clients(config.get("ros2_clients", []))
+        self._restart_http_clients(config.get("http_clients", []))
 
     def _rebuild_bottom_bar(self, bar_cfg: dict | None) -> None:
         if self._bottom_bar is not None:
@@ -135,6 +138,15 @@ class Widget(QWidget):
             client.start()
             self._udp_clients.append(client)
 
+    def _restart_http_clients(self, client_configs: list[dict[str, Any]]) -> None:
+        for client in self._http_clients:
+            client.stop()
+        self._http_clients = []
+        for client_config in client_configs:
+            client = HttpClient(client_config, self.event_bus)
+            client.start()
+            self._http_clients.append(client)
+
     def _restart_ros2_clients(self, client_configs: list[dict[str, Any]]) -> None:
         for client in self._ros2_clients:
             client.stop()
@@ -152,6 +164,9 @@ class Widget(QWidget):
         for client in self._ros2_clients:
             client.stop()
         self._ros2_clients = []
+        for client in self._http_clients:
+            client.stop()
+        self._http_clients = []
         super().closeEvent(event)
 
 

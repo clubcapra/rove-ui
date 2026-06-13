@@ -180,19 +180,26 @@ const jointAngles = {};  // joint name → current angle rad
 // GLBs exported from that toolchain keep Z-up geometry.
 // Apply a -90° rotation around X to the root so Z-up → Y-up in Three.js.
 const poseGroup = new THREE.Group();
-poseGroup.rotation.x = -Math.PI / 2;
+const _off = urdfData.model_offset;
+if (Array.isArray(_off) && _off.length >= 3) {
+  poseGroup.position.set(_off[0], _off[1], _off[2]);
+}
 scene.add(poseGroup);
+
+const D2R = Math.PI / 180;
+const _rotCfg = urdfData.model_rotation;
+const _baseRotX = -Math.PI / 2 + (Array.isArray(_rotCfg) && _rotCfg.length >= 1 ? _rotCfg[0] * D2R : 0);
+const _baseRotY =                 (Array.isArray(_rotCfg) && _rotCfg.length >= 2 ? _rotCfg[1] * D2R : 0);
+const _baseRotZ =                 (Array.isArray(_rotCfg) && _rotCfg.length >= 3 ? _rotCfg[2] * D2R : 0);
+const _baseCorrection = new THREE.Quaternion().setFromEuler(new THREE.Euler(_baseRotX, _baseRotY, _baseRotZ));
+poseGroup.quaternion.copy(_baseCorrection);
 
 let _roll = 0, _pitch = 0, _yaw = 0;
 function _updatePose() {
-  // Combine the coord-correction with IMU orientation
-  const correction = new THREE.Quaternion().setFromEuler(
-    new THREE.Euler(-Math.PI / 2, 0, 0)
-  );
   const imu = new THREE.Quaternion().setFromEuler(
     new THREE.Euler(-_roll, _yaw, _pitch, 'YZX')
   );
-  poseGroup.quaternion.multiplyQuaternions(imu, correction);
+  poseGroup.quaternion.multiplyQuaternions(imu, _baseCorrection);
 }
 
 // ── build link groups ─────────────────────────────────────────────────────────

@@ -210,6 +210,8 @@ class URDFViewer(QWidget):
         urdf_data["link_colors"]      = self._config.get("link_colors", {})
         urdf_data["hide_joint_panel"] = bool(self._config.get("hide_joint_panel", False))
         urdf_data["thermal_links"]    = controls.get("thermal_links", []) if isinstance(controls, dict) else []
+        urdf_data["model_offset"]     = self._config.get("model_offset", None)
+        urdf_data["model_rotation"]   = self._config.get("model_rotation", None)
         urdf_json = json.dumps(urdf_data, separators=(",", ":"))
         html = template.replace("/* URDF_DATA_PLACEHOLDER */", f"window.URDF_DATA = {urdf_json};")
         self._html_file.write_text(html, encoding="utf-8")

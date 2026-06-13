@@ -27,6 +27,17 @@
       "poll_interval_ms": 100, "recv_timeout_s": 2.0,
       "rediscovery_interval_s": 30, "enabled": true
     },
+        {
+      "type": "udp_poll", "name": "odrive_32",
+      "base_url": "http://192.168.2.2:8080",
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "odrive_32",
+      "discovery_port_field": "data_port",
+      "topic": "odrive.32", "topic_prefix": "odrive.32",
+      "proto_type": "DriveNodeState", "publish_field_topics": true,
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
+    },
     {
       "type": "udp_poll", "name": "odrive_33",
       "base_url": "http://192.168.2.2:8080",
@@ -85,6 +96,21 @@
   ],
 
   "ros2_clients": [],
+
+  "http_clients": [
+    {
+      "type": "http_action",
+      "name": "mapping",
+      "base_url": "http://192.168.2.3",
+      "actions": [
+        {"topic": "mapping.go",      "method": "POST", "endpoint": "/mapping/go"},
+        {"topic": "mapping.pause",   "method": "POST", "endpoint": "/mapping/pause"},
+        {"topic": "mapping.restart", "method": "POST", "endpoint": "/mapping/restart"},
+        {"topic": "mapping.export",  "method": "POST", "endpoint": "/mapping/export"}
+      ]
+    }
+  ],
+
   "console": true,
 
   "views": {
@@ -180,16 +206,28 @@
                 "color": "#ff3d3d"
               },
               {
-                "label": "START MAPPING",
-                "event": "mapping.start",
+                "label": "MAPPING GO",
+                "event": "mapping.go",
                 "value": "1",
                 "color": "#00e676"
               },
               {
-                "label": "MAPPING BUILD",
-                "event": "mapping.build",
+                "label": "MAPPING PAUSE",
+                "event": "mapping.pause",
                 "value": "1",
                 "color": "#ffae00"
+              },
+              {
+                "label": "EXPORT MAP",
+                "event": "mapping.export",
+                "value": "1",
+                "color": "#1a6fff"
+              },
+              {
+                "label": "RESTART MAP",
+                "event": "mapping.restart",
+                "value": "1",
+                "color": "#ff3d3d"
               }
 
             ]
@@ -266,6 +304,8 @@
           "label": "3D VIEWER",
           "data": {
             "urdf": "src/media/rove_urdf/rove.urdf",
+            "model_offset": [0, 0, 0],
+            "model_rotation": [-90, 0, 0],
             "link_colors": {
               "Core": "#c8c8d0", "FlipperFL": "#72c572", "FlipperBL": "#6b6bc4",
               "FlipperFR": "#d56868", "FlipperBR": "#e1e17c",
@@ -306,7 +346,7 @@
           "name": "Costmap",
           "label": "COSTMAP",
           "data": {
-            "source": "http://localhost:8080/map_feed",
+            "source": "http://192.168.2.3/minimap",
             "cornerPositionWidth": 8,
             "cornerPositionHeight": 8,
             "click_topic": "costmap.click",

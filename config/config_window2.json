@@ -90,6 +90,8 @@
           },
           "data": {
             "urdf": "src/media/rove_urdf/rove.urdf",
+            "model_offset": [0, 0, 0],
+            "model_rotation": [-90, 0, 0],
             "hide_joint_panel": true,
             "link_colors": {
               "Core":              "#1e1e1e",
