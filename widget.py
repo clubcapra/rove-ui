@@ -112,15 +112,44 @@ class Widget(QWidget):
         self._restart_ros2_clients(config.get("ros2_clients", []))
         self._restart_http_clients(config.get("http_clients", []))
 
-    def _rebuild_bottom_bar(self, bar_cfg: dict | None) -> None:
+    def _rebuild_bottom_bar(self, bar_cfg) -> None:
         if self._bottom_bar is not None:
-            self._main_layout.removeWidget(self._bottom_bar)
+            self._bottom_bar.setParent(None)
             self._bottom_bar.deleteLater()
             self._bottom_bar = None
-        if bar_cfg:
-            from src.views.components.button_bar import ButtonBar
-            self._bottom_bar = ButtonBar(bar_cfg, event_bus=self.event_bus)
-            self._main_layout.addWidget(self._bottom_bar)
+        if not bar_cfg:
+            return
+        from PySide6.QtWidgets import QVBoxLayout
+        from src.views.components.button_bar import ButtonBar
+        bars = bar_cfg if isinstance(bar_cfg, list) else [bar_cfg]
+        container = QWidget(self)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        for cfg in bars:
+            layout.addWidget(ButtonBar(cfg, event_bus=self.event_bus))
+        self._bottom_bar = container
+        self._bottom_bar.show()
+        self._bottom_bar.raise_()
+        self._reposition_bottom_bar()
+
+    def _reposition_bottom_bar(self) -> None:
+        if self._bottom_bar is None:
+            return
+        hint = self._bottom_bar.sizeHint()
+        w, h = hint.width(), hint.height()
+        x = (self.width() - w) // 2
+        y = self.height() - h
+        self._bottom_bar.setGeometry(x, y, w, h)
+        self._bottom_bar.raise_()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reposition_bottom_bar()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._reposition_bottom_bar()
 
     def update_header_time(self, time_value: str):
         self._header.update_time(time_value)

@@ -5,8 +5,8 @@
     ],
     "ping_interval_s": 2,
     "batteries": [
-      {"name": "ROVE",   "topic": "battery.percentage", "unit": "V"},
-      {"name": "STATION",     "topic": "system.battery",     "unit": "%", "source": "system", "poll_interval_s": 30}
+      {"name": "ROVE",    "topic": "battery.percentage", "unit": "V"},
+      {"name": "STATION", "topic": "system.battery",     "unit": "%", "source": "system", "poll_interval_s": 30}
     ],
     "E-Stop": {
       "active_color":   "#ff3d3d",
@@ -17,17 +17,6 @@
 
   "udp_clients": [
     {
-      "type": "udp_poll", "name": "odrive_32",
-      "base_url": "http://192.168.2.2:8080",
-      "discovery_endpoint": "/discover",
-      "discovery_sensor_id": "odrive_32",
-      "discovery_port_field": "data_port",
-      "topic": "odrive.32", "topic_prefix": "odrive.32",
-      "proto_type": "DriveNodeState", "publish_field_topics": true,
-      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 30, "enabled": true
-    },
-        {
       "type": "udp_poll", "name": "odrive_32",
       "base_url": "http://192.168.2.2:8080",
       "discovery_endpoint": "/discover",
@@ -91,7 +80,7 @@
       "topic": "kinova_arm", "topic_prefix": "kinova_arm",
       "publish_field_topics": true,
       "poll_interval_ms": 100, "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 30,  "enabled": true
+      "rediscovery_interval_s": 30, "enabled": true
     }
   ],
 
@@ -113,7 +102,143 @@
 
   "console": true,
 
+  "bottom_bar": [
+    {
+      "height": 40,
+      "buttons": [
+        {"label": "REAR CAM",  "event": "camera.select", "value": "REAR_CAM",  "active_topic": "camera.select"},
+        {"label": "ARM CAM",   "event": "camera.select", "value": "ARM_CAM",   "active_topic": "camera.select"},
+        {"label": "LEFT CAM",  "event": "camera.select", "value": "LEFT_CAM",  "active_topic": "camera.select"},
+        {"label": "RIGHT CAM", "event": "camera.select", "value": "RIGHT_CAM", "active_topic": "camera.select"},
+        {"label": "BACK CAM",  "event": "camera.select", "value": "BACK_CAM",  "active_topic": "camera.select"},
+        {"label": "FRONT CAM", "event": "camera.select", "value": "FRONT_CAM", "active_topic": "camera.select"}
+      ]
+    },
+    {
+      "height": 40,
+      "buttons": [
+        {
+          "label": "E-STOP",
+          "event": "estop_status",
+          "value": "1",
+          "off_value": "0",
+          "toggle": true,
+          "color": "#ff3d3d"
+        },
+        {"label": "MAPPING GO",    "event": "mapping.go",      "value": "1", "color": "#00e676"},
+        {"label": "MAPPING PAUSE", "event": "mapping.pause",   "value": "1", "color": "#ffae00"},
+        {"label": "EXPORT MAP",    "event": "mapping.export",  "value": "1", "color": "#1a6fff"},
+        {"label": "RESTART MAP",   "event": "mapping.restart", "value": "1", "color": "#ff3d3d"}
+      ]
+    }
+  ],
+
   "views": {
+
+    "CAMERA": {
+      "type": "layout",
+      "diaposition": "absolute",
+      "content": [
+        {
+          "type": "camera",
+          "name": "Camera",
+          "style": { "x": 0, "y": 0, "width": "100%", "height": "100%", "z_index": 0 },
+          "data": {
+            "mode": "rtsp",
+            "hide_controls": true,
+            "select_topic": "camera.select",
+            "vtx_host": "192.168.2.2",
+            "vtx_port": 5540,
+            "cameras": [
+              {"name": "ARM_CAM",   "udp_vtx_id": 0, "rtsp_ip": "192.168.2.36"},
+              {"name": "REAR_CAM",  "udp_vtx_id": 1, "rtsp_ip": "192.168.2.31"},
+              {"name": "LEFT_CAM",  "udp_vtx_id": 2, "rtsp_ip": "192.168.2.32"},
+              {"name": "RIGHT_CAM", "udp_vtx_id": 3, "rtsp_ip": "192.168.2.33"},
+              {"name": "BACK_CAM",  "udp_vtx_id": 4, "rtsp_ip": "192.168.2.34"},
+              {"name": "FRONT_CAM", "udp_vtx_id": 5, "rtsp_ip": "192.168.2.35"}
+            ],
+            "rtsp":      { "source": "rtsp://192.168.2.30:554/", "source_type": "rtsp" },
+            "webcamera": {
+              "device_path": "/dev/video0",
+              "responsive":  { "aspect_ratio": "4:3", "overflow_anchor": "center" }
+            }
+          }
+        },
+        {
+          "type": "bitmap",
+          "name": "costmap_overlay",
+          "style": {
+            "right": 14, "bottom": 14,
+            "width": 220, "height": 220,
+            "z_index": 2
+          },
+          "data": {
+            "data_topic": "costmap.grid",
+            "round": true,
+            "cornerPositionWidth": 8,
+            "cornerPositionHeight": 8,
+            "gps_lat_topic": "gnss.latitude",
+            "gps_lng_topic": "gnss.longitude",
+            "gps_yaw_topic": "gnss.yaw"
+          }
+        },
+        {
+          "type": "robot",
+          "name": "RobotOverlay",
+          "label": "ROBOT STATUS",
+          "style": {
+            "x": 14, "bottom": 14,
+            "width": 320, "height": 260,
+            "z_index": 1
+          },
+          "data": {
+            "urdf": "src/media/rove_urdf/rove.urdf",
+            "model_offset": [0, 0, 0],
+            "model_rotation": [-90, 0, 0],
+            "hide_joint_panel": true,
+            "link_colors": {
+              "Core":            "#1e1e1e",
+              "FlipperFL":       "#2a2a2a",
+              "FlipperBL":       "#2a2a2a",
+              "FlipperFR":       "#2a2a2a",
+              "FlipperBR":       "#2a2a2a",
+              "Base":            "#1a1a1a",
+              "ASection":        "#1e1e1e",
+              "BSection":        "#1e1e1e",
+              "JointA":          "#222222",
+              "JointB":          "#222222",
+              "JointGripper":    "#2a2020",
+              "dji_mid360":      "#141414",
+              "vn300_vectornav": "#141414",
+              "chinese_camera":   "#101010",
+              "chinese_camera_2": "#101010",
+              "chinese_camera_3": "#101010"
+            },
+            "controls": {
+              "thermal_links": [
+                {"link": "DrumFL", "topic": "odrive.32.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "DrumBL", "topic": "odrive.33.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "DrumFR", "topic": "odrive.34.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "DrumBR", "topic": "odrive.31.motor_temp", "min_temp": 20, "max_temp": 80}
+              ],
+              "joint_angles": [
+                {"joint": "joint_revolute_9",  "topic": "kinova_arm.joint_1_pos", "scale": 0.01745,  "offset": 1.5708},
+                {"joint": "joint_revolute_10", "topic": "kinova_arm.joint_2_pos", "scale": -0.01745, "offset": 0},
+                {"joint": "joint_revolute_11", "topic": "kinova_arm.joint_3_pos", "scale": 0.01745,  "offset": 1.5708},
+                {"joint": "joint_revolute_12", "topic": "kinova_arm.joint_4_pos", "scale": 0.01745,  "offset": 0},
+                {"joint": "joint_revolute_13", "topic": "kinova_arm.joint_5_pos", "scale": 0.01745,  "offset": 1.5708},
+                {"joint": "joint_revolute_14", "topic": "kinova_arm.joint_6_pos", "scale": 0.01745,  "offset": 1.5708}
+              ],
+              "robot_pose": {
+                "roll_topic":  "gnss.roll",
+                "pitch_topic": "gnss.pitch",
+                "yaw_topic":   "gnss.yaw"
+              }
+            }
+          }
+        }
+      ]
+    },
 
     "MISSION": {
       "type": "layout",
@@ -131,106 +256,9 @@
             "robot_position_lat_topic": "gnss.latitude",
             "robot_position_lng_topic": "gnss.longitude",
             "robot_position_yaw_topic": "gnss.yaw",
-            "click_topic":    "map.click",
-            "poi_topic":      "map.poi",
-            "add_poi_at_topic": "costmap.poi"
-          }
-        },
-        {
-          "type": "button_bar",
-          "name": "cam_selector",
-          "style": {
-            "x": "center", "bottom": 14,
-            "width": "auto", "height": 40,
-            "z_index": 1
-          },
-          "data": {
-            "height": 40,
-            "buttons": [
-              {
-                "label": "REAR CAM",
-                "event": "camera.select",
-                "value": "REAR_CAM",
-                "active_topic": "camera.select"
-              },
-              {
-                "label": "ARM CAM",
-                "event": "camera.select",
-                "value": "ARM_CAM",
-                "active_topic": "camera.select"
-              },
-              {
-                "label": "LEFT CAM",
-                "event": "camera.select",
-                "value": "LEFT_CAM",
-                "active_topic": "camera.select"
-              },
-              {
-                "label": "RIGHT CAM",
-                "event": "camera.select",
-                "value": "RIGHT_CAM",
-                "active_topic": "camera.select"
-              },
-              {
-                "label": "BACK CAM",
-                "event": "camera.select",
-                "value": "BACK_CAM",
-                "active_topic": "camera.select"
-              },
-              {
-                "label": "FRONT CAM",
-                "event": "camera.select",
-                "value": "FRONT_CAM",
-                "active_topic": "camera.select"
-              }
-            ]
-          }
-        },
-        {
-          "type": "button_bar",
-          "name": "action_bar",
-          "style": {
-            "x": "center", "bottom": 62,
-            "width": "auto", "height": 40,
-            "z_index": 1
-          },
-          "data": {
-            "height": 40,
-            "buttons": [
-              {
-                "label": "E-STOP",
-                "event": "estop_status",
-                "value": "1",
-                "off_value": "0",
-                "toggle": true,
-                "color": "#ff3d3d"
-              },
-              {
-                "label": "MAPPING GO",
-                "event": "mapping.go",
-                "value": "1",
-                "color": "#00e676"
-              },
-              {
-                "label": "MAPPING PAUSE",
-                "event": "mapping.pause",
-                "value": "1",
-                "color": "#ffae00"
-              },
-              {
-                "label": "EXPORT MAP",
-                "event": "mapping.export",
-                "value": "1",
-                "color": "#1a6fff"
-              },
-              {
-                "label": "RESTART MAP",
-                "event": "mapping.restart",
-                "value": "1",
-                "color": "#ff3d3d"
-              }
-
-            ]
+            "click_topic":       "map.click",
+            "poi_topic":         "map.poi",
+            "add_poi_at_topic":  "costmap.poi"
           }
         }
       ]
@@ -317,12 +345,12 @@
             },
             "controls": {
               "joint_angles": [
-                {"joint": "joint_revolute_9",  "topic": "kinova_arm.joint_1_pos", "scale": 0.01745, "offset": 1.5708},
+                {"joint": "joint_revolute_9",  "topic": "kinova_arm.joint_1_pos", "scale": 0.01745,  "offset": 1.5708},
                 {"joint": "joint_revolute_10", "topic": "kinova_arm.joint_2_pos", "scale": -0.01745, "offset": 0},
-                {"joint": "joint_revolute_11", "topic": "kinova_arm.joint_3_pos", "scale": 0.01745, "offset": 1.5708},
-                {"joint": "joint_revolute_12", "topic": "kinova_arm.joint_4_pos", "scale": 0.01745, "offset": 0},
-                {"joint": "joint_revolute_13", "topic": "kinova_arm.joint_5_pos", "scale": 0.01745, "offset": 1.5708},
-                {"joint": "joint_revolute_14", "topic": "kinova_arm.joint_6_pos", "scale": 0.01745, "offset": 1.5708}
+                {"joint": "joint_revolute_11", "topic": "kinova_arm.joint_3_pos", "scale": 0.01745,  "offset": 1.5708},
+                {"joint": "joint_revolute_12", "topic": "kinova_arm.joint_4_pos", "scale": 0.01745,  "offset": 0},
+                {"joint": "joint_revolute_13", "topic": "kinova_arm.joint_5_pos", "scale": 0.01745,  "offset": 1.5708},
+                {"joint": "joint_revolute_14", "topic": "kinova_arm.joint_6_pos", "scale": 0.01745,  "offset": 1.5708}
               ],
               "robot_pose": {
                 "roll_topic":  "gnss.roll",
@@ -349,12 +377,12 @@
             "source": "http://192.168.2.3/minimap",
             "cornerPositionWidth": 8,
             "cornerPositionHeight": 8,
-            "click_topic": "costmap.click",
-            "poi_topic": "costmap.poi",
+            "click_topic":       "costmap.click",
+            "poi_topic":         "costmap.poi",
             "add_poi_gps_topic": "map.poi",
-            "gps_lat_topic": "gnss.latitude",
-            "gps_lng_topic": "gnss.longitude",
-            "gps_yaw_topic": "gnss.yaw"
+            "gps_lat_topic":     "gnss.latitude",
+            "gps_lng_topic":     "gnss.longitude",
+            "gps_yaw_topic":     "gnss.yaw"
           },
           "grid": { "row": 0, "column": 0 }
         }
@@ -371,6 +399,22 @@
           "data": {
             "manifest_path": "src/media/mission_manifest.json",
             "send_topic": "mission.send"
+          }
+        }
+      ]
+    },
+
+    "INPUT MANAGER": {
+      "type": "layout",
+      "diaposition": "vertical",
+      "content": [
+        {
+          "type": "input_manager",
+          "name": "gamepad",
+          "data": {
+            "default_config": "config/input_config.yml",
+            "udp_host": "192.168.2.2",
+            "udp_port": 9000
           }
         }
       ]
