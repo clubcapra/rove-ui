@@ -80,7 +80,7 @@
       "topic": "kinova_arm", "topic_prefix": "kinova_arm",
       "publish_field_topics": true,
       "poll_interval_ms": 100, "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 30, "enabled": true
+      "rediscovery_interval_s": 30,  "enabled": true
     }
   ],
 

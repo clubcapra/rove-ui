@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<robot name="rove_cursed_aaaah_goofy_design">
+<robot name="rove_standard">
   <link name="ASection">
     <visual>
       <geometry>
@@ -284,6 +284,31 @@
     <parent link="FlipperBR_pivot" />
     <child link="FlipperBR" />
   </joint>
+  <link name="pole">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/pole.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="meshes/pole.glb" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="joint_revolute_9" type="fixed">
+    <origin xyz="0.31746 0.209 0.221123" rpy="0 0 0" />
+    <parent link="Core" />
+    <child link="pole_pivot" />
+    <axis xyz="0 0 1" />
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1" />
+  </joint>
+  <link name="pole_pivot" />
+  <joint name="joint_revolute_9_offset" type="fixed">
+    <origin xyz="-0.0467844 0.000515604 -0.00281394" rpy="0 0 -1.5708" />
+    <parent link="pole_pivot" />
+    <child link="pole" />
+  </joint>
   <link name="dji_mid360">
     <visual>
       <geometry>
@@ -296,7 +321,70 @@
       </geometry>
     </collision>
   </link>
-  <joint name="joint_revolute_9" type="revolute">
+  <joint name="joint_revolute_10" type="fixed">
+    <origin xyz="-9.31322e-11 -2.66092e-11 0.587" rpy="0 0 0" />
+    <parent link="pole" />
+    <child link="dji_mid360_pivot" />
+    <axis xyz="0 0 1" />
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1" />
+  </joint>
+  <link name="dji_mid360_pivot" />
+  <joint name="joint_revolute_10_offset" type="fixed">
+    <origin xyz="0.00112693 0.0015559 0.0289736" rpy="1.5708 0 1.5708" />
+    <parent link="dji_mid360_pivot" />
+    <child link="dji_mid360" />
+  </joint>
+  <link name="dji_mid360_2">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/dji_mid360.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="meshes/dji_mid360.glb" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="joint_revolute_11" type="fixed">
+    <origin xyz="4.59098e-18 0 0.574" rpy="0 0 0" />
+    <parent link="pole" />
+    <child link="dji_mid360_2_pivot" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1" />
+  </joint>
+  <link name="dji_mid360_2_pivot" />
+  <joint name="joint_revolute_11_offset" type="fixed">
+    <origin xyz="0.000551953 -0.000521468 -0.0284671" rpy="-1.5708 0 1.5708" />
+    <parent link="dji_mid360_2_pivot" />
+    <child link="dji_mid360_2" />
+  </joint>
+  <link name="chinese_camera">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/chinese_camera.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="meshes/chinese_camera.glb" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="joint_revolute_12" type="fixed">
+    <origin xyz="0.0725343 -0.024 0.587101" rpy="0 0 0" />
+    <parent link="pole" />
+    <child link="chinese_camera_pivot" />
+    <axis xyz="0 1 0" />
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1" />
+  </joint>
+  <link name="chinese_camera_pivot" />
+  <joint name="joint_revolute_12_offset" type="fixed">
+    <origin xyz="0.0154955 0.0243019 -0.00922952" rpy="-1.5708 0 1.5708" />
+    <parent link="chinese_camera_pivot" />
+    <child link="chinese_camera" />
+  </joint>
+  <joint name="joint_revolute_13" type="revolute">
     <origin xyz="-0.399414 0.209923 0.221123" rpy="0 0 0" />
     <parent link="Core" />
     <child link="Base_pivot" />
@@ -304,12 +392,12 @@
     <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1" />
   </joint>
   <link name="Base_pivot" />
-  <joint name="joint_revolute_9_offset" type="fixed">
-    <origin xyz="0.399414 -0.209923 -0.221123" rpy="0 0 0" />
+  <joint name="joint_revolute_13_offset" type="fixed">
+    <origin xyz="0.399414 -0.209923 -0.15" rpy="0 0 0" />
     <parent link="Base_pivot" />
     <child link="Base" />
   </joint>
-  <joint name="joint_revolute_10" type="revolute">
+  <joint name="joint_revolute_14" type="revolute">
     <origin xyz="-0.4 0.27 0.388" rpy="0 0 0" />
     <parent link="Base" />
     <child link="ASection_pivot" />
@@ -317,12 +405,12 @@
     <limit lower="-0.5" upper="3.6" effort="10" velocity="1" />
   </joint>
   <link name="ASection_pivot" />
-  <joint name="joint_revolute_10_offset" type="fixed">
+  <joint name="joint_revolute_14_offset" type="fixed">
     <origin xyz="0.4 -0.27 -0.388" rpy="0 0 0" />
     <parent link="ASection_pivot" />
     <child link="ASection" />
   </joint>
-  <joint name="joint_revolute_11" type="revolute">
+  <joint name="joint_revolute_15" type="revolute">
     <origin xyz="-0.7 0.255 0.378" rpy="0 0 0" />
     <parent link="ASection" />
     <child link="JointA_pivot" />
@@ -330,12 +418,12 @@
     <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1" />
   </joint>
   <link name="JointA_pivot" />
-  <joint name="joint_revolute_11_offset" type="fixed">
+  <joint name="joint_revolute_15_offset" type="fixed">
     <origin xyz="0.7 -0.255 -0.378" rpy="0 0 0" />
     <parent link="JointA_pivot" />
     <child link="JointA" />
   </joint>
-  <joint name="joint_revolute_12" type="revolute">
+  <joint name="joint_revolute_16" type="revolute">
     <origin xyz="-0.767647 0.205 0.378" rpy="0 0 0" />
     <parent link="JointA" />
     <child link="BSection_pivot" />
@@ -343,12 +431,12 @@
     <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1" />
   </joint>
   <link name="BSection_pivot" />
-  <joint name="joint_revolute_12_offset" type="fixed">
+  <joint name="joint_revolute_16_offset" type="fixed">
     <origin xyz="0.767647 -0.205 -0.378" rpy="0 0 0" />
     <parent link="BSection_pivot" />
     <child link="BSection" />
   </joint>
-  <joint name="joint_revolute_13" type="revolute">
+  <joint name="joint_revolute_17" type="revolute">
     <origin xyz="-1.1 0.205 0.378" rpy="0 0 0" />
     <parent link="BSection" />
     <child link="JointB_pivot" />
@@ -356,12 +444,12 @@
     <limit lower="-1.6" upper="1.6" effort="10" velocity="1" />
   </joint>
   <link name="JointB_pivot" />
-  <joint name="joint_revolute_13_offset" type="fixed">
+  <joint name="joint_revolute_17_offset" type="fixed">
     <origin xyz="1.08936 -0.205 -0.378" rpy="0 0 0" />
     <parent link="JointB_pivot" />
     <child link="JointB" />
   </joint>
-  <joint name="joint_revolute_14" type="revolute">
+  <joint name="joint_revolute_18" type="revolute">
     <origin xyz="-1.1728 0.20415 0.378" rpy="0 0 0" />
     <parent link="JointB" />
     <child link="JointGripper_pivot" />
@@ -369,64 +457,139 @@
     <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1" />
   </joint>
   <link name="JointGripper_pivot" />
-  <joint name="joint_revolute_14_offset" type="fixed">
+  <joint name="joint_revolute_18_offset" type="fixed">
     <origin xyz="1.1728 -0.20415 -0.378" rpy="0 0 0" />
     <parent link="JointGripper_pivot" />
     <child link="JointGripper" />
   </joint>
-  <link name="chinese_camera">
-    <visual>
-      <geometry>
-        <mesh filename="meshes/chinese_camera_5.glb" />
-      </geometry>
-    </visual>
-    <collision>
-      <geometry>
-        <mesh filename="meshes/chinese_camera_5.glb" />
-      </geometry>
-    </collision>
-  </link>
-  <joint name="joint_revolute_15" type="fixed">
-    <origin xyz="-0.447106 0.216081 0.168303" rpy="0 0 0" />
-    <parent link="Core" />
-    <child link="chinese_camera_pivot" />
-    <axis xyz="-0.999548 0.0300528 0" />
-    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1" />
-  </joint>
-  <link name="chinese_camera_pivot" />
-  <joint name="joint_revolute_15_offset" type="fixed">
-    <origin xyz="-0.0228113 -0.00141777 -0.0192583" rpy="-1.5708 -5.55112e-17 -1.5708" />
-    <parent link="chinese_camera_pivot" />
-    <child link="chinese_camera" />
-  </joint>
   <link name="chinese_camera_2">
     <visual>
       <geometry>
-        <mesh filename="meshes/chinese_camera_6.glb" />
+        <mesh filename="meshes/chinese_camera_2.glb" />
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="meshes/chinese_camera_6.glb" />
+        <mesh filename="meshes/chinese_camera_2.glb" />
       </geometry>
     </collision>
   </link>
-  <joint name="joint_revolute_16" type="fixed">
-    <origin xyz="0.31746 0.209 0.192576" rpy="0 0 0" />
-    <parent link="Core" />
+  <joint name="joint_revolute_19" type="fixed">
+    <origin xyz="0.024 0.0730961 0.586861" rpy="0 0 0" />
+    <parent link="pole" />
     <child link="chinese_camera_2_pivot" />
-    <axis xyz="1 0 0" />
+    <axis xyz="0 0.23939 0.970923" />
     <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1" />
   </joint>
   <link name="chinese_camera_2_pivot" />
-  <joint name="joint_revolute_16_offset" type="fixed">
-    <origin xyz="0.031733 -0.000947911 -0.0166233" rpy="-1.5708 5.55112e-17 1.5708" />
+  <joint name="joint_revolute_19_offset" type="fixed">
+    <origin xyz="-0.0239323 0.014361 -0.00867528" rpy="-1.5708 -1.38778e-16 3.14159" />
     <parent link="chinese_camera_2_pivot" />
     <child link="chinese_camera_2" />
   </joint>
   <link name="chinese_camera_3">
     <visual>
       <geometry>
+        <mesh filename="meshes/chinese_camera_3.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="meshes/chinese_camera_3.glb" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="joint_revolute_20" type="fixed">
+    <origin xyz="-0.0730961 0.024 0.586861" rpy="0 0 0" />
+    <parent link="pole" />
+    <child link="chinese_camera_3_pivot" />
+    <axis xyz="0 -1 0" />
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1" />
+  </joint>
+  <link name="chinese_camera_3_pivot" />
+  <joint name="joint_revolute_20_offset" type="fixed">
+    <origin xyz="-0.0149206 -0.0234735 -0.00886397" rpy="-1.5708 5.55112e-17 -1.5708" />
+    <parent link="chinese_camera_3_pivot" />
+    <child link="chinese_camera_3" />
+  </joint>
+  <link name="chinese_camera_4">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/chinese_camera_4.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="meshes/chinese_camera_4.glb" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="joint_revolute_21" type="revolute">
+    <origin xyz="-0.024 -0.0727157 0.587006" rpy="0 0 0" />
+    <parent link="pole" />
+    <child link="chinese_camera_4_pivot" />
+    <axis xyz="0 -0.46469 0.885474" />
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1" />
+  </joint>
+  <link name="chinese_camera_4_pivot" />
+  <joint name="joint_revolute_21_offset" type="fixed">
+    <origin xyz="0.0248549 -0.0148706 -0.0090392" rpy="-1.5708 -2.22045e-16 1.60237e-31" />
+    <parent link="chinese_camera_4_pivot" />
+    <child link="chinese_camera_4" />
+  </joint>
+  <link name="chinese_camera_5">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/chinese_camera_5.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="meshes/chinese_camera_5.glb" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="joint_revolute_22" type="fixed">
+    <origin xyz="-0.447106 0.216081 0.168303" rpy="0 0 0" />
+    <parent link="Core" />
+    <child link="chinese_camera_5_pivot" />
+    <axis xyz="-0.999548 0.0300528 0" />
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1" />
+  </joint>
+  <link name="chinese_camera_5_pivot" />
+  <joint name="joint_revolute_22_offset" type="fixed">
+    <origin xyz="-0.0228113 -0.00141777 -0.0192583" rpy="-1.5708 -5.55112e-17 -1.5708" />
+    <parent link="chinese_camera_5_pivot" />
+    <child link="chinese_camera_5" />
+  </joint>
+  <link name="chinese_camera_6">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/chinese_camera_6.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="meshes/chinese_camera_6.glb" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="joint_revolute_23" type="fixed">
+    <origin xyz="0.31746 0.209 0.192576" rpy="0 0 0" />
+    <parent link="Core" />
+    <child link="chinese_camera_6_pivot" />
+    <axis xyz="1 0 0" />
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1" />
+  </joint>
+  <link name="chinese_camera_6_pivot" />
+  <joint name="joint_revolute_23_offset" type="fixed">
+    <origin xyz="0.031733 -0.000947911 -0.0166233" rpy="-1.5708 5.55112e-17 1.5708" />
+    <parent link="chinese_camera_6_pivot" />
+    <child link="chinese_camera_6" />
+  </joint>
+  <link name="chinese_camera_7">
+    <visual>
+      <geometry>
         <mesh filename="meshes/chinese_camera_7.glb" />
       </geometry>
     </visual>
@@ -436,30 +599,18 @@
       </geometry>
     </collision>
   </link>
-  <joint name="joint_revolute_17" type="fixed">
+  <joint name="joint_revolute_24" type="fixed">
     <origin xyz="-1.1936 0.205 0.4155" rpy="0 0 0" />
     <parent link="JointGripper" />
-    <child link="chinese_camera_3_pivot" />
+    <child link="chinese_camera_7_pivot" />
     <axis xyz="0 -0.111961 0.993713" />
     <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1" />
   </joint>
-  <link name="chinese_camera_3_pivot" />
-  <joint name="joint_revolute_17_offset" type="fixed">
+  <link name="chinese_camera_7_pivot" />
+  <joint name="joint_revolute_24_offset" type="fixed">
     <origin xyz="0.00311921 6.66671e-05 0.0217355" rpy="-1.5708 -5.55112e-17 -1.5708" />
-    <parent link="chinese_camera_3_pivot" />
-    <child link="chinese_camera_3" />
-  </joint>
-  <joint name="joint_fixed" type="fixed">
-    <origin xyz="0.31746 0.209 0.221123" rpy="0 0 0" />
-    <parent link="Core" />
-    <child link="dji_mid360_pivot" />
-    <axis xyz="0 0 1" />
-  </joint>
-  <link name="dji_mid360_pivot" />
-  <joint name="joint_fixed_offset" type="fixed">
-    <origin xyz="-0.00962646 -0.000611322 0.119542" rpy="1.5708 0.737075 -1.49941e-16" />
-    <parent link="dji_mid360_pivot" />
-    <child link="dji_mid360" />
+    <parent link="chinese_camera_7_pivot" />
+    <child link="chinese_camera_7" />
   </joint>
   <link name="vn300_vectornav">
     <visual>
@@ -473,16 +624,4 @@
       </geometry>
     </collision>
   </link>
-  <joint name="joint_fixed_2" type="fixed">
-    <origin xyz="-0.00477682 0.314 0.168809" rpy="0 0 0" />
-    <parent link="Core" />
-    <child link="vn300_vectornav_pivot" />
-    <axis xyz="0 0 1" />
-  </joint>
-  <link name="vn300_vectornav_pivot" />
-  <joint name="joint_fixed_2_offset" type="fixed">
-    <origin xyz="0.00110012 0.0513647 -0.00152608" rpy="1.5708 0 -1.5708" />
-    <parent link="vn300_vectornav_pivot" />
-    <child link="vn300_vectornav" />
-  </joint>
 </robot>
