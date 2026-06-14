@@ -43,7 +43,11 @@ class HttpClient:
 
             url = self._base_url + endpoint
 
-            def _on_event(_value, _url=url, _method=method, _body=body, _timeout=timeout):
+            trigger = action.get("trigger_value", None)
+
+            def _on_event(value, _url=url, _method=method, _body=body, _timeout=timeout, _trigger=trigger):
+                if _trigger is not None and str(value) != str(_trigger):
+                    return
                 threading.Thread(
                     target=self._fire,
                     args=(_url, _method, _body, _timeout),

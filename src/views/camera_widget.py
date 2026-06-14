@@ -16,9 +16,27 @@ from src.views.rtsp_view import RTSPView
 from src.views.web_camera_view import WebCameraView
 
 
-def _rtsp_reachable(ip: str, port: int = 554, timeout: float = 1.5) -> bool:
+def _parse_rtsp_ip(rtsp_ip: str) -> tuple[str, int, str]:
+    """Parse 'host', 'host:port', or 'host:port/path' → (host, port, path)."""
+    path = ""
+    if "/" in rtsp_ip:
+        host_part, path = rtsp_ip.split("/", 1)
+        path = "/" + path
+    else:
+        host_part = rtsp_ip
+    if ":" in host_part:
+        host, port_str = host_part.rsplit(":", 1)
+        try:
+            return host, int(port_str), path
+        except ValueError:
+            pass
+    return host_part, 554, path
+
+
+def _rtsp_reachable(rtsp_ip: str, timeout: float = 1.5) -> bool:
+    host, port, _ = _parse_rtsp_ip(rtsp_ip)
     try:
-        with socket.create_connection((ip, port), timeout=timeout):
+        with socket.create_connection((host, port), timeout=timeout):
             return True
     except OSError:
         return False
@@ -333,7 +351,11 @@ class CameraWidget:
             webcam_view.send_vtx_command(vtx_id, self._vtx_host, self._vtx_port)
 
         if rtsp_ip:
-            rtsp_source = cam.get("rtsp_source", f"rtsp://{rtsp_ip}:554/")
+            if "rtsp_source" in cam:
+                rtsp_source = cam["rtsp_source"]
+            else:
+                host, port, path = _parse_rtsp_ip(rtsp_ip)
+                rtsp_source = f"rtsp://{host}:{port}{path or '/'}"
             rtsp_view: RTSPView = self._views["rtsp"]  # type: ignore[assignment]
             rtsp_view.set_source(rtsp_source)
 

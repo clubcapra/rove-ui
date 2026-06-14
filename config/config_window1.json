@@ -18,7 +18,7 @@
   "udp_clients": [
     {
       "type": "udp_poll", "name": "odrive_32",
-      "base_url": "http://192.168.2.2:8080",
+      "base_url": "http://192.168.2.5:8080",
       "discovery_endpoint": "/discover",
       "discovery_sensor_id": "odrive_32",
       "discovery_port_field": "data_port",
@@ -29,7 +29,7 @@
     },
     {
       "type": "udp_poll", "name": "odrive_33",
-      "base_url": "http://192.168.2.2:8080",
+      "base_url": "http://192.168.2.5:8080",
       "discovery_endpoint": "/discover",
       "discovery_sensor_id": "odrive_33",
       "discovery_port_field": "data_port",
@@ -40,7 +40,7 @@
     },
     {
       "type": "udp_poll", "name": "odrive_34",
-      "base_url": "http://192.168.2.2:8080",
+      "base_url": "http://192.168.2.5:8080",
       "discovery_endpoint": "/discover",
       "discovery_sensor_id": "odrive_34",
       "discovery_port_field": "data_port",
@@ -51,7 +51,7 @@
     },
     {
       "type": "udp_poll", "name": "odrive_31",
-      "base_url": "http://192.168.2.2:8080",
+      "base_url": "http://192.168.2.5:8080",
       "discovery_endpoint": "/discover",
       "discovery_sensor_id": "odrive_31",
       "discovery_port_field": "data_port",
@@ -61,8 +61,52 @@
       "rediscovery_interval_s": 30, "enabled": true
     },
     {
+      "type": "udp_poll", "name": "odrive_41",
+      "base_url": "http://192.168.2.5:8080",
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "odrive_41",
+      "discovery_port_field": "data_port",
+      "topic": "odrive.41", "topic_prefix": "odrive.41",
+      "proto_type": "DriveNodeState", "publish_field_topics": true,
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
+    },
+    {
+      "type": "udp_poll", "name": "odrive_42",
+      "base_url": "http://192.168.2.5:8080",
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "odrive_42",
+      "discovery_port_field": "data_port",
+      "topic": "odrive.42", "topic_prefix": "odrive.42",
+      "proto_type": "DriveNodeState", "publish_field_topics": true,
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
+    },
+    {
+      "type": "udp_poll", "name": "odrive_43",
+      "base_url": "http://192.168.2.5:8080",
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "odrive_43",
+      "discovery_port_field": "data_port",
+      "topic": "odrive.43", "topic_prefix": "odrive.43",
+      "proto_type": "DriveNodeState", "publish_field_topics": true,
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
+    },
+    {
+      "type": "udp_poll", "name": "odrive_44",
+      "base_url": "http://192.168.2.5:8080",
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "odrive_44",
+      "discovery_port_field": "data_port",
+      "topic": "odrive.44", "topic_prefix": "odrive.44",
+      "proto_type": "DriveNodeState", "publish_field_topics": true,
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
+    },
+    {
       "type": "udp_poll", "name": "vn300",
-      "base_url": "http://192.168.2.2:8080",
+      "base_url": "http://192.168.2.5:8080",
       "discovery_endpoint": "/discover",
       "discovery_sensor_id": "vectornav_ttyUSB_VN300",
       "discovery_port_field": "data_port",
@@ -73,7 +117,7 @@
     },
     {
       "type": "udp_poll", "name": "kinova_arm",
-      "base_url": "http://192.168.2.2:8080",
+      "base_url": "http://192.168.2.5:8080",
       "discovery_endpoint": "/discover",
       "discovery_sensor_id": "kinova_arm",
       "discovery_port_field": "data_port",
@@ -90,12 +134,27 @@
     {
       "type": "http_action",
       "name": "mapping",
-      "base_url": "http://192.168.2.3",
+      "base_url": "http://192.168.2.5",
       "actions": [
         {"topic": "mapping.go",      "method": "POST", "endpoint": "/mapping/go"},
         {"topic": "mapping.pause",   "method": "POST", "endpoint": "/mapping/pause"},
         {"topic": "mapping.restart", "method": "POST", "endpoint": "/mapping/restart"},
         {"topic": "mapping.export",  "method": "POST", "endpoint": "/mapping/export"}
+      ]
+    },
+    {
+      "type": "http_action",
+      "name": "odrive_estop",
+      "base_url": "http://192.168.2.5:8080",
+      "actions": [
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_31/estop"},
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_32/estop"},
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_33/estop"},
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_34/estop"},
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_41/estop"},
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_42/estop"},
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_43/estop"},
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_44/estop"}
       ]
     }
   ],
@@ -125,7 +184,7 @@
           "toggle": true,
           "color": "#ff3d3d"
         },
-        {"label": "MAPPING GO",    "event": "mapping.go",      "value": "1", "color": "#00e676"},
+        {"label": "MAPPING START",    "event": "mapping.go",      "value": "1", "color": "#00e676"},
         {"label": "MAPPING PAUSE", "event": "mapping.pause",   "value": "1", "color": "#ffae00"},
         {"label": "EXPORT MAP",    "event": "mapping.export",  "value": "1", "color": "#1a6fff"},
         {"label": "RESTART MAP",   "event": "mapping.restart", "value": "1", "color": "#ff3d3d"}
@@ -147,17 +206,17 @@
             "mode": "rtsp",
             "hide_controls": true,
             "select_topic": "camera.select",
-            "vtx_host": "192.168.2.2",
+            "vtx_host": "192.168.2.5",
             "vtx_port": 5540,
             "cameras": [
-              {"name": "ARM_CAM",   "udp_vtx_id": 0, "rtsp_ip": "192.168.2.36"},
-              {"name": "REAR_CAM",  "udp_vtx_id": 1, "rtsp_ip": "192.168.2.31"},
-              {"name": "LEFT_CAM",  "udp_vtx_id": 2, "rtsp_ip": "192.168.2.32"},
-              {"name": "RIGHT_CAM", "udp_vtx_id": 3, "rtsp_ip": "192.168.2.33"},
-              {"name": "BACK_CAM",  "udp_vtx_id": 4, "rtsp_ip": "192.168.2.34"},
-              {"name": "FRONT_CAM", "udp_vtx_id": 5, "rtsp_ip": "192.168.2.35"}
+              {"name": "ARM_CAM",   "udp_vtx_id": 0, "rtsp_ip": "192.168.2.5:8554/cam_arm"},
+              {"name": "REAR_CAM",  "udp_vtx_id": 1, "rtsp_ip": "192.168.2.5:8554/cam_rear"},
+              {"name": "LEFT_CAM",  "udp_vtx_id": 2, "rtsp_ip": "192.168.2.5:8554/cam_left"},
+              {"name": "RIGHT_CAM", "udp_vtx_id": 3, "rtsp_ip": "192.168.2.5:8554/cam_right"},
+              {"name": "BACK_CAM",  "udp_vtx_id": 4, "rtsp_ip": "192.168.2.5:8554/cam_back"},
+              {"name": "FRONT_CAM", "udp_vtx_id": 5, "rtsp_ip": "192.168.2.5:8554/cam_front"}
             ],
-            "rtsp":      { "source": "rtsp://192.168.2.30:554/", "source_type": "rtsp" },
+            "rtsp":      { "source": "rtsp://192.168.2.5:8554/cam_arm", "source_type": "rtsp", "codec": "h264" },
             "webcamera": {
               "device_path": "/dev/video0",
               "responsive":  { "aspect_ratio": "4:3", "overflow_anchor": "center" }
@@ -216,10 +275,14 @@
             },
             "controls": {
               "thermal_links": [
-                {"link": "DrumFL", "topic": "odrive.32.motor_temp", "min_temp": 20, "max_temp": 80},
-                {"link": "DrumBL", "topic": "odrive.33.motor_temp", "min_temp": 20, "max_temp": 80},
-                {"link": "DrumFR", "topic": "odrive.34.motor_temp", "min_temp": 20, "max_temp": 80},
-                {"link": "DrumBR", "topic": "odrive.31.motor_temp", "min_temp": 20, "max_temp": 80}
+                {"link": "DrumFL",    "topic": "odrive.32.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "DrumBL",    "topic": "odrive.33.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "DrumFR",    "topic": "odrive.34.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "DrumBR",    "topic": "odrive.31.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "FlipperFL", "topic": "odrive.41.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "FlipperBL", "topic": "odrive.42.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "FlipperFR", "topic": "odrive.43.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "FlipperBR", "topic": "odrive.44.motor_temp", "min_temp": 20, "max_temp": 80}
               ],
               "joint_angles": [
                 {"joint": "joint_revolute_9",  "topic": "kinova_arm.joint_1_pos", "scale": 0.01745,  "offset": 1.5708},
@@ -280,10 +343,14 @@
             "label_key": "Parameter",
             "value_key": "Value",
             "data": [
-              {"Parameter": "FL", "Value": 0, "unit": "turns", "topic": "odrive.32.pos_estimate"},
-              {"Parameter": "RL", "Value": 0, "unit": "turns", "topic": "odrive.33.pos_estimate"},
-              {"Parameter": "FR", "Value": 0, "unit": "turns", "topic": "odrive.34.pos_estimate"},
-              {"Parameter": "RR", "Value": 0, "unit": "turns", "topic": "odrive.31.pos_estimate"}
+              {"Parameter": "DrumFL", "Value": 0, "unit": "turns", "topic": "odrive.32.pos_estimate"},
+              {"Parameter": "DrumBL", "Value": 0, "unit": "turns", "topic": "odrive.33.pos_estimate"},
+              {"Parameter": "DrumFR", "Value": 0, "unit": "turns", "topic": "odrive.34.pos_estimate"},
+              {"Parameter": "DrumBR", "Value": 0, "unit": "turns", "topic": "odrive.31.pos_estimate"},
+              {"Parameter": "FlipFL", "Value": 0, "unit": "turns", "topic": "odrive.41.pos_estimate"},
+              {"Parameter": "FlipBL", "Value": 0, "unit": "turns", "topic": "odrive.42.pos_estimate"},
+              {"Parameter": "FlipFR", "Value": 0, "unit": "turns", "topic": "odrive.43.pos_estimate"},
+              {"Parameter": "FlipBR", "Value": 0, "unit": "turns", "topic": "odrive.44.pos_estimate"}
             ]
           },
           "grid": { "row": 0, "column": 0 }
@@ -299,10 +366,14 @@
             "label_key": "Parameter",
             "value_key": "Value",
             "data": [
-              {"Parameter": "FL", "Value": 0, "unit": "°C", "topic": "odrive.32.motor_temp"},
-              {"Parameter": "RL", "Value": 0, "unit": "°C", "topic": "odrive.33.motor_temp"},
-              {"Parameter": "FR", "Value": 0, "unit": "°C", "topic": "odrive.34.motor_temp"},
-              {"Parameter": "RR", "Value": 0, "unit": "°C", "topic": "odrive.31.motor_temp"}
+              {"Parameter": "DrumFL", "Value": 0, "unit": "°C", "topic": "odrive.32.motor_temp"},
+              {"Parameter": "DrumBL", "Value": 0, "unit": "°C", "topic": "odrive.33.motor_temp"},
+              {"Parameter": "DrumFR", "Value": 0, "unit": "°C", "topic": "odrive.34.motor_temp"},
+              {"Parameter": "DrumBR", "Value": 0, "unit": "°C", "topic": "odrive.31.motor_temp"},
+              {"Parameter": "FlipFL", "Value": 0, "unit": "°C", "topic": "odrive.41.motor_temp"},
+              {"Parameter": "FlipBL", "Value": 0, "unit": "°C", "topic": "odrive.42.motor_temp"},
+              {"Parameter": "FlipFR", "Value": 0, "unit": "°C", "topic": "odrive.43.motor_temp"},
+              {"Parameter": "FlipBR", "Value": 0, "unit": "°C", "topic": "odrive.44.motor_temp"}
             ]
           },
           "grid": { "row": 0, "column": 1 }
@@ -318,10 +389,14 @@
             "label_key": "Parameter",
             "value_key": "Value",
             "data": [
-              {"Parameter": "FL", "Value": 0, "unit": "°C", "topic": "odrive.32.fet_temp"},
-              {"Parameter": "RL", "Value": 0, "unit": "°C", "topic": "odrive.33.fet_temp"},
-              {"Parameter": "FR", "Value": 0, "unit": "°C", "topic": "odrive.34.fet_temp"},
-              {"Parameter": "RR", "Value": 0, "unit": "°C", "topic": "odrive.31.fet_temp"}
+              {"Parameter": "DrumFL", "Value": 0, "unit": "°C", "topic": "odrive.32.fet_temp"},
+              {"Parameter": "DrumBL", "Value": 0, "unit": "°C", "topic": "odrive.33.fet_temp"},
+              {"Parameter": "DrumFR", "Value": 0, "unit": "°C", "topic": "odrive.34.fet_temp"},
+              {"Parameter": "DrumBR", "Value": 0, "unit": "°C", "topic": "odrive.31.fet_temp"},
+              {"Parameter": "FlipFL", "Value": 0, "unit": "°C", "topic": "odrive.41.fet_temp"},
+              {"Parameter": "FlipBL", "Value": 0, "unit": "°C", "topic": "odrive.42.fet_temp"},
+              {"Parameter": "FlipFR", "Value": 0, "unit": "°C", "topic": "odrive.43.fet_temp"},
+              {"Parameter": "FlipBR", "Value": 0, "unit": "°C", "topic": "odrive.44.fet_temp"}
             ]
           },
           "grid": { "row": 1, "column": 0 }
@@ -344,6 +419,16 @@
               "chinese_camera": "#202028", "chinese_camera_2": "#202028", "chinese_camera_3": "#202028"
             },
             "controls": {
+              "thermal_links": [
+                {"link": "DrumFL",    "topic": "odrive.32.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "DrumBL",    "topic": "odrive.33.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "DrumFR",    "topic": "odrive.34.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "DrumBR",    "topic": "odrive.31.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "FlipperFL", "topic": "odrive.41.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "FlipperBL", "topic": "odrive.42.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "FlipperFR", "topic": "odrive.43.motor_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "FlipperBR", "topic": "odrive.44.motor_temp", "min_temp": 20, "max_temp": 80}
+              ],
               "joint_angles": [
                 {"joint": "joint_revolute_9",  "topic": "kinova_arm.joint_1_pos", "scale": 0.01745,  "offset": 1.5708},
                 {"joint": "joint_revolute_10", "topic": "kinova_arm.joint_2_pos", "scale": -0.01745, "offset": 0},
@@ -410,11 +495,16 @@
       "content": [
         {
           "type": "input_manager",
-          "name": "gamepad",
+          "name": "teleop",
           "data": {
-            "default_config": "config/input_config.yml",
-            "udp_host": "192.168.2.2",
-            "udp_port": 9000
+            "package_dir": "/home/william/projets/control/capra_steamdeck",
+            "host": "192.168.2.5",
+            "port": 9101,
+            "device": "xbox",
+            "strategy": "arcade_drive",
+            "rate": 100.0,
+            "no_haptics": false,
+            "no_ui": true
           }
         }
       ]
