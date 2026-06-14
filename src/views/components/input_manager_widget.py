@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QProcess, QProcessEnvironment
+import threading
+from typing import Optional
+
+from PySide6.QtCore import Qt, QTimer, Signal, QObject
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -18,27 +21,39 @@ from src.controller.event_bus import EventBus
 from src.views import theme
 
 _DEVICES = ["xbox", "steamdeck"]
-_STRATEGIES = ["arcade_drive", "tank_drive", "arm_control", "arcade_arm"]
+_STRATEGIES = {
+    "arcade_drive": "ArcadeDriveStrategy",
+    "tank_drive":   "TankDriveStrategy",
+    "arm_control":  "ArmControlStrategy",
+    "arcade_arm":   "ArcadeArmStrategy",
+}
+_MAX_LOG_LINES = 600
 
-_MAX_LOG_LINES = 500
+
+class _Emitter(QObject):
+    log_line = Signal(str)
+    status_changed = Signal(bool)   # True = running
 
 
 class InputManagerWidget(QWidget):
-    """Subprocess launcher for capra_teleop_interface.
+    """Teleop controller manager.
 
-    Spawns `python3 -m capra_teleop_interface` with the configured args and
-    streams its stdout/stderr into a live log area.
+    Builds and runs an xbox/steamdeck controller (from src.controller.teleop)
+    in a background thread, streaming RoveControl protobuf at 100 Hz.
     """
 
     def __init__(self, config: dict, event_bus: EventBus | None = None, parent=None) -> None:
         super().__init__(parent)
         self._cfg = config
         self.event_bus = event_bus or EventBus()
-        self._process = QProcess(self)
-        self._process.readyReadStandardOutput.connect(self._on_stdout)
-        self._process.readyReadStandardError.connect(self._on_stderr)
-        self._process.finished.connect(self._on_finished)
+        self._controller = None
+        self._thread: Optional[threading.Thread] = None
+        self._emitter = _Emitter()
+        self._emitter.log_line.connect(self._append_log)
+        self._emitter.status_changed.connect(self._set_running)
+
         self._build_ui()
+        self.event_bus.subscribe("estop_status", self._on_estop)
 
     # ------------------------------------------------------------------
     # UI
@@ -49,11 +64,10 @@ class InputManagerWidget(QWidget):
         root.setContentsMargins(12, 12, 12, 12)
         root.setSpacing(8)
 
-        # ── Title ─────────────────────────────────────────────────────
         title = QLabel("◆ TELEOP CONTROLLER")
         title.setStyleSheet(
             f"color: {theme.CYAN}; font-size: 11px; font-family: 'Courier New'; "
-            f"letter-spacing: 1px; background: transparent;"
+            "letter-spacing: 1px; background: transparent;"
         )
         root.addWidget(title)
 
@@ -61,7 +75,7 @@ class InputManagerWidget(QWidget):
         sep.setStyleSheet(f"color: {theme.BORDER_DIM};")
         root.addWidget(sep)
 
-        # ── Config form ───────────────────────────────────────────────
+        # ── Config ────────────────────────────────────────────────────
         form = QVBoxLayout(); form.setSpacing(4)
 
         self._host_edit = QLineEdit(str(self._cfg.get("host", "192.168.2.5")))
@@ -74,21 +88,27 @@ class InputManagerWidget(QWidget):
 
         self._device_combo = QComboBox()
         self._device_combo.addItems(_DEVICES)
-        device = str(self._cfg.get("device", "xbox"))
-        if device in _DEVICES:
-            self._device_combo.setCurrentText(device)
+        dev = str(self._cfg.get("device", "xbox"))
+        if dev in _DEVICES:
+            self._device_combo.setCurrentText(dev)
         form.addLayout(self._field("Device", self._device_combo))
 
         self._strategy_combo = QComboBox()
-        self._strategy_combo.addItems(_STRATEGIES)
-        strategy = str(self._cfg.get("strategy", "arcade_drive"))
-        if strategy in _STRATEGIES:
-            self._strategy_combo.setCurrentText(strategy)
+        self._strategy_combo.addItems(list(_STRATEGIES.keys()))
+        strat = str(self._cfg.get("strategy", "arcade_drive"))
+        if strat in _STRATEGIES:
+            self._strategy_combo.setCurrentText(strat)
         form.addLayout(self._field("Strategy", self._strategy_combo))
+
+        self._rate_spin = QSpinBox()
+        self._rate_spin.setRange(1, 200)
+        self._rate_spin.setSuffix(" Hz")
+        self._rate_spin.setValue(int(self._cfg.get("rate", 100)))
+        form.addLayout(self._field("Rate", self._rate_spin))
 
         root.addLayout(form)
 
-        # ── Status + buttons ──────────────────────────────────────────
+        # ── Status row ────────────────────────────────────────────────
         ctrl = QHBoxLayout(); ctrl.setSpacing(8)
 
         self._status_dot = QLabel("●")
@@ -100,7 +120,8 @@ class InputManagerWidget(QWidget):
 
         self._status_label = QLabel("stopped")
         self._status_label.setStyleSheet(
-            f"color: {theme.TEXT_DIM}; font-size: 10px; font-family: 'Courier New'; background: transparent;"
+            f"color: {theme.TEXT_DIM}; font-size: 10px; "
+            "font-family: 'Courier New'; background: transparent;"
         )
         ctrl.addWidget(self._status_label, 1)
 
@@ -121,12 +142,12 @@ class InputManagerWidget(QWidget):
         sep2.setStyleSheet(f"color: {theme.BORDER_DIM};")
         root.addWidget(sep2)
 
-        # ── Log area ──────────────────────────────────────────────────
+        # ── Log ───────────────────────────────────────────────────────
         self._log = QPlainTextEdit()
         self._log.setReadOnly(True)
         self._log.setStyleSheet(
             f"background: {theme.BG_DARK}; color: {theme.TEXT}; "
-            f"font-family: 'Courier New'; font-size: 10px; border: none;"
+            "font-family: 'Courier New'; font-size: 10px; border: none;"
         )
         self._log.setMaximumBlockCount(_MAX_LOG_LINES)
         root.addWidget(self._log, 1)
@@ -140,80 +161,96 @@ class InputManagerWidget(QWidget):
         row = QHBoxLayout(); row.setSpacing(8)
         lbl = QLabel(label)
         lbl.setFixedWidth(70)
-        lbl.setStyleSheet(f"color: {theme.TEXT_DIM}; font-size: 10px; font-family: 'Courier New'; background: transparent;")
+        lbl.setStyleSheet(
+            f"color: {theme.TEXT_DIM}; font-size: 10px; "
+            "font-family: 'Courier New'; background: transparent;"
+        )
         row.addWidget(lbl)
         row.addWidget(widget, 1)
         return row
 
     # ------------------------------------------------------------------
-    # Process control
-
-    def _build_args(self) -> list[str]:
-        args = [
-            "-m", "capra_teleop_interface",
-            "--host", self._host_edit.text().strip(),
-            "--port", str(self._port_spin.value()),
-            "--device", self._device_combo.currentText(),
-            "--strategy", self._strategy_combo.currentText(),
-            "--rate", str(float(self._cfg.get("rate", 100.0))),
-            "--no-ui",
-        ]
-        if self._cfg.get("no_haptics", False):
-            args.append("--no-haptics")
-        return args
+    # Controller lifecycle
 
     def _start(self) -> None:
-        if self._process.state() != QProcess.ProcessState.NotRunning:
+        if self._thread and self._thread.is_alive():
             return
 
-        package_dir = str(self._cfg.get("package_dir", "."))
-        self._process.setWorkingDirectory(package_dir)
+        host = self._host_edit.text().strip()
+        port = self._port_spin.value()
+        device_key = self._device_combo.currentText()
+        strategy_key = self._strategy_combo.currentText()
+        rate = float(self._rate_spin.value())
+        no_haptics = bool(self._cfg.get("no_haptics", False))
 
-        env = QProcessEnvironment.systemEnvironment()
-        self._process.setProcessEnvironment(env)
+        self._append_log(f"Starting {device_key} / {strategy_key} → {host}:{port}")
 
-        args = self._build_args()
-        self._log.appendPlainText(f"$ python3 {' '.join(args)}")
-        self._process.start("python3", args)
+        try:
+            from src.controller.teleop.controllers import XboxController, SteamDeckController
+            from src.controller.teleop.strategies import (
+                ArcadeDriveStrategy, TankDriveStrategy,
+                ArmControlStrategy, ArcadeArmStrategy,
+            )
+            from src.controller.teleop.network.udp_sender import UdpSender, UdpEndpoint
 
-        if not self._process.waitForStarted(3000):
-            self._log.appendPlainText("[ERROR] Failed to start process")
+            strategy_map = {
+                "arcade_drive": ArcadeDriveStrategy,
+                "tank_drive":   TankDriveStrategy,
+                "arm_control":  ArmControlStrategy,
+                "arcade_arm":   ArcadeArmStrategy,
+            }
+            device_map = {
+                "xbox":       XboxController,
+                "steamdeck":  SteamDeckController,
+            }
+
+            endpoint = UdpEndpoint(host=host, port=port)
+            sender = UdpSender(endpoint)
+            strategy = strategy_map[strategy_key]()
+            device_cls = device_map[device_key]
+
+            self._controller = device_cls(
+                sender=sender,
+                strategy=strategy,
+                rate_hz=rate,
+                haptics_enabled=not no_haptics,
+            )
+        except Exception as exc:
+            self._append_log(f"[ERROR] Failed to build controller: {exc}")
             return
 
-        self._set_running(True)
+        self._emitter.status_changed.emit(True)
+
+        def _run():
+            try:
+                self._controller.run()
+            except Exception as exc:
+                self._emitter.log_line.emit(f"[ERROR] {exc}")
+            finally:
+                self._emitter.status_changed.emit(False)
+                self._emitter.log_line.emit("[controller stopped]")
+
+        self._thread = threading.Thread(target=_run, daemon=True, name="teleop-controller")
+        self._thread.start()
 
     def _stop(self) -> None:
-        if self._process.state() == QProcess.ProcessState.NotRunning:
-            return
-        self._process.terminate()
-        if not self._process.waitForFinished(3000):
-            self._process.kill()
+        if self._controller is not None:
+            self._controller.stop()
 
     # ------------------------------------------------------------------
-    # Process signals
+    # EventBus callbacks
 
-    def _on_stdout(self) -> None:
-        data = self._process.readAllStandardOutput().data().decode(errors="replace")
-        for line in data.splitlines():
-            self._log.appendPlainText(line)
-        self._scroll_to_bottom()
+    def _on_estop(self, value) -> None:
+        if str(value) == "1":
+            self._stop()
 
-    def _on_stderr(self) -> None:
-        data = self._process.readAllStandardError().data().decode(errors="replace")
-        for line in data.splitlines():
-            self._log.appendPlainText(f"[ERR] {line}")
-        self._scroll_to_bottom()
+    # ------------------------------------------------------------------
+    # UI helpers (called from Qt thread)
 
-    def _on_finished(self, exit_code: int, exit_status: QProcess.ExitStatus) -> None:
-        self._set_running(False)
-        self._log.appendPlainText(f"[process exited: code={exit_code}]")
-
-    def _scroll_to_bottom(self) -> None:
+    def _append_log(self, text: str) -> None:
+        self._log.appendPlainText(text)
         sb = self._log.verticalScrollBar()
         sb.setValue(sb.maximum())
-
-    # ------------------------------------------------------------------
-    # State helpers
 
     def _set_running(self, running: bool) -> None:
         color = "#44ff44" if running else theme.TEXT_DIM
@@ -223,7 +260,8 @@ class InputManagerWidget(QWidget):
         )
         self._status_label.setText(label)
         self._status_label.setStyleSheet(
-            f"color: {color}; font-size: 10px; font-family: 'Courier New'; background: transparent;"
+            f"color: {color}; font-size: 10px; "
+            "font-family: 'Courier New'; background: transparent;"
         )
         self._start_btn.setEnabled(not running)
         self._stop_btn.setEnabled(running)
@@ -231,6 +269,7 @@ class InputManagerWidget(QWidget):
         self._port_spin.setEnabled(not running)
         self._device_combo.setEnabled(not running)
         self._strategy_combo.setEnabled(not running)
+        self._rate_spin.setEnabled(not running)
 
     def closeEvent(self, event) -> None:
         self._stop()

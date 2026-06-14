@@ -497,14 +497,12 @@
           "type": "input_manager",
           "name": "teleop",
           "data": {
-            "package_dir": "/home/william/projets/control/capra_steamdeck",
             "host": "192.168.2.5",
             "port": 9101,
             "device": "xbox",
             "strategy": "arcade_drive",
-            "rate": 100.0,
-            "no_haptics": false,
-            "no_ui": true
+            "rate": 100,
+            "no_haptics": false
           }
         }
       ]
