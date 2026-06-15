@@ -352,6 +352,12 @@ class LayoutPanel:
             self._register_child(name, widget)
             return widget
 
+        if vtype == "quit_app":
+            from .components.quit_widget import QuitWidget
+            widget = QuitWidget(name, data, event_bus=self.event_bus)
+            self._register_child(name, widget)
+            return widget
+
         # Placeholder for other view types (table, map, point_cloud, etc.)
         lbl = QLabel(f"Placeholder {vtype}: {name}")
         return lbl

@@ -497,7 +497,7 @@
           "name": "teleop",
           "data": {
             "host": "192.168.2.2",
-            "port": 5005,
+            "port": 5050,
             "device": "xbox",
             "strategy": "arcade_drive",
             "rate": 100,
@@ -526,6 +526,14 @@
       "diaposition": "vertical",
       "content": [
         { "type": "console", "name": "event_log" }
+      ]
+    },
+
+    "EXIT": {
+      "type": "layout",
+      "diaposition": "vertical",
+      "content": [
+        { "type": "quit_app", "name": "quit" }
       ]
     }
 

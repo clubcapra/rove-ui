@@ -23,6 +23,7 @@ from typing import Optional
 from typing import Callable
 
 from .input_model import Button, ControllerInput
+from ..frames import snapshot, snapshot_changed, zero_rove_control
 from ..haptics.base import HapticFeedback, NullHaptic
 from ..network.stuck_detector import StuckDetector
 from ..network.udp_receiver import UdpTorqueReceiver
@@ -60,6 +61,9 @@ class ControllerBase(ABC):
         trigger_deadzone: float = 0.02,
         is_send_allowed: "Callable[[], bool] | None" = None,
         stuck_detector: "Optional[StuckDetector]" = None,
+        send_heartbeat_s: float = 0.1,
+        change_epsilon: float = 0.02,
+        on_frame_sent: "Callable[[object, bool], None] | None" = None,
     ) -> None:
         self._sender = sender
         self._strategy = strategy
@@ -77,6 +81,23 @@ class ControllerBase(ABC):
         # in the UI the operator is in Settings/Data and we must not move
         # the robot. If unset (CLI without UI), default-open.
         self._is_send_allowed = is_send_allowed or (lambda: True)
+
+        # --- Send policy: "on change + held heartbeat" ------------------
+        # Rather than blasting an identical frame every tick, we send when the
+        # command changes, and while a control is *held* (non-idle) we re-send
+        # at ``send_heartbeat_s`` intervals so the push-based robot keeps
+        # getting fresh packets. Idle + unchanged => silence.
+        self._send_heartbeat_s = send_heartbeat_s
+        self._change_epsilon = change_epsilon
+        self._on_frame_sent = on_frame_sent
+        self._last_snap: "tuple | None" = None
+        self._last_send_t: float = 0.0
+
+        # --- E-stop: latching local zero + heartbeat --------------------
+        # When engaged, every outgoing frame is zeroed (gripper kept) and we
+        # keep streaming those zeros — even while idle — so the robot actively
+        # halts. Stays latched until ``set_estop(False)``.
+        self._estopped = False
 
     # ---- Template method ----------------------------------------------------
 
@@ -122,18 +143,51 @@ class ControllerBase(ABC):
                 else:
                     msg.gripper.position = self._gripper_latch
 
-                # Push-based control: the robot stops when packets stop
-                # arriving, so suppress frames where nothing is commanded
-                # rather than spam empty telemetry. The send gate is what
-                # the UI's tab selection drives — when the operator is on
-                # Settings/Data, _is_send_allowed returns False and the
-                # frame is dropped here (still built so strategy state
-                # stays coherent for when the gate reopens).
-                if (
-                    not inp.is_idle(self._stick_deadzone, self._trigger_deadzone)
-                    and self._is_send_allowed()
-                ):
+                # E-stop: zero every outgoing frame (gripper kept). The zeroed
+                # frame is itself a "change" the first time it's applied, so it
+                # ships immediately; the heartbeat below keeps streaming zeros
+                # while latched so the robot actively halts.
+                if self._estopped:
+                    zero_rove_control(msg)
+
+                # Send policy: "on change + held heartbeat" (see __init__).
+                #   * command changed         -> send now
+                #   * held (non-idle) & due   -> resend at heartbeat interval
+                #   * E-stopped & due         -> stream zeros even while idle
+                #   * idle & unchanged        -> stay silent (push-based)
+                # The send gate is the UI's Control-tab selector: when the
+                # operator is on Settings/Data, _is_send_allowed() is False and
+                # the frame is dropped here (still built so strategy state stays
+                # coherent for when the gate reopens).
+                now = time.monotonic()
+                snap = snapshot(msg)
+                changed = (
+                    self._last_snap is None
+                    or snapshot_changed(self._last_snap, snap, self._change_epsilon)
+                )
+                held = not inp.is_idle(self._stick_deadzone, self._trigger_deadzone)
+                due = (now - self._last_send_t) >= self._send_heartbeat_s
+
+                should_send = False
+                if self._is_send_allowed():
+                    if self._estopped:
+                        should_send = changed or due
+                    elif held:
+                        should_send = changed or due
+                    elif changed:
+                        # Just released to idle (or otherwise reached zero):
+                        # ship the final frame once so the halt is explicit.
+                        should_send = True
+
+                if should_send:
                     self._sender.send(msg)
+                    self._last_send_t = now
+                    self._last_snap = snap
+                    if self._on_frame_sent is not None:
+                        try:
+                            self._on_frame_sent(msg, changed)
+                        except Exception:  # logging must never kill the loop
+                            pass
 
                 # Haptic priority: stuck-detection wins over torque rumble
                 # because being stuck is the most actionable signal for the
@@ -183,6 +237,20 @@ class ControllerBase(ABC):
         ``lambda: True`` to disable gating.
         """
         self._is_send_allowed = fn
+
+    def set_estop(self, estopped: bool) -> None:
+        """Engage or clear the latching E-stop.
+
+        While engaged, every outgoing frame is zeroed (gripper kept) and the
+        loop keeps streaming zeros so the robot actively halts. The latch holds
+        until this is called with ``False`` (RESUME). Thread-safe: a single
+        bool the send loop reads each tick.
+        """
+        self._estopped = bool(estopped)
+        log.warning("E-STOP %s", "ENGAGED" if estopped else "CLEARED")
+
+    def is_estopped(self) -> bool:
+        return self._estopped
 
     def set_strategy(self, strategy: ControlStrategy) -> None:
         """Hot-swap the active strategy."""

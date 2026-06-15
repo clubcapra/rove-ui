@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from typing import Optional
 
 from PySide6.QtCore import Qt, QTimer, Signal, QObject
@@ -33,6 +34,7 @@ _MAX_LOG_LINES = 600
 class _Emitter(QObject):
     log_line = Signal(str)
     status_changed = Signal(bool)   # True = running
+    estop_changed = Signal(bool)    # True = E-stop engaged
 
 
 class InputManagerWidget(QWidget):
@@ -48,9 +50,11 @@ class InputManagerWidget(QWidget):
         self.event_bus = event_bus or EventBus()
         self._controller = None
         self._thread: Optional[threading.Thread] = None
+        self._last_log_t = 0.0  # throttle heartbeat lines in the log pane
         self._emitter = _Emitter()
         self._emitter.log_line.connect(self._append_log)
         self._emitter.status_changed.connect(self._set_running)
+        self._emitter.estop_changed.connect(self._set_estop_ui)
 
         self._build_ui()
         self.event_bus.subscribe("estop_status", self._on_estop)
@@ -78,12 +82,14 @@ class InputManagerWidget(QWidget):
         # ── Config ────────────────────────────────────────────────────
         form = QVBoxLayout(); form.setSpacing(4)
 
-        self._host_edit = QLineEdit(str(self._cfg.get("host", "192.168.2.5")))
+        self._host_edit = QLineEdit(str(self._cfg.get("host", "192.168.2.2")))
         form.addLayout(self._field("Host", self._host_edit))
 
         self._port_spin = QSpinBox()
         self._port_spin.setRange(1, 65535)
-        self._port_spin.setValue(int(self._cfg.get("port", 9101)))
+        # 5050 is the rover teleop control port (NOT 5005, which is the
+        # gripper command port — see capra_teleop_interface default.yaml).
+        self._port_spin.setValue(int(self._cfg.get("port", 5050)))
         form.addLayout(self._field("Port", self._port_spin))
 
         self._device_combo = QComboBox()
@@ -137,6 +143,15 @@ class InputManagerWidget(QWidget):
         ctrl.addWidget(self._stop_btn)
 
         root.addLayout(ctrl)
+
+        # ── E-stop ────────────────────────────────────────────────────
+        # Latching: engaging zeroes all motion (gripper kept) and keeps
+        # streaming zeros so the robot actively halts; RESUME clears it.
+        self._estop_btn = QPushButton("⏻ E-STOP")
+        self._estop_btn.setEnabled(False)
+        self._estop_btn.clicked.connect(self._toggle_estop)
+        self._style_estop(False)
+        root.addWidget(self._estop_btn)
 
         sep2 = QFrame(); sep2.setFrameShape(QFrame.Shape.HLine)
         sep2.setStyleSheet(f"color: {theme.BORDER_DIM};")
@@ -214,12 +229,15 @@ class InputManagerWidget(QWidget):
                 strategy=strategy,
                 rate_hz=rate,
                 haptics_enabled=not no_haptics,
+                on_frame_sent=self._on_frame_sent,
             )
         except Exception as exc:
             self._append_log(f"[ERROR] Failed to build controller: {exc}")
             return
 
+        self._last_log_t = 0.0
         self._emitter.status_changed.emit(True)
+        self._emitter.estop_changed.emit(False)
 
         def _run():
             try:
@@ -238,11 +256,61 @@ class InputManagerWidget(QWidget):
             self._controller.stop()
 
     # ------------------------------------------------------------------
+    # E-stop
+
+    def _toggle_estop(self) -> None:
+        if self._controller is None:
+            return
+        engage = not self._controller.is_estopped()
+        self._controller.set_estop(engage)
+        self._append_log("*** E-STOP ENGAGED ***" if engage else "--- E-stop cleared (RESUME) ---")
+        self._set_estop_ui(engage)
+
+    def _set_estop_ui(self, engaged: bool) -> None:
+        self._estop_btn.setText("RESUME" if engaged else "⏻ E-STOP")
+        self._style_estop(engaged)
+
+    def _style_estop(self, engaged: bool) -> None:
+        # Red when armed (click to halt); amber when latched (click to resume).
+        accent = "#ffaa00" if engaged else "#ff3333"
+        self._estop_btn.setStyleSheet(
+            f"QPushButton {{ background: {theme.BG_DARK}; color: {accent}; "
+            f"border: 2px solid {accent}; border-radius: 3px; padding: 8px; "
+            f"font-size: 13px; font-weight: bold; font-family: 'Courier New'; "
+            "letter-spacing: 2px; }"
+            f"QPushButton:hover {{ background: {accent}; color: {theme.BG_DARK}; }}"
+            f"QPushButton:disabled {{ color: {theme.TEXT_DIM}; border-color: {theme.BORDER_DIM}; }}"
+        )
+
+    # ------------------------------------------------------------------
     # EventBus callbacks
 
     def _on_estop(self, value) -> None:
-        if str(value) == "1":
-            self._stop()
+        # Drive the latch (engage on "1", clear otherwise) so an app-wide
+        # E-stop signal halts the robot the same way the on-page button does,
+        # instead of killing the controller thread outright.
+        if self._controller is None:
+            return
+        self._controller.set_estop(str(value) == "1")
+        self._emitter.estop_changed.emit(str(value) == "1")
+
+    # ------------------------------------------------------------------
+    # Frame logging (called from the controller thread)
+
+    def _on_frame_sent(self, msg, changed: bool) -> None:
+        # Runs on the teleop thread. Log every change immediately; throttle
+        # held-heartbeat frames to ~2 s so the pane doesn't flood. Marshal to
+        # the Qt thread via the emitter signal.
+        now = time.monotonic()
+        if not changed and (now - self._last_log_t) < 2.0:
+            return
+        self._last_log_t = now
+        from src.controller.teleop.frames import format_frame
+        estopped = self._controller is not None and self._controller.is_estopped()
+        marker = "[ESTOP]" if estopped else ("→" if changed else "·")
+        line = f"{marker} {format_frame(msg)}"
+        self._emitter.log_line.emit(line)
+        print(f"[teleop] {line}")  # also to stdout console
 
     # ------------------------------------------------------------------
     # UI helpers (called from Qt thread)
@@ -265,6 +333,9 @@ class InputManagerWidget(QWidget):
         )
         self._start_btn.setEnabled(not running)
         self._stop_btn.setEnabled(running)
+        self._estop_btn.setEnabled(running)
+        if not running:
+            self._set_estop_ui(False)
         self._host_edit.setEnabled(not running)
         self._port_spin.setEnabled(not running)
         self._device_combo.setEnabled(not running)

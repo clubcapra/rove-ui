@@ -1,0 +1,26 @@
+syntax = "proto3";
+package telemetry;
+import "proto/core/DriveNodeState.proto";
+
+// Subset of capra_jetson_stack/protos/RoveTelemetry.proto. Field numbers
+// match the canonical schema so the wire bytes are interchangeable; we
+// just leave the unused embedded messages off this side. Adding them
+// later (battery, vn300, odrives) is purely a codegen change.
+
+message RoveTelemetry {
+    // 1: OdrivesTelemetry odrives — not decoded on this side yet
+    OvisTelemetry ovis = 2;
+    // 3: Vn300 vn300
+    // 4: Battery battery
+    uint64 timestamp_us = 5;
+    uint32 machine_state = 6;
+}
+
+message OvisTelemetry {
+    DriveNodeState act_1 = 1;
+    DriveNodeState act_2 = 2;
+    DriveNodeState act_3 = 3;
+    DriveNodeState act_4 = 4;
+    DriveNodeState act_5 = 5;
+    DriveNodeState act_6 = 6;
+}
