@@ -1,257 +1,460 @@
-"""
-Input Manager for handling gamepad/joystick inputs.
-
-Processes Joy messages and provides semantic input events based on device mapping.
-Handles button presses, axis movements, deadzones, and threshold conversions.
-"""
-
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from enum import IntEnum
-from typing import Any, Callable, Optional
+import threading
+import time
+from typing import Optional
+
+from PySide6.QtCore import Qt, QTimer, Signal, QObject
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPlainTextEdit,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from src.controller.event_bus import EventBus
+from src.views import theme
+
+_DEVICES = ["xbox", "steamdeck"]
+_STRATEGIES = {
+    "arcade_drive": "ArcadeDriveStrategy",
+    "tank_drive":   "TankDriveStrategy",
+    "arm_control":  "ArmControlStrategy",
+    "arcade_arm":   "ArcadeArmStrategy",
+}
+_STRATEGY_LABELS = {
+    "arcade_drive": "Arcade Drive",
+    "tank_drive":   "Tank Drive",
+    "arm_control":  "Arm Control",
+    "arcade_arm":   "Arcade + Arm",
+}
+_MAX_LOG_LINES = 600
 
 
-class ButtonEvent(IntEnum):
-    """Standard button codes matching evdev conventions."""
-    BUTTON_A = 304
-    BUTTON_B = 305
-    BUTTON_X = 307
-    BUTTON_Y = 308
-    BUTTON_LB = 310
-    BUTTON_RB = 311
-    BUTTON_VIEW = 314
-    BUTTON_MENU = 315
-    BUTTON_SUPER = 316
-    BUTTON_LS = 317
-    BUTTON_RS = 318
+class _Emitter(QObject):
+    log_line = Signal(str)
+    status_changed = Signal(bool)   # True = running
+    estop_changed = Signal(bool)    # True = E-stop engaged
 
 
-@dataclass
-class AxisAsButton:
-    """Converts an axis to a button event when threshold is crossed."""
-    axis_code: int
-    neg_button: int  # Button when value < -threshold (-1 to ignore)
-    pos_button: int  # Button when value > +threshold (-1 to ignore)
-    threshold: float = 0.5
-    _state: int = 0  # Track previous state to detect changes
+class InputManagerWidget(QWidget):
+    """Teleop controller manager.
 
-
-@dataclass
-class DeviceMapping:
-    """Mapping configuration for a specific input device."""
-    name: str
-    udev_path: str
-    device_id: str
-    alias: str
-    enabled: bool = True
-    deadzone: float = 0.05
-    sanitize: bool = True
-    
-    button_map: dict[int, int] = field(default_factory=dict)  # Joy index -> button code
-    axis_map: dict[int, int] = field(default_factory=dict)    # Joy index -> axis code
-    axis_ranges: dict[int, tuple[int, int]] = field(default_factory=dict)  # axis code -> [min, max]
-    axes_as_buttons: list[AxisAsButton] = field(default_factory=list)
-
-
-@dataclass
-class InputState:
-    """Current state of all input values."""
-    buttons: dict[int, int] = field(default_factory=dict)  # button -> state (0/1)
-    axes: dict[int, float] = field(default_factory=dict)   # axis -> normalized value (-1 to 1)
-
-
-class InputManager:
+    Builds and runs an xbox/steamdeck controller (from src.controller.teleop)
+    in a background thread, streaming RoveControl protobuf at 100 Hz.
     """
-    Manages gamepad input processing and distribution.
-    
-    Usage:
-        manager = InputManager(event_bus)
-        manager.set_device_mapping(device_config_dict)
-        manager.process_joy_message(axes, buttons)
-    """
-    
-    def __init__(self, event_bus: EventBus | None = None):
+
+    def __init__(self, config: dict, event_bus: EventBus | None = None, parent=None) -> None:
+        super().__init__(parent)
+        self._cfg = config
         self.event_bus = event_bus or EventBus()
-        self.devices: dict[str, DeviceMapping] = {}
-        self.input_state: dict[str, InputState] = {}
-        
-    def set_device_mapping(self, device_config: dict[str, Any]) -> None:
-        """Load device mapping from configuration dict."""
-        mapping = DeviceMapping(
-            name=device_config.get("name", "Unknown"),
-            udev_path=device_config.get("udev_path", ""),
-            device_id=device_config.get("id", ""),
-            alias=device_config.get("alias", ""),
-            enabled=device_config.get("enabled", True),
-            deadzone=float(device_config.get("deadzone", 0.05)),
-            sanitize=bool(device_config.get("sanitize", True)),
+        self._controller = None
+        self._thread: Optional[threading.Thread] = None
+        self._last_log_t = 0.0  # throttle heartbeat lines in the log pane
+        self._emitter = _Emitter()
+        self._emitter.log_line.connect(self._append_log)
+        self._emitter.status_changed.connect(self._set_running)
+        self._emitter.estop_changed.connect(self._set_estop_ui)
+        self._active_strategy_key: str = str(self._cfg.get("strategy", "arcade_drive"))
+        self._gripper_latch: int = 0  # survives stop/start cycles
+
+        self._build_ui()
+        self.event_bus.subscribe("estop_status", self._on_estop)
+
+    # ------------------------------------------------------------------
+    # UI
+
+    def _build_ui(self) -> None:
+        self.setStyleSheet(f"background: {theme.BG_PANEL}; color: {theme.TEXT};")
+        root = QVBoxLayout(self)
+        root.setContentsMargins(14, 14, 14, 14)
+        root.setSpacing(10)
+
+        title = QLabel("◆ TELEOP CONTROLLER")
+        title.setStyleSheet(
+            f"color: {theme.CYAN}; font-size: 12px; font-family: 'Courier New'; "
+            "letter-spacing: 1px; background: transparent;"
         )
-        
-        # Parse button mapping
-        buttons_cfg = device_config.get("mapping", {}).get("buttons", {})
-        for joy_idx, button_code in buttons_cfg.items():
-            mapping.button_map[int(joy_idx)] = button_code
-        
-        # Parse axis mapping
-        axes_cfg = device_config.get("mapping", {}).get("axes", {})
-        for joy_idx, axis_code in axes_cfg.items():
-            mapping.axis_map[int(joy_idx)] = axis_code
-        
-        # Parse axis ranges for normalization
-        axis_ranges_cfg = device_config.get("mapping", {}).get("axis_ranges", {})
-        for axis_code, range_pair in axis_ranges_cfg.items():
-            mapping.axis_ranges[int(axis_code)] = tuple(range_pair)
-        
-        # Parse axes_as_buttons conversions
-        axes_as_buttons_cfg = device_config.get("mapping", {}).get("axes_as_buttons", [])
-        for aab_cfg in axes_as_buttons_cfg:
-            aab = AxisAsButton(
-                axis_code=int(aab_cfg.get("axis_code", 0)),
-                neg_button=int(aab_cfg.get("neg_button", -1)),
-                pos_button=int(aab_cfg.get("pos_button", -1)),
-                threshold=float(aab_cfg.get("threshold", 0.5)),
-            )
-            mapping.axes_as_buttons.append(aab)
-        
-        self.devices[mapping.alias] = mapping
-        self.input_state[mapping.alias] = InputState()
-        self.event_bus.publish_sync(
-            "log",
-            f"Input device mapping loaded: {mapping.name} ({mapping.alias})",
+        root.addWidget(title)
+
+        sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet(f"color: {theme.BORDER_DIM};")
+        root.addWidget(sep)
+
+        # ── Config ────────────────────────────────────────────────────
+        form = QVBoxLayout(); form.setSpacing(6)
+
+        self._host_edit = QLineEdit(str(self._cfg.get("host", "192.168.2.2")))
+        self._host_edit.setStyleSheet(_input_style())
+        form.addLayout(self._field("Host", self._host_edit))
+
+        self._port_spin = QSpinBox()
+        self._port_spin.setRange(1, 65535)
+        self._port_spin.setValue(int(self._cfg.get("port", 5050)))
+        self._port_spin.setStyleSheet(_input_style())
+        form.addLayout(self._field("Port", self._port_spin))
+
+        self._device_combo = QComboBox()
+        self._device_combo.addItems(_DEVICES)
+        dev = str(self._cfg.get("device", "xbox"))
+        if dev in _DEVICES:
+            self._device_combo.setCurrentText(dev)
+        self._device_combo.setStyleSheet(_input_style())
+        form.addLayout(self._field("Device", self._device_combo))
+
+        self._rate_spin = QSpinBox()
+        self._rate_spin.setRange(1, 200)
+        self._rate_spin.setSuffix(" Hz")
+        self._rate_spin.setValue(int(self._cfg.get("rate", 100)))
+        self._rate_spin.setStyleSheet(_input_style())
+        form.addLayout(self._field("Rate", self._rate_spin))
+
+        root.addLayout(form)
+
+        # ── Strategy selector ─────────────────────────────────────────
+        strat_label = QLabel("STRATEGY")
+        strat_label.setStyleSheet(
+            f"color: {theme.TEXT_DIM}; font-size: 10px; font-family: 'Courier New'; "
+            "letter-spacing: 1px; background: transparent;"
         )
-    
-    def process_joy_message(
-        self,
-        device_alias: str,
-        axes: list[float],
-        buttons: list[int],
-    ) -> None:
-        """
-        Process a Joy message and publish semantic input events.
-        
-        Publishes:
-        - input.{device_alias}.button.{button_code}: 0 or 1
-        - input.{device_alias}.axis.{axis_code}: normalized float (-1 to 1)
-        - input.{device_alias}.pressed.{button_name}: for button presses
-        - input.{device_alias}.released.{button_name}: for button releases
-        """
-        device = self.devices.get(device_alias)
-        if not device or not device.enabled:
-            return
-        
-        state = self.input_state[device_alias]
-        prefix = f"input.{device_alias}"
-        
-        # Process buttons
-        for joy_idx, button_state in enumerate(buttons):
-            button_code = device.button_map.get(joy_idx)
-            if button_code is None:
-                continue
-            
-            prev_state = state.buttons.get(button_code, 0)
-            state.buttons[button_code] = button_state
-            
-            # Publish button state
-            self.event_bus.publish_sync(
-                f"{prefix}.button.{button_code}",
-                button_state,
+        root.addWidget(strat_label)
+
+        self._strategy_btns: dict[str, QPushButton] = {}
+        strat_grid = QGridLayout()
+        strat_grid.setSpacing(5)
+        strat_grid.setContentsMargins(0, 0, 0, 0)
+        keys = list(_STRATEGIES.keys())
+        for i, key in enumerate(keys):
+            btn = QPushButton(_STRATEGY_LABELS[key])
+            btn.setCheckable(True)
+            btn.setMinimumHeight(44)
+            btn.clicked.connect(lambda _checked, k=key: self._on_strategy_selected(k))
+            self._strategy_btns[key] = btn
+            strat_grid.addWidget(btn, i // 2, i % 2)
+
+        active = self._active_strategy_key
+        if active not in self._strategy_btns:
+            active = keys[0]
+            self._active_strategy_key = active
+        for k, b in self._strategy_btns.items():
+            b.setChecked(k == active)
+            self._style_strategy_btn(b, k == active)
+
+        root.addLayout(strat_grid)
+
+        # ── Status row ────────────────────────────────────────────────
+        ctrl = QHBoxLayout(); ctrl.setSpacing(8)
+
+        self._status_dot = QLabel("●")
+        self._status_dot.setFixedWidth(18)
+        self._status_dot.setStyleSheet(
+            f"color: {theme.TEXT_DIM}; font-size: 16px; background: transparent;"
+        )
+        ctrl.addWidget(self._status_dot)
+
+        self._status_label = QLabel("stopped")
+        self._status_label.setStyleSheet(
+            f"color: {theme.TEXT_DIM}; font-size: 11px; "
+            "font-family: 'Courier New'; background: transparent;"
+        )
+        ctrl.addWidget(self._status_label, 1)
+
+        self._start_btn = QPushButton("START")
+        self._start_btn.setMinimumHeight(44)
+        self._start_btn.setStyleSheet(_btn_style("#44ff44"))
+        self._start_btn.clicked.connect(self._start)
+        ctrl.addWidget(self._start_btn)
+
+        self._stop_btn = QPushButton("STOP")
+        self._stop_btn.setMinimumHeight(44)
+        self._stop_btn.setStyleSheet(_btn_style("#ff6666"))
+        self._stop_btn.setEnabled(False)
+        self._stop_btn.clicked.connect(self._stop)
+        ctrl.addWidget(self._stop_btn)
+
+        root.addLayout(ctrl)
+
+        # ── E-stop ────────────────────────────────────────────────────
+        # Latching: engaging zeroes all motion (gripper kept) and keeps
+        # streaming zeros so the robot actively halts; RESUME clears it.
+        self._estop_btn = QPushButton("⏻  E-STOP")
+        self._estop_btn.setMinimumHeight(54)
+        self._estop_btn.setEnabled(False)
+        self._estop_btn.clicked.connect(self._toggle_estop)
+        self._style_estop(False)
+        root.addWidget(self._estop_btn)
+
+        sep2 = QFrame(); sep2.setFrameShape(QFrame.Shape.HLine)
+        sep2.setStyleSheet(f"color: {theme.BORDER_DIM};")
+        root.addWidget(sep2)
+
+        # ── Log ───────────────────────────────────────────────────────
+        self._log = QPlainTextEdit()
+        self._log.setReadOnly(True)
+        self._log.setStyleSheet(
+            f"background: {theme.BG_DARK}; color: {theme.TEXT}; "
+            "font-family: 'Courier New'; font-size: 10px; border: none;"
+        )
+        self._log.setMaximumBlockCount(_MAX_LOG_LINES)
+        root.addWidget(self._log, 1)
+
+        clr = QPushButton("CLEAR LOG")
+        clr.setMinimumHeight(36)
+        clr.setStyleSheet(_btn_style(theme.TEXT_DIM))
+        clr.clicked.connect(self._log.clear)
+        root.addWidget(clr)
+
+    def _field(self, label: str, widget: QWidget) -> QHBoxLayout:
+        row = QHBoxLayout(); row.setSpacing(10)
+        lbl = QLabel(label)
+        lbl.setFixedWidth(56)
+        lbl.setStyleSheet(
+            f"color: {theme.TEXT_DIM}; font-size: 11px; "
+            "font-family: 'Courier New'; background: transparent;"
+        )
+        row.addWidget(lbl)
+        row.addWidget(widget, 1)
+        return row
+
+    def _style_strategy_btn(self, btn: QPushButton, active: bool) -> None:
+        if active:
+            btn.setStyleSheet(
+                f"QPushButton {{ background: {theme.BG_DARK}; color: {theme.CYAN}; "
+                f"border: 2px solid {theme.CYAN}; border-radius: 4px; "
+                f"font-size: 13px; font-family: 'Courier New'; font-weight: bold; }}"
+                f"QPushButton:hover {{ background: {theme.BG_SURFACE}; }}"
             )
-            #Logging for debugging
-            self.event_bus.publish_sync(
-                "log",
-                f"Button state changed: {button_code} = {button_state}"
+        else:
+            btn.setStyleSheet(
+                f"QPushButton {{ background: {theme.BG_DARK}; color: {theme.TEXT}; "
+                f"border: 1px solid {theme.BORDER}; border-radius: 4px; "
+                f"font-size: 13px; font-family: 'Courier New'; }}"
+                f"QPushButton:hover {{ border-color: {theme.CYAN}; color: {theme.CYAN}; }}"
+                f"QPushButton:pressed {{ background: {theme.BG_SURFACE}; }}"
             )
 
-            # Publish press/release events
-            if button_state and not prev_state:
-                self.event_bus.publish_sync(f"{prefix}.pressed.{button_code}", True)
-            elif not button_state and prev_state:
-                self.event_bus.publish_sync(f"{prefix}.released.{button_code}", True)
-        
-        # Process axes
-        for joy_idx, raw_value in enumerate(axes):
-            axis_code = device.axis_map.get(joy_idx)
-            if axis_code is None:
-                continue
-            
-            # Normalize axis value
-            normalized = self._normalize_axis(device, axis_code, raw_value)
-            
-            # Apply deadzone
-            if abs(normalized) < device.deadzone:
-                normalized = 0.0
-            
-            prev_value = state.axes.get(axis_code, 0.0)
-            state.axes[axis_code] = normalized
-            
-            # Publish axis value
-            self.event_bus.publish_sync(
-                f"{prefix}.axis.{axis_code}",
-                normalized,
+    # ------------------------------------------------------------------
+    # Strategy hot-swap
+
+    def _on_strategy_selected(self, key: str) -> None:
+        if key == self._active_strategy_key:
+            # Re-check the active button so it stays visually selected
+            self._strategy_btns[key].setChecked(True)
+            return
+
+        self._active_strategy_key = key
+        for k, b in self._strategy_btns.items():
+            b.setChecked(k == key)
+            self._style_strategy_btn(b, k == key)
+
+        if self._controller is not None:
+            try:
+                from src.controller.teleop.strategies import (
+                    ArcadeDriveStrategy, TankDriveStrategy,
+                    ArmControlStrategy, ArcadeArmStrategy,
+                )
+                strategy_map = {
+                    "arcade_drive": ArcadeDriveStrategy,
+                    "tank_drive":   TankDriveStrategy,
+                    "arm_control":  ArmControlStrategy,
+                    "arcade_arm":   ArcadeArmStrategy,
+                }
+                new_strategy = strategy_map[key]()
+                self._controller.set_strategy(new_strategy)
+                self._append_log(f"→ strategy: {key}")
+            except Exception as exc:
+                self._append_log(f"[ERROR] strategy switch failed: {exc}")
+
+    # ------------------------------------------------------------------
+    # Controller lifecycle
+
+    def _start(self) -> None:
+        if self._thread and self._thread.is_alive():
+            return
+
+        host = self._host_edit.text().strip()
+        port = self._port_spin.value()
+        device_key = self._device_combo.currentText()
+        strategy_key = self._active_strategy_key
+        rate = float(self._rate_spin.value())
+        no_haptics = bool(self._cfg.get("no_haptics", False))
+
+        self._append_log(f"Starting {device_key} / {strategy_key} → {host}:{port}")
+
+        try:
+            from src.controller.teleop.controllers import XboxController, SteamDeckController
+            from src.controller.teleop.strategies import (
+                ArcadeDriveStrategy, TankDriveStrategy,
+                ArmControlStrategy, ArcadeArmStrategy,
             )
-            self.event_bus.publish_sync(
-                "log",
-                f"Axis value changed: {axis_code} = {normalized:.3f}"
+            from src.controller.teleop.network.udp_sender import UdpSender, UdpEndpoint
+
+            strategy_map = {
+                "arcade_drive": ArcadeDriveStrategy,
+                "tank_drive":   TankDriveStrategy,
+                "arm_control":  ArmControlStrategy,
+                "arcade_arm":   ArcadeArmStrategy,
+            }
+            device_map = {
+                "xbox":       XboxController,
+                "steamdeck":  SteamDeckController,
+            }
+
+            endpoint = UdpEndpoint(host=host, port=port)
+            sender = UdpSender(endpoint)
+            strategy = strategy_map[strategy_key]()
+            device_cls = device_map[device_key]
+
+            self._controller = device_cls(
+                sender=sender,
+                strategy=strategy,
+                rate_hz=rate,
+                haptics_enabled=not no_haptics,
+                on_frame_sent=self._on_frame_sent,
+                initial_gripper_position=self._gripper_latch,
             )
-        
-        # Process axes_as_buttons conversions
-        for aab in device.axes_as_buttons:
-            axis_value = state.axes.get(aab.axis_code, 0.0)
-            
-            # Check negative threshold
-            if aab.neg_button >= 0:
-                if axis_value < -aab.threshold and aab._state != 1:
-                    aab._state = 1
-                    self.event_bus.publish_sync(
-                        f"{prefix}.pressed.{aab.neg_button}",
-                        True,
-                    )
-                elif axis_value >= -aab.threshold and aab._state == 1:
-                    aab._state = 0
-                    self.event_bus.publish_sync(
-                        f"{prefix}.released.{aab.neg_button}",
-                        True,
-                    )
-            
-            # Check positive threshold
-            if aab.pos_button >= 0:
-                if axis_value > aab.threshold and aab._state != 2:
-                    aab._state = 2
-                    self.event_bus.publish_sync(
-                        f"{prefix}.pressed.{aab.pos_button}",
-                        True,
-                    )
-                elif axis_value <= aab.threshold and aab._state == 2:
-                    aab._state = 0
-                    self.event_bus.publish_sync(
-                        f"{prefix}.released.{aab.pos_button}",
-                        True,
-                    )
-    
-    def _normalize_axis(
-        self,
-        device: DeviceMapping,
-        axis_code: int,
-        raw_value: float,
-    ) -> float:
-        """Normalize raw axis value to [-1, 1] range."""
-        axis_range = device.axis_ranges.get(axis_code)
-        
-        if axis_range is None:
-            # Default normalization (standard -32767 to 32767)
-            return max(-1.0, min(1.0, raw_value / 32767.0))
-        
-        raw_min, raw_max = axis_range
-        
-        # Handle single-sided ranges (like triggers 0-1023)
-        if raw_min == raw_max:
-            return 0.0
-        
-        # Normalize to [-1, 1]
-        normalized = (raw_value - raw_min) / (raw_max - raw_min)
-        normalized = normalized * 2.0 - 1.0  # Convert [0, 1] to [-1, 1]
-        
-        return max(-1.0, min(1.0, normalized))
+        except Exception as exc:
+            self._append_log(f"[ERROR] Failed to build controller: {exc}")
+            return
+
+        self._last_log_t = 0.0
+        self._emitter.status_changed.emit(True)
+        self._emitter.estop_changed.emit(False)
+
+        def _run():
+            try:
+                self._controller.run()
+            except Exception as exc:
+                self._emitter.log_line.emit(f"[ERROR] {exc}")
+            finally:
+                self._emitter.status_changed.emit(False)
+                self._emitter.log_line.emit("[controller stopped]")
+
+        self._thread = threading.Thread(target=_run, daemon=True, name="teleop-controller")
+        self._thread.start()
+
+    def _stop(self) -> None:
+        if self._controller is not None:
+            self._controller.stop()
+
+    # ------------------------------------------------------------------
+    # E-stop
+
+    def _toggle_estop(self) -> None:
+        if self._controller is None:
+            return
+        engage = not self._controller.is_estopped()
+        self._controller.set_estop(engage)
+        self._append_log("*** E-STOP ENGAGED ***" if engage else "--- E-stop cleared (RESUME) ---")
+        self._set_estop_ui(engage)
+
+    def _set_estop_ui(self, engaged: bool) -> None:
+        self._estop_btn.setText("RESUME" if engaged else "⏻  E-STOP")
+        self._style_estop(engaged)
+
+    def _style_estop(self, engaged: bool) -> None:
+        # Red when armed (click to halt); amber when latched (click to resume).
+        accent = "#ffaa00" if engaged else "#ff3333"
+        self._estop_btn.setStyleSheet(
+            f"QPushButton {{ background: {theme.BG_DARK}; color: {accent}; "
+            f"border: 2px solid {accent}; border-radius: 4px; padding: 10px; "
+            f"font-size: 15px; font-weight: bold; font-family: 'Courier New'; "
+            "letter-spacing: 2px; }"
+            f"QPushButton:hover {{ background: {accent}; color: {theme.BG_DARK}; }}"
+            f"QPushButton:disabled {{ color: {theme.TEXT_DIM}; border-color: {theme.BORDER_DIM}; }}"
+        )
+
+    # ------------------------------------------------------------------
+    # EventBus callbacks
+
+    def _on_estop(self, value) -> None:
+        # Drive the latch (engage on "1", clear otherwise) so an app-wide
+        # E-stop signal halts the robot the same way the on-page button does,
+        # instead of killing the controller thread outright.
+        if self._controller is None:
+            return
+        self._controller.set_estop(str(value) == "1")
+        self._emitter.estop_changed.emit(str(value) == "1")
+
+    # ------------------------------------------------------------------
+    # Frame logging (called from the controller thread)
+
+    def _on_frame_sent(self, msg, changed: bool) -> None:
+        # Runs on the teleop thread. Log every change immediately; throttle
+        # held-heartbeat frames to ~2 s so the pane doesn't flood. Marshal to
+        # the Qt thread via the emitter signal.
+        now = time.monotonic()
+        if not changed and (now - self._last_log_t) < 2.0:
+            return
+        self._last_log_t = now
+        from src.controller.teleop.frames import format_frame
+        estopped = self._controller is not None and self._controller.is_estopped()
+        marker = "[ESTOP]" if estopped else ("→" if changed else "·")
+        line = f"{marker} {format_frame(msg)}"
+        self._emitter.log_line.emit(line)
+        print(f"[teleop] {line}")  # also to stdout console
+
+    # ------------------------------------------------------------------
+    # UI helpers (called from Qt thread)
+
+    def _append_log(self, text: str) -> None:
+        self._log.appendPlainText(text)
+        sb = self._log.verticalScrollBar()
+        sb.setValue(sb.maximum())
+
+    def _set_running(self, running: bool) -> None:
+        if not running and self._controller is not None:
+            self._gripper_latch = self._controller.gripper_position
+
+        color = "#44ff44" if running else theme.TEXT_DIM
+        label = "running" if running else "stopped"
+        self._status_dot.setStyleSheet(
+            f"color: {color}; font-size: 16px; background: transparent;"
+        )
+        self._status_label.setText(label)
+        self._status_label.setStyleSheet(
+            f"color: {color}; font-size: 11px; "
+            "font-family: 'Courier New'; background: transparent;"
+        )
+        self._start_btn.setEnabled(not running)
+        self._stop_btn.setEnabled(running)
+        self._estop_btn.setEnabled(running)
+        if not running:
+            self._set_estop_ui(False)
+        # Config fields locked while running; strategy buttons always live.
+        self._host_edit.setEnabled(not running)
+        self._port_spin.setEnabled(not running)
+        self._device_combo.setEnabled(not running)
+        self._rate_spin.setEnabled(not running)
+
+    def closeEvent(self, event) -> None:
+        self._stop()
+        super().closeEvent(event)
+
+
+def _input_style() -> str:
+    return (
+        f"background: {theme.BG_DARK}; color: {theme.TEXT}; "
+        f"border: 1px solid {theme.BORDER}; border-radius: 3px; "
+        f"padding: 6px 10px; font-size: 13px; font-family: 'Courier New'; "
+        "min-height: 36px;"
+    )
+
+
+def _btn_style(accent: str = "") -> str:
+    c = accent or theme.TEXT_DIM
+    return (
+        f"QPushButton {{ background: {theme.BG_DARK}; color: {c}; "
+        f"border: 1px solid {theme.BORDER_DIM}; border-radius: 4px; "
+        f"padding: 8px 18px; font-size: 13px; font-family: 'Courier New'; }}"
+        f"QPushButton:hover {{ border-color: {c}; }}"
+        f"QPushButton:pressed {{ background: {theme.BG_PANEL}; }}"
+        f"QPushButton:disabled {{ color: {theme.TEXT_DIM}; border-color: {theme.BORDER_DIM}; }}"
+    )
