@@ -9,7 +9,7 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background: #1a1a2e;
+            background: #dde0e5;
         }
         #canvas-container {
             width: 100%;
@@ -26,9 +26,9 @@
             gap: 8px;
             padding: 8px;
             border-radius: 8px;
-            background: rgba(8, 12, 28, 0.72);
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            color: #f4f7ff;
+            background: rgba(210,214,220,0.88);
+            border: 1px solid #8e9aaa;
+            color: #1a2230;
             font: 12px/1.2 "Segoe UI", sans-serif;
             pointer-events: none;
             z-index: 10;
@@ -39,13 +39,13 @@
             gap: 6px;
             padding: 3px 6px;
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.06);
+            background: rgba(142,154,170,0.15);
         }
         .legend-swatch {
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            border: 1px solid rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(26,34,48,0.5);
         }
         #edit-panel {
             position: absolute;
@@ -54,9 +54,9 @@
             width: 260px;
             padding: 10px;
             border-radius: 8px;
-            background: rgba(8, 12, 28, 0.82);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #f4f7ff;
+            background: rgba(210,214,220,0.95);
+            border: 1px solid #8e9aaa;
+            color: #1a2230;
             font: 12px/1.4 "Segoe UI", sans-serif;
             z-index: 20;
             user-select: none;
@@ -70,21 +70,21 @@
             margin-bottom: 6px;
         }
         .edit-sub {
-            opacity: 0.85;
+            opacity: 0.75;
             margin-bottom: 8px;
         }
         #save-pivot-btn {
             appearance: none;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            border: 1px solid #5a6a7e;
             border-radius: 6px;
             padding: 6px 10px;
-            background: #1f8f6b;
+            background: #1a7a4a;
             color: #ffffff;
             font: inherit;
             cursor: pointer;
         }
         #save-pivot-btn:hover {
-            background: #25a37b;
+            background: #1e9058;
         }
     </style>
 </head>
@@ -122,7 +122,7 @@
 
     // Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1a2e);
+    scene.background = new THREE.Color(0xdde0e5);
 
     // Camera
     const camera = new THREE.PerspectiveCamera(
@@ -559,7 +559,7 @@
     }
 
     // Grid helper
-    const grid = new THREE.GridHelper(10, 10, 0x444466, 0x333355);
+    const grid = new THREE.GridHelper(10, 10, 0x8e9aaa, 0xb0b8c4);
     scene.add(grid);
 
     // Axes helper

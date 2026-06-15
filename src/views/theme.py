@@ -1,26 +1,26 @@
-# Tactical dark theme constants — Rove Mission Control UI
+# Tactical light theme constants — Rove Mission Control UI
 
 # ── Background layers ─────────────────────────────────────────────────────────
-BG_DEEP    = "#080808"   # window / outermost background
-BG_DARK    = "#0f0f0f"   # panel background
-BG_PANEL   = "#161616"   # elevated surface (header bars, nav)
-BG_SURFACE = "#1e1e1e"   # interactive cells, hover areas
+BG_DEEP    = "#e8eaed"   # window / outermost background
+BG_DARK    = "#dde0e5"   # panel background
+BG_PANEL   = "#d2d6dc"   # elevated surface (header bars, nav)
+BG_SURFACE = "#c5cad2"   # interactive cells, hover areas
 
 # ── Borders ───────────────────────────────────────────────────────────────────
-BORDER_DIM    = "#222222"   # inactive / decorative borders
-BORDER        = "#2e2e2e"   # default borders
-BORDER_BRIGHT = "#484848"   # highlighted / focused borders
+BORDER_DIM    = "#b0b8c4"   # inactive / decorative borders
+BORDER        = "#8e9aaa"   # default borders
+BORDER_BRIGHT = "#5a6a7e"   # highlighted / focused borders
 
 # ── Accent colors ─────────────────────────────────────────────────────────────
-CYAN   = "#ffae00"   # primary active / selected
-GREEN  = "#00e676"   # ok / connected / nominal
-RED    = "#ff3d3d"   # alert / error / e-stop
-AMBER  = "#ffb300"   # warning / degraded
+CYAN   = "#c47000"   # primary active / selected
+GREEN  = "#1a7a4a"   # ok / connected / nominal
+RED    = "#cc2020"   # alert / error / e-stop
+AMBER  = "#c47a00"   # warning / degraded
 
 # ── Text ──────────────────────────────────────────────────────────────────────
-TEXT       = "#d0d8e0"   # primary readable text
-TEXT_DIM   = "#505050"   # secondary / inactive labels
-TEXT_MUTED = "#282828"   # very dim decorative text
+TEXT       = "#1a2230"   # primary readable text
+TEXT_DIM   = "#5a6878"   # secondary / inactive labels
+TEXT_MUTED = "#9aaabb"   # very dim decorative text
 
 # ── Font ──────────────────────────────────────────────────────────────────────
 FONT_MONO = "'Courier New', monospace"
@@ -28,7 +28,7 @@ FONT_MONO = "'Courier New', monospace"
 # ── Scrollbars ────────────────────────────────────────────────────────────────
 _SCROLL = f"""
 QScrollBar:vertical {{
-    background: {BG_DARK}; width: 5px; border: none; margin: 0;
+    background: {BG_PANEL}; width: 5px; border: none; margin: 0;
 }}
 QScrollBar::handle:vertical {{
     background: {BORDER}; border-radius: 2px; min-height: 20px;
@@ -38,7 +38,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
     height: 0; border: 0; background: none;
 }}
 QScrollBar:horizontal {{
-    background: {BG_DARK}; height: 5px; border: none; margin: 0;
+    background: {BG_PANEL}; height: 5px; border: none; margin: 0;
 }}
 QScrollBar::handle:horizontal {{
     background: {BORDER}; border-radius: 2px; min-width: 20px;

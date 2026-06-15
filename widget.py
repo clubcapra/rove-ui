@@ -56,6 +56,8 @@ class Widget(QWidget):
         self._ros2_clients: list[ROS2Client] = []
         self._http_clients: list[HttpClient] = []
         self._bottom_bar: QWidget | None = None
+        self._global_bottom_bar_cfg: list | None = None
+        self._view_bottom_bar_cfgs: dict[str, list | None] = {}
 
 
     def load_config(self, configFile):
@@ -87,6 +89,9 @@ class Widget(QWidget):
 
         self._nav.clear()
 
+        self._global_bottom_bar_cfg = config.get("bottom_bar") or None
+        self._view_bottom_bar_cfgs = {}
+
         for view_name, view_cfg in views_root.items():
             vtype = view_cfg.get("type")
             if vtype == "layout":
@@ -97,20 +102,36 @@ class Widget(QWidget):
             else:
                 page_widget = QLabel(f"Page placeholder: {view_name} ({vtype})")
 
+            view_bar = view_cfg.get("bottom_bar")
+            self._view_bottom_bar_cfgs[view_name] = view_bar
+
             idx = self._stack.addWidget(page_widget)
             self._pages[view_name] = idx
-            self._nav.add_page(view_name, lambda i=idx: self._stack.setCurrentIndex(i))
+            self._nav.add_page(
+                view_name,
+                lambda i=idx, n=view_name: self._switch_page(i, n),
+            )
 
         if self._stack.count() > 0:
-            self._stack.setCurrentIndex(0)
+            first_name = next(iter(views_root))
+            self._switch_page(0, first_name)
             self._nav.activate_first()
 
         self._nav.setVisible(self._stack.count() > 1)
-
-        self._rebuild_bottom_bar(config.get("bottom_bar"))
         self._restart_udp_clients(config.get("udp_clients", []))
         self._restart_ros2_clients(config.get("ros2_clients", []))
         self._restart_http_clients(config.get("http_clients", []))
+
+    def _switch_page(self, idx: int, view_name: str) -> None:
+        self._stack.setCurrentIndex(idx)
+        view_cfg = self._view_bottom_bar_cfgs.get(view_name)
+        if view_cfg is not None:
+            effective = view_cfg
+        elif self._global_bottom_bar_cfg is not None:
+            effective = self._global_bottom_bar_cfg
+        else:
+            effective = None
+        self._rebuild_bottom_bar(effective)
 
     def _rebuild_bottom_bar(self, bar_cfg) -> None:
         if self._bottom_bar is not None:

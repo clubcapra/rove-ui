@@ -165,17 +165,6 @@
     {
       "height": 40,
       "buttons": [
-        {"label": "REAR CAM",  "event": "camera.select", "value": "REAR_CAM",  "active_topic": "camera.select"},
-        {"label": "ARM CAM",   "event": "camera.select", "value": "ARM_CAM",   "active_topic": "camera.select"},
-        {"label": "LEFT CAM",  "event": "camera.select", "value": "LEFT_CAM",  "active_topic": "camera.select"},
-        {"label": "RIGHT CAM", "event": "camera.select", "value": "RIGHT_CAM", "active_topic": "camera.select"},
-        {"label": "BACK CAM",  "event": "camera.select", "value": "BACK_CAM",  "active_topic": "camera.select"},
-        {"label": "FRONT CAM", "event": "camera.select", "value": "FRONT_CAM", "active_topic": "camera.select"}
-      ]
-    },
-    {
-      "height": 40,
-      "buttons": [
         {
           "label": "E-STOP",
           "event": "estop_status",
@@ -197,6 +186,29 @@
     "CAMERA": {
       "type": "layout",
       "diaposition": "absolute",
+      "bottom_bar": [
+        {
+          "height": 40,
+          "buttons": [
+            {"label": "REAR CAM",  "event": "camera.select", "value": "REAR_CAM",  "active_topic": "camera.select"},
+            {"label": "ARM CAM",   "event": "camera.select", "value": "ARM_CAM",   "active_topic": "camera.select"},
+            {"label": "LEFT CAM",  "event": "camera.select", "value": "LEFT_CAM",  "active_topic": "camera.select"},
+            {"label": "RIGHT CAM", "event": "camera.select", "value": "RIGHT_CAM", "active_topic": "camera.select"},
+            {"label": "BACK CAM",  "event": "camera.select", "value": "BACK_CAM",  "active_topic": "camera.select"},
+            {"label": "FRONT CAM", "event": "camera.select", "value": "FRONT_CAM", "active_topic": "camera.select"}
+          ]
+        },
+        {
+          "height": 40,
+          "buttons": [
+            {"label": "E-STOP", "event": "estop_status", "value": "1", "off_value": "0", "toggle": true, "color": "#ff3d3d"},
+            {"label": "MAPPING START",  "event": "mapping.go",      "value": "1", "color": "#00e676"},
+            {"label": "MAPPING PAUSE",  "event": "mapping.pause",   "value": "1", "color": "#ffae00"},
+            {"label": "EXPORT MAP",     "event": "mapping.export",  "value": "1", "color": "#1a6fff"},
+            {"label": "RESTART MAP",    "event": "mapping.restart", "value": "1", "color": "#ff3d3d"}
+          ]
+        }
+      ],
       "content": [
         {
           "type": "camera",
@@ -304,6 +316,29 @@
     "MISSION": {
       "type": "layout",
       "diaposition": "absolute",
+      "bottom_bar": [
+        {
+          "height": 40,
+          "buttons": [
+            {"label": "REAR CAM",  "event": "camera.select", "value": "REAR_CAM",  "active_topic": "camera.select"},
+            {"label": "ARM CAM",   "event": "camera.select", "value": "ARM_CAM",   "active_topic": "camera.select"},
+            {"label": "LEFT CAM",  "event": "camera.select", "value": "LEFT_CAM",  "active_topic": "camera.select"},
+            {"label": "RIGHT CAM", "event": "camera.select", "value": "RIGHT_CAM", "active_topic": "camera.select"},
+            {"label": "BACK CAM",  "event": "camera.select", "value": "BACK_CAM",  "active_topic": "camera.select"},
+            {"label": "FRONT CAM", "event": "camera.select", "value": "FRONT_CAM", "active_topic": "camera.select"}
+          ]
+        },
+        {
+          "height": 40,
+          "buttons": [
+            {"label": "E-STOP", "event": "estop_status", "value": "1", "off_value": "0", "toggle": true, "color": "#ff3d3d"},
+            {"label": "MAPPING START",  "event": "mapping.go",      "value": "1", "color": "#00e676"},
+            {"label": "MAPPING PAUSE",  "event": "mapping.pause",   "value": "1", "color": "#ffae00"},
+            {"label": "EXPORT MAP",     "event": "mapping.export",  "value": "1", "color": "#1a6fff"},
+            {"label": "RESTART MAP",    "event": "mapping.restart", "value": "1", "color": "#ff3d3d"}
+          ]
+        }
+      ],
       "content": [
         {
           "type": "map",

@@ -8,66 +8,66 @@
   <script src="leaflet.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; background: #080808; font-family: 'Courier New', monospace; overflow: hidden; }
+    html, body { height: 100%; background: #e8eaed; font-family: 'Courier New', monospace; overflow: hidden; }
 
     #map {
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 24px;
-      background: #080808;
+      background: #e8eaed;
     }
     .leaflet-container { cursor: crosshair !important; }
 
     /* Status bar */
     #status-bar {
       position: absolute; bottom: 0; left: 0; right: 0; height: 24px;
-      background: #0f0f0f; border-top: 1px solid #2e2e2e;
+      background: #d2d6dc; border-top: 1px solid #8e9aaa;
       display: flex; align-items: center;
-      font-size: 10px; color: #505050; z-index: 1000; pointer-events: none;
+      font-size: 10px; color: #5a6878; z-index: 1000; pointer-events: none;
     }
-    .sb { padding: 0 12px; border-right: 1px solid #222222; white-space: nowrap; }
+    .sb { padding: 0 12px; border-right: 1px solid #b0b8c4; white-space: nowrap; }
     .sb:last-child { border-right: none; }
-    #sb-coords { color: #d0d8e0; }
+    #sb-coords { color: #1a2230; }
     .sb-spacer { flex: 1; }
 
     /* Popup */
     .leaflet-popup-content-wrapper {
-      background: #161616; color: #d0d8e0;
-      border: 1px solid #2e2e2e; border-radius: 0;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.85), 0 0 0 1px rgba(0,212,255,0.06);
+      background: #d2d6dc; color: #1a2230;
+      border: 1px solid #8e9aaa; border-radius: 0;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.18), 0 0 0 1px rgba(90,106,126,0.12);
       font-family: 'Courier New', monospace; font-size: 11px;
     }
     .leaflet-popup-content { margin: 10px 14px; }
-    .leaflet-popup-tip { background: #161616; }
-    .leaflet-popup-close-button { color: #505050 !important; font-size: 18px !important; }
-    .leaflet-popup-close-button:hover { color: #ffae00 !important; background: transparent !important; }
+    .leaflet-popup-tip { background: #d2d6dc; }
+    .leaflet-popup-close-button { color: #5a6878 !important; font-size: 18px !important; }
+    .leaflet-popup-close-button:hover { color: #c47000 !important; background: transparent !important; }
 
     /* Zoom controls */
     .leaflet-control-zoom a {
-      background: #161616 !important; color: #d0d8e0 !important;
-      border-color: #2e2e2e !important; border-radius: 0 !important;
+      background: #d2d6dc !important; color: #1a2230 !important;
+      border-color: #8e9aaa !important; border-radius: 0 !important;
       font-family: monospace;
     }
-    .leaflet-control-zoom a:hover { background: #1e1e1e !important; color: #ffae00 !important; }
-    .leaflet-bar { border: 1px solid #2e2e2e !important; box-shadow: none !important; }
-    .leaflet-bar a { border-bottom-color: #2e2e2e !important; }
+    .leaflet-control-zoom a:hover { background: #c5cad2 !important; color: #c47000 !important; }
+    .leaflet-bar { border: 1px solid #8e9aaa !important; box-shadow: none !important; }
+    .leaflet-bar a { border-bottom-color: #8e9aaa !important; }
     .leaflet-control-attribution {
-      background: rgba(6,10,15,0.8) !important; color: #1e3040 !important;
+      background: rgba(210,214,220,0.85) !important; color: #5a6878 !important;
       font-family: monospace; font-size: 9px;
     }
-    .leaflet-control-attribution a { color: #484848 !important; }
+    .leaflet-control-attribution a { color: #5a6a7e !important; }
 
     /* POI popup content */
     .tac-popup { display: flex; flex-direction: column; gap: 4px; }
-    .tac-label { color: #ffae00; font-weight: 700; letter-spacing: 1px; }
-    .tac-coords { color: #505050; font-size: 10px; }
-    .tac-popup img { max-width: 200px; max-height: 150px; margin-top: 6px; border: 1px solid #2e2e2e; }
+    .tac-label { color: #c47000; font-weight: 700; letter-spacing: 1px; }
+    .tac-coords { color: #5a6878; font-size: 10px; }
+    .tac-popup img { max-width: 200px; max-height: 150px; margin-top: 6px; border: 1px solid #8e9aaa; }
     .tac-rm-btn {
       margin-top: 4px; padding: 4px 10px;
-      background: transparent; border: 1px solid #ff3d3d;
-      color: #ff3d3d; font-family: 'Courier New', monospace;
+      background: transparent; border: 1px solid #cc2020;
+      color: #cc2020; font-family: 'Courier New', monospace;
       font-size: 10px; letter-spacing: 1.5px; cursor: pointer;
     }
-    .tac-rm-btn:hover { background: rgba(255,61,61,0.12); }
+    .tac-rm-btn:hover { background: rgba(204,32,32,0.10); }
 
     /* Click flash */
     @keyframes flash {
@@ -77,7 +77,7 @@
     }
     .click-flash {
       position: absolute; width: 14px; height: 14px;
-      border: 1px solid #ffae00;
+      border: 1px solid #c47000;
       pointer-events: none;
       animation: flash 0.45s ease-out forwards;
       margin-left: -7px; margin-top: -7px; z-index: 2000;
@@ -89,20 +89,20 @@
       top: 80px; left: 10px;
       z-index: 1000;
       width: 26px; height: 26px;
-      background: #161616;
-      border: 1px solid #2e2e2e;
-      color: #505050;
+      background: #d2d6dc;
+      border: 1px solid #8e9aaa;
+      color: #5a6878;
       font-size: 14px;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: color 0.15s, border-color 0.15s, background 0.15s;
     }
     #btn-recenter:hover {
-      background: #1e1e1e;
-      border-color: #ffae00;
-      color: #ffae00;
+      background: #c5cad2;
+      border-color: #c47000;
+      color: #c47000;
     }
-    #btn-recenter:active { background: #080808; }
+    #btn-recenter:active { background: #b0b8c4; }
 
     /* ── Action wheel ───────────────────────────────────────────── */
     #action-wheel {
@@ -114,7 +114,7 @@
     #aw-backdrop {
       position: absolute;
       top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.30);
+      background: rgba(26,34,48,0.20);
       cursor: default;
     }
     #aw-ring {
@@ -125,9 +125,9 @@
     #aw-coords-box {
       position: absolute;
       transform: translate(-50%, -50%);
-      background: #0a0a0a;
-      border: 1px solid #2e2e2e;
-      color: #484848;
+      background: #dde0e5;
+      border: 1px solid #8e9aaa;
+      color: #5a6878;
       font-size: 9px;
       font-family: 'Courier New', monospace;
       padding: 4px 8px;
@@ -140,9 +140,9 @@
       position: absolute;
       width: 64px; height: 64px;
       border-radius: 50%;
-      background: #0f0f0f;
-      border: 1.5px solid #2e2e2e;
-      color: #d0d8e0;
+      background: #d2d6dc;
+      border: 1.5px solid #8e9aaa;
+      color: #1a2230;
       font-family: 'Courier New', monospace;
       cursor: pointer;
       display: flex; flex-direction: column;
@@ -154,47 +154,139 @@
       -webkit-tap-highlight-color: transparent;
     }
     .aw-btn:hover, .aw-btn:active {
-      background: #1a1a1a;
-      border-color: #ffae00;
-      color: #ffae00;
-      box-shadow: 0 0 16px rgba(255,174,0,0.25);
+      background: #c5cad2;
+      border-color: #c47000;
+      color: #c47000;
+      box-shadow: 0 0 16px rgba(196,112,0,0.20);
     }
     .aw-btn.aw-goto:hover, .aw-btn.aw-goto:active {
-      border-color: #00e676;
-      color: #00e676;
-      box-shadow: 0 0 16px rgba(0,230,118,0.2);
+      border-color: #1a7a4a;
+      color: #1a7a4a;
+      box-shadow: 0 0 16px rgba(26,122,74,0.18);
     }
     .aw-btn.aw-cancel:hover, .aw-btn.aw-cancel:active {
-      border-color: #ff3d3d;
-      color: #ff3d3d;
-      box-shadow: 0 0 16px rgba(255,61,61,0.2);
+      border-color: #cc2020;
+      color: #cc2020;
+      box-shadow: 0 0 16px rgba(204,32,32,0.18);
     }
     .aw-btn.aw-sentinel:hover, .aw-btn.aw-sentinel:active {
-      border-color: #22d3ee; color: #22d3ee;
-      box-shadow: 0 0 16px rgba(34,211,238,0.22);
+      border-color: #0891b2; color: #0891b2;
+      box-shadow: 0 0 16px rgba(8,145,178,0.18);
     }
     .aw-btn.aw-orbit:hover, .aw-btn.aw-orbit:active {
-      border-color: #a78bfa; color: #a78bfa;
-      box-shadow: 0 0 16px rgba(167,139,250,0.20);
+      border-color: #7c3aed; color: #7c3aed;
+      box-shadow: 0 0 16px rgba(124,58,237,0.16);
     }
     .aw-btn.aw-relay:hover, .aw-btn.aw-relay:active {
-      border-color: #34d399; color: #34d399;
-      box-shadow: 0 0 16px rgba(52,211,153,0.20);
+      border-color: #059669; color: #059669;
+      box-shadow: 0 0 16px rgba(5,150,105,0.16);
     }
     .aw-btn.aw-pathway:hover, .aw-btn.aw-pathway:active {
-      border-color: #f7d412; color: #f7d412;
-      box-shadow: 0 0 16px rgba(251,146,60,0.22);
+      border-color: #b45309; color: #b45309;
+      box-shadow: 0 0 16px rgba(180,83,9,0.18);
     }
     .aw-btn.aw-start:hover, .aw-btn.aw-start:active {
-      border-color: #00e676; color: #00e676;
-      box-shadow: 0 0 16px rgba(0,230,118,0.25);
+      border-color: #1a7a4a; color: #1a7a4a;
+      box-shadow: 0 0 16px rgba(26,122,74,0.20);
     }
+
+    /* ── Compass heading overlay ────────────────────────────────── */
+    #compass-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 6000;
+      align-items: center;
+      justify-content: center;
+      background: rgba(26,34,48,0.40);
+    }
+    #compass-box {
+      background: #dde0e5;
+      border: 1px solid #1a7a4a;
+      font-family: 'Courier New', monospace;
+      min-width: 290px;
+      user-select: none;
+    }
+    #compass-titlebar {
+      background: #d2d6dc;
+      border-bottom: 1px solid #b0b8c4;
+      padding: 7px 12px;
+      color: #1a7a4a;
+      font-size: 10px;
+      letter-spacing: 2px;
+      font-weight: 700;
+    }
+    #compass-body { padding: 14px 18px; }
+    #compass-hint {
+      color: #5a6878;
+      font-size: 9px;
+      letter-spacing: 1px;
+      margin-bottom: 14px;
+    }
+    #compass-svg-wrap {
+      display: flex;
+      justify-content: center;
+      cursor: grab;
+    }
+    #compass-svg-wrap:active { cursor: grabbing; }
+    #compass-deg {
+      text-align: center;
+      font-size: 32px;
+      font-weight: 700;
+      color: #1a7a4a;
+      letter-spacing: 3px;
+      margin: 10px 0 4px;
+    }
+    #compass-cardinal {
+      text-align: center;
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: #5a6878;
+      margin-bottom: 12px;
+    }
+    #compass-presets {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    #compass-presets button {
+      flex: 1;
+      background: #c5cad2;
+      border: 1px solid #8e9aaa;
+      color: #5a6878;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      padding: 6px 0;
+      cursor: pointer;
+    }
+    #compass-presets button:hover { border-color: #1a7a4a; color: #1a7a4a; }
+    #compass-btns { display: flex; gap: 8px; }
+    #compass-btns button {
+      flex: 1;
+      background: #c5cad2;
+      border: 1px solid #8e9aaa;
+      color: #1a2230;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      padding: 10px 0;
+      cursor: pointer;
+    }
+    #compass-btns button:hover { border-color: #1a2230; }
+    #cb-confirm {
+      background: #1a7a4a !important;
+      color: #ffffff !important;
+      border-color: #1a7a4a !important;
+      font-weight: 700 !important;
+    }
+    #cb-confirm:hover { background: #1e9058 !important; }
     #sentinel-banner {
       display: none;
       position: absolute;
       top: 50px; left: 50%; transform: translateX(-50%);
-      background: #080808; border: 1px solid #22d3ee;
-      color: #22d3ee; font-family: 'Courier New', monospace;
+      background: #dde0e5; border: 1px solid #0891b2;
+      color: #0891b2; font-family: 'Courier New', monospace;
       font-size: 10px; letter-spacing: 2px; font-weight: 700;
       padding: 6px 18px; z-index: 3500; pointer-events: none;
       white-space: nowrap;
@@ -203,8 +295,8 @@
       display: none;
       position: absolute;
       top: 50px; left: 50%; transform: translateX(-50%);
-      background: #080808; border: 1px solid #f7d412;
-      color: #f7d412; font-family: 'Courier New', monospace;
+      background: #dde0e5; border: 1px solid #b45309;
+      color: #b45309; font-family: 'Courier New', monospace;
       font-size: 10px; letter-spacing: 2px; font-weight: 700;
       padding: 6px 14px 6px 18px; z-index: 3500;
       white-space: nowrap; display: none;
@@ -216,7 +308,7 @@
       color: inherit; font: inherit; letter-spacing: 2px;
       padding: 2px 10px; cursor: pointer;
     }
-    #pathway-cancel-btn { color: #f7d412; border-color: #f7d412; }
+    #pathway-cancel-btn { color: #b45309; border-color: #b45309; }
     #pathway-done-btn:disabled { opacity: 0.35; cursor: default; }
     .aw-icon { font-size: 20px; line-height: 1; }
     .aw-lbl  { font-size: 7px; letter-spacing: 1.5px; font-weight: 700; opacity: 0.85; }
@@ -259,15 +351,15 @@
       position: absolute;
       top: 10px; right: 10px;
       z-index: 1000;
-      background: #0f0f0f;
-      border: 1px solid #2e2e2e;
+      background: #d2d6dc;
+      border: 1px solid #8e9aaa;
       min-width: 200px;
       font-family: 'Courier New', monospace;
     }
     #filter-title {
-      background: #080808;
-      border-bottom: 1px solid #2e2e2e;
-      color: #505050;
+      background: #dde0e5;
+      border-bottom: 1px solid #8e9aaa;
+      color: #5a6878;
       font-size: 16px;
       letter-spacing: 1.5px;
       padding: 4px 8px;
@@ -280,15 +372,15 @@
       cursor: pointer;
       font-size: 16px;
       letter-spacing: 1px;
-      border-bottom: 1px solid #161616;
-      color: #a0a0a0;
+      border-bottom: 1px solid #c5cad2;
+      color: #5a6878;
       user-select: none;
       transition: background 0.1s, color 0.1s;
     }
     .filter-row:last-child { border-bottom: none; }
-    .filter-row:hover { background: #1a1a1a; color: #d0d8e0; }
+    .filter-row:hover { background: #c5cad2; color: #1a2230; }
     .filter-dot { width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0; }
-    .filter-row.off { color: #383838; }
+    .filter-row.off { color: #9aaabb; }
     .filter-row.off .filter-dot { opacity: 0.2; }
   </style>
 </head>
@@ -301,7 +393,7 @@
   <span class="sb" id="sb-pois">0 WAYPOINTS</span>
   <span class="sb" id="sb-steps">0 STEPS</span>
   <span class="sb-spacer"></span>
-  <span class="sb" style="color:#222222;">&#9658; TAP TO PLACE ACTION</span>
+  <span class="sb" style="color:#9aaabb;">&#9658; TAP TO PLACE ACTION</span>
 </div>
 
 <!-- Action wheel overlay -->
@@ -344,6 +436,31 @@
     </button>
   </div>
 </div>
+<!-- Compass heading overlay (shown after SET START) -->
+<div id="compass-overlay">
+  <div id="compass-box">
+    <div id="compass-titlebar">◈ SET INITIAL HEADING</div>
+    <div id="compass-body">
+      <div id="compass-hint">DRAG ARROW · ROBOT FACING DIRECTION AT START</div>
+      <div id="compass-svg-wrap">
+        <svg id="compass-svg" viewBox="-110 -110 220 220" width="240" height="240"></svg>
+      </div>
+      <div id="compass-deg">000°</div>
+      <div id="compass-cardinal">NORTH</div>
+      <div id="compass-presets">
+        <button onclick="compassSetDeg(0)">N</button>
+        <button onclick="compassSetDeg(90)">E</button>
+        <button onclick="compassSetDeg(180)">S</button>
+        <button onclick="compassSetDeg(270)">W</button>
+      </div>
+      <div id="compass-btns">
+        <button id="cb-cancel">ANNULER</button>
+        <button id="cb-confirm">◆ CONFIRMER</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="sentinel-banner">◆ TAP MAP — SET POINT B</div>
 <div id="pathway-banner">
   <span>◆ PATHWAY</span>
@@ -742,23 +859,37 @@
   let _startMapX = null, _startMapY = null;
   let _startMarker = null;
 
-  window.mapSetStartPosition = function(lat, lng, mapX, mapY) {
+  var _headingOffset = 0;   // degrees: robot's real-world heading at map-frame yaw=0
+
+  window.mapSetStartPosition = function(lat, lng, mapX, mapY, headingDeg) {
     _startLat = lat; _startLng = lng;
     _startMapX = mapX; _startMapY = mapY;
+    _headingOffset = headingDeg || 0;
+
     if (_startMarker) map.removeLayer(_startMarker);
-    const svg =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="-10 -10 20 20">' +
-      '<line x1="-8" y1="0" x2="8" y2="0" stroke="#00e676" stroke-width="2"/>' +
-      '<line x1="0" y1="-8" x2="0" y2="8" stroke="#00e676" stroke-width="2"/>' +
-      '<circle r="3" fill="none" stroke="#00e676" stroke-width="1.5"/></svg>';
+
+    // Arrow icon pointing in the set heading direction
+    var h = _headingOffset;
+    var markerHtml =
+      '<div style="position:relative;width:32px;height:32px">' +
+      '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="-16 -16 32 32"' +
+      '  style="transform:rotate(' + h + 'deg)">' +
+      '  <circle r="13" fill="rgba(210,214,220,0.85)" stroke="#1a7a4a" stroke-width="1.5"/>' +
+      '  <polygon points="0,-10 -4,5 4,5" fill="#1a7a4a"/>' +
+      '  <circle r="2.5" fill="#1a7a4a"/>' +
+      '</svg></div>';
+
     _startMarker = L.marker([lat, lng], {
-      icon: L.divIcon({ html: svg, iconSize: [20,20], iconAnchor: [10,10], className: '' }),
+      icon: L.divIcon({ html: markerHtml, iconSize: [32,32], iconAnchor: [16,16], className: '' }),
       zIndexOffset: 800
     }).addTo(map);
+
+    var hdgLabel = String(Math.round(h)).padStart(3,'0') + '° ' + _compassCardinalLabel(h);
     _startMarker.bindPopup(
       '<div class="tac-popup">' +
       '<div class="tac-label" style="color:#00e676">◈ START POSITION</div>' +
       '<div class="tac-coords">' + lat.toFixed(6) + ' / ' + lng.toFixed(6) + '</div>' +
+      '<div class="tac-coords" style="color:#00e676">HDG: ' + hdgLabel + '</div>' +
       '<button class="tac-rm-btn" style="border-color:#00e676;color:#00e676" ' +
       'onclick="window.mapClearStartPosition()">✕ CLEAR START</button></div>'
     );
@@ -768,19 +899,26 @@
     if (_startMarker) { map.removeLayer(_startMarker); _startMarker = null; }
     _startLat = null; _startLng = null;
     _startMapX = null; _startMapY = null;
+    _headingOffset = 0;
     console.log('__mapcb__:' + JSON.stringify({ action: 'clear_start' }));
   };
 
-  // Called each time new relative position arrives from Python.
-  // x/y are absolute map-frame coordinates (metres from map origin).
+  // x/y: absolute map-frame coordinates (metres from map origin).
+  // Applies heading rotation so map-frame x/y → real-world East/North.
   window.mapUpdateRelativePosition = function(x, y, yaw_deg) {
     if (_startLat === null || _startMapX === null) return;
-    var dx = x - _startMapX;   // east  (metres)
-    var dy = y - _startMapY;   // north (metres)
-    var lat = _startLat + dy / 111111.0;
-    var lng = _startLng + dx / (111111.0 * Math.cos(_startLat * Math.PI / 180));
+    var dx  = x - _startMapX;
+    var dy  = y - _startMapY;
+    var h   = _headingOffset * Math.PI / 180;
+    // Rotate map-frame displacement into world East/North
+    var east  = dx * Math.sin(h) - dy * Math.cos(h);
+    var north = dx * Math.cos(h) + dy * Math.sin(h);
+    var lat = _startLat  + north / 111111.0;
+    var lng = _startLng  + east  / (111111.0 * Math.cos(_startLat * Math.PI / 180));
     window.mapSetRobotPosition(lat, lng);
-    if (yaw_deg !== undefined && yaw_deg !== null) window.mapSetRobotYaw(yaw_deg);
+    if (yaw_deg !== undefined && yaw_deg !== null) {
+      window.mapSetRobotYaw(_headingOffset + yaw_deg);
+    }
   };
 
   // ── Sentinel two-tap state ─────────────────────────────────────────────
@@ -882,7 +1020,7 @@
       const x2 = Math.round(Math.cos(rad) * (_AW_RADIUS - 32));
       const y2 = Math.round(Math.sin(rad) * (_AW_RADIUS - 32));
       svgContent += '<line x1="0" y1="0" x2="' + x2 + '" y2="' + y2 +
-        '" stroke="#2e2e2e" stroke-width="1" stroke-dasharray="3 3"/>';
+        '" stroke="#8e9aaa" stroke-width="1" stroke-dasharray="3 3"/>';
     }
     svg.innerHTML = svgContent;
 
@@ -967,7 +1105,180 @@
     const lat = _awLat, lng = _awLng;
     hideActionWheel();
     showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#00e676');
-    _awEmit('set_start', lat, lng);
+    showCompassOverlay(lat, lng);
+  });
+
+  // ── Compass heading overlay ───────────────────────────────────────────
+
+  var _compassLat = null, _compassLng = null, _compassDeg = 0;
+
+  var _CARDINALS = [
+    [0,'N'],[45,'NE'],[90,'E'],[135,'SE'],
+    [180,'S'],[225,'SO'],[270,'O'],[315,'NO']
+  ];
+
+  function _compassCardinalLabel(deg) {
+    deg = ((deg % 360) + 360) % 360;
+    var best = _CARDINALS[0];
+    var bestDiff = 360;
+    for (var i = 0; i < _CARDINALS.length; i++) {
+      var diff = Math.abs(deg - _CARDINALS[i][0]);
+      if (diff > 180) diff = 360 - diff;
+      if (diff < bestDiff) { bestDiff = diff; best = _CARDINALS[i]; }
+    }
+    return best[1];
+  }
+
+  function _buildCompassSVG() {
+    var svg = document.getElementById('compass-svg');
+    var ns  = 'http://www.w3.org/2000/svg';
+
+    // Background
+    var bg = document.createElementNS(ns, 'circle');
+    bg.setAttribute('r','105'); bg.setAttribute('fill','#dde0e5');
+    bg.setAttribute('stroke','#8e9aaa'); bg.setAttribute('stroke-width','1');
+    svg.appendChild(bg);
+
+    // Tick marks
+    for (var d = 0; d < 360; d += 5) {
+      var isMajor = d % 90 === 0;
+      var isMed   = !isMajor && d % 45 === 0;
+      var r1 = isMajor ? 72 : (isMed ? 78 : 83);
+      var r2 = 90;
+      var rad = (d - 90) * Math.PI / 180;
+      var line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', (Math.cos(rad)*r1).toFixed(2));
+      line.setAttribute('y1', (Math.sin(rad)*r1).toFixed(2));
+      line.setAttribute('x2', (Math.cos(rad)*r2).toFixed(2));
+      line.setAttribute('y2', (Math.sin(rad)*r2).toFixed(2));
+      line.setAttribute('stroke', isMajor ? '#1a7a4a' : (isMed ? '#5a9a7a' : '#9aaabb'));
+      line.setAttribute('stroke-width', isMajor ? '2' : '1');
+      svg.appendChild(line);
+    }
+
+    // Cardinal labels
+    _CARDINALS.forEach(function(pair) {
+      var deg = pair[0], lbl = pair[1];
+      var rad = (deg - 90) * Math.PI / 180;
+      var r   = 70;
+      var t   = document.createElementNS(ns, 'text');
+      t.setAttribute('x', (Math.cos(rad)*r).toFixed(1));
+      t.setAttribute('y', (Math.sin(rad)*r + 4).toFixed(1));
+      t.setAttribute('text-anchor','middle');
+      t.setAttribute('font-size', deg % 90 === 0 ? '11' : '8');
+      t.setAttribute('font-family','Courier New');
+      t.setAttribute('font-weight', deg % 90 === 0 ? '700' : '400');
+      t.setAttribute('fill', deg % 90 === 0 ? '#1a7a4a' : '#5a6878');
+      t.textContent = lbl;
+      svg.appendChild(t);
+    });
+
+    // Ring border
+    var ring = document.createElementNS(ns, 'circle');
+    ring.setAttribute('r','95'); ring.setAttribute('fill','none');
+    ring.setAttribute('stroke','#1a7a4a'); ring.setAttribute('stroke-width','1');
+    ring.setAttribute('opacity','0.4');
+    svg.appendChild(ring);
+
+    // Rotating arrow group
+    var g = document.createElementNS(ns, 'g');
+    g.setAttribute('id','compass-arrow-g');
+    // Arrow body
+    var arrow = document.createElementNS(ns, 'polygon');
+    arrow.setAttribute('points','0,-55 -8,20 0,10 8,20');
+    arrow.setAttribute('fill','#1a7a4a'); arrow.setAttribute('opacity','0.9');
+    g.appendChild(arrow);
+    // Arrow tail (south indicator)
+    var tail = document.createElementNS(ns, 'polygon');
+    tail.setAttribute('points','0,55 -6,-10 0,-5 6,-10');
+    tail.setAttribute('fill','#cc2020'); tail.setAttribute('opacity','0.7');
+    g.appendChild(tail);
+    // Center dot
+    var dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('r','5'); dot.setAttribute('fill','#dde0e5');
+    dot.setAttribute('stroke','#1a7a4a'); dot.setAttribute('stroke-width','2');
+    g.appendChild(dot);
+    svg.appendChild(g);
+  }
+  _buildCompassSVG();
+
+  function compassSetDeg(deg) {
+    _compassDeg = ((deg % 360) + 360) % 360;
+    _updateCompassDisplay();
+  }
+
+  function _updateCompassDisplay() {
+    var d = Math.round(_compassDeg);
+    document.getElementById('compass-deg').textContent =
+      String(d).padStart(3,'0') + '°';
+    document.getElementById('compass-cardinal').textContent =
+      _compassCardinalLabel(d);
+    var g = document.getElementById('compass-arrow-g');
+    if (g) g.setAttribute('transform','rotate(' + _compassDeg + ')');
+  }
+
+  function _compassAngleFromEvent(clientX, clientY) {
+    var rect = document.getElementById('compass-svg').getBoundingClientRect();
+    var cx   = rect.left + rect.width  / 2;
+    var cy   = rect.top  + rect.height / 2;
+    var dx   = clientX - cx, dy = clientY - cy;
+    return (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
+  }
+
+  var _compassDragging = false;
+
+  document.getElementById('compass-svg').addEventListener('mousedown', function(e) {
+    _compassDragging = true;
+    _compassDeg = _compassAngleFromEvent(e.clientX, e.clientY);
+    _updateCompassDisplay();
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!_compassDragging) return;
+    _compassDeg = _compassAngleFromEvent(e.clientX, e.clientY);
+    _updateCompassDisplay();
+  });
+  document.addEventListener('mouseup', function() { _compassDragging = false; });
+
+  // Touch support
+  document.getElementById('compass-svg').addEventListener('touchstart', function(e) {
+    _compassDragging = true;
+    var t = e.touches[0];
+    _compassDeg = _compassAngleFromEvent(t.clientX, t.clientY);
+    _updateCompassDisplay();
+    e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('touchmove', function(e) {
+    if (!_compassDragging) return;
+    var t = e.touches[0];
+    _compassDeg = _compassAngleFromEvent(t.clientX, t.clientY);
+    _updateCompassDisplay();
+    e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('touchend', function() { _compassDragging = false; });
+
+  function showCompassOverlay(lat, lng) {
+    _compassLat = lat; _compassLng = lng;
+    _compassDeg = 0;
+    _updateCompassDisplay();
+    var el = document.getElementById('compass-overlay');
+    el.style.display = 'flex';
+  }
+
+  function hideCompassOverlay() {
+    document.getElementById('compass-overlay').style.display = 'none';
+    _compassLat = null; _compassLng = null;
+  }
+
+  document.getElementById('cb-cancel').addEventListener('click', function() {
+    hideCompassOverlay();
+  });
+
+  document.getElementById('cb-confirm').addEventListener('click', function() {
+    var lat = _compassLat, lng = _compassLng;
+    var hdg = Math.round(_compassDeg * 10) / 10;
+    hideCompassOverlay();
+    _awEmit('set_start', lat, lng, { heading_deg: hdg });
   });
 
   document.getElementById('aw-btn-pathway').addEventListener('click', function(e) {

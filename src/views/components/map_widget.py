@@ -74,6 +74,7 @@ class MapWidget(QWidget):
         self._start_map_y: float | None = None
         self._start_lat: float | None = None     # GPS anchor when start was set
         self._start_lng: float | None = None
+        self._heading_offset: float = 0.0        # degrees: real-world heading when map yaw=0
         self._pos_nam: QNetworkAccessManager | None = None
         self._pos_timer: QTimer | None = None
         self._pos_pending: bool = False
@@ -296,16 +297,20 @@ class MapWidget(QWidget):
                 else:
                     yaw = None
                 if self._start_map_x is not None and self._start_lat is not None:
-                    # Compute GPS from relative displacement + anchor
                     dx = self._robot_x - self._start_map_x
                     dy = self._robot_y - self._start_map_y
-                    robot_lat = self._start_lat + dy / 111_111.0
-                    robot_lng = self._start_lng + dx / (
+                    # Rotate map-frame displacement into world East/North
+                    h     = math.radians(self._heading_offset)
+                    east  = dx * math.sin(h) - dy * math.cos(h)
+                    north = dx * math.cos(h) + dy * math.sin(h)
+                    robot_lat = self._start_lat + north / 111_111.0
+                    robot_lng = self._start_lng + east / (
                         111_111.0 * math.cos(math.radians(self._start_lat))
                     )
-                    # Publish for SAR recorder and other subscribers
+                    real_yaw = (self._heading_offset + yaw) if yaw is not None else None
                     self._event_bus.publish_sync("robot.gps_position", {
-                        "lat": robot_lat, "lng": robot_lng, "ts": time.time()
+                        "lat": robot_lat, "lng": robot_lng,
+                        "yaw_deg": real_yaw, "ts": time.time(),
                     })
                     yaw_arg = f"{yaw:.4f}" if yaw is not None else "null"
                     self.run_js(
@@ -335,27 +340,31 @@ class MapWidget(QWidget):
                 lng = float(data["lng"])
             except (KeyError, TypeError, ValueError):
                 return
-            self._start_map_x = self._robot_x
-            self._start_map_y = self._robot_y
-            self._start_lat   = lat
-            self._start_lng   = lng
+            hdg = float(data.get("heading_deg", 0.0))
+            self._start_map_x     = self._robot_x
+            self._start_map_y     = self._robot_y
+            self._start_lat       = lat
+            self._start_lng       = lng
+            self._heading_offset  = hdg
             self.run_js(
                 f"window.mapSetStartPosition("
                 f"{lat:.8f}, {lng:.8f}, "
-                f"{self._robot_x:.4f}, {self._robot_y:.4f});"
+                f"{self._robot_x:.4f}, {self._robot_y:.4f}, {hdg:.1f});"
             )
             self._event_bus.publish_sync(
                 "log",
                 f"[Map] Start set: GPS=({lat:.6f},{lng:.6f}) "
-                f"map=({self._robot_x:.3f},{self._robot_y:.3f})",
+                f"map=({self._robot_x:.3f},{self._robot_y:.3f}) "
+                f"hdg={hdg:.1f}°",
             )
             return
 
         if action == "clear_start":
-            self._start_map_x = None
-            self._start_map_y = None
-            self._start_lat   = None
-            self._start_lng   = None
+            self._start_map_x    = None
+            self._start_map_y    = None
+            self._start_lat      = None
+            self._start_lng      = None
+            self._heading_offset = 0.0
             self._event_bus.publish_sync("log", "[Map] Start position cleared")
             return
 
