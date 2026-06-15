@@ -185,6 +185,10 @@
       border-color: #f7d412; color: #f7d412;
       box-shadow: 0 0 16px rgba(251,146,60,0.22);
     }
+    .aw-btn.aw-start:hover, .aw-btn.aw-start:active {
+      border-color: #00e676; color: #00e676;
+      box-shadow: 0 0 16px rgba(0,230,118,0.25);
+    }
     #sentinel-banner {
       display: none;
       position: absolute;
@@ -242,12 +246,13 @@
       animation: aw-pop-coords 0.3s ease forwards;
     }
     #aw-btn-poi      { animation-delay: 0ms   !important; }
-    #aw-btn-goto     { animation-delay: 20ms  !important; }
-    #aw-btn-sentinel { animation-delay: 40ms  !important; }
-    #aw-btn-orbit    { animation-delay: 60ms  !important; }
-    #aw-btn-relay    { animation-delay: 80ms  !important; }
-    #aw-btn-cancel   { animation-delay: 100ms !important; }
-    #aw-btn-pathway  { animation-delay: 120ms !important; }
+    #aw-btn-goto     { animation-delay: 15ms  !important; }
+    #aw-btn-start    { animation-delay: 30ms  !important; }
+    #aw-btn-pathway  { animation-delay: 45ms  !important; }
+    #aw-btn-relay    { animation-delay: 60ms  !important; }
+    #aw-btn-cancel   { animation-delay: 75ms  !important; }
+    #aw-btn-orbit    { animation-delay: 90ms  !important; }
+    #aw-btn-sentinel { animation-delay: 105ms !important; }
 
     /* Filter panel */
     #filter-panel {
@@ -324,6 +329,10 @@
     <button class="aw-btn aw-relay" id="aw-btn-relay">
       <span class="aw-icon">⊡</span>
       <span class="aw-lbl">RELAY</span>
+    </button>
+    <button class="aw-btn aw-start" id="aw-btn-start">
+      <span class="aw-icon">◈</span>
+      <span class="aw-lbl">SET START</span>
     </button>
     <button class="aw-btn aw-pathway" id="aw-btn-pathway">
       <span class="aw-icon">⤳</span>
@@ -715,16 +724,63 @@
   // ── Action wheel ──────────────────────────────────────────────────────
   let _awLat = null, _awLng = null;
 
-  // 7 buttons at ~51° intervals
+  // 8 buttons at 45° intervals
   const _AW_RADIUS = 96;
   const _AW_ANGLES = {
     'aw-btn-poi':      -90,
-    'aw-btn-goto':     -38,
-    'aw-btn-pathway':   14,
-    'aw-btn-orbit':     66,
-    'aw-btn-relay':    118,
-    'aw-btn-cancel':   170,
-    'aw-btn-sentinel': -142,
+    'aw-btn-goto':     -45,
+    'aw-btn-start':      0,
+    'aw-btn-pathway':   45,
+    'aw-btn-relay':     90,
+    'aw-btn-cancel':   135,
+    'aw-btn-orbit':    180,
+    'aw-btn-sentinel': -135,
+  };
+
+  // ── Start / relative-position state ──────────────────────────────────
+  let _startLat = null, _startLng = null;
+  let _startMapX = null, _startMapY = null;
+  let _startMarker = null;
+
+  window.mapSetStartPosition = function(lat, lng, mapX, mapY) {
+    _startLat = lat; _startLng = lng;
+    _startMapX = mapX; _startMapY = mapY;
+    if (_startMarker) map.removeLayer(_startMarker);
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="-10 -10 20 20">' +
+      '<line x1="-8" y1="0" x2="8" y2="0" stroke="#00e676" stroke-width="2"/>' +
+      '<line x1="0" y1="-8" x2="0" y2="8" stroke="#00e676" stroke-width="2"/>' +
+      '<circle r="3" fill="none" stroke="#00e676" stroke-width="1.5"/></svg>';
+    _startMarker = L.marker([lat, lng], {
+      icon: L.divIcon({ html: svg, iconSize: [20,20], iconAnchor: [10,10], className: '' }),
+      zIndexOffset: 800
+    }).addTo(map);
+    _startMarker.bindPopup(
+      '<div class="tac-popup">' +
+      '<div class="tac-label" style="color:#00e676">◈ START POSITION</div>' +
+      '<div class="tac-coords">' + lat.toFixed(6) + ' / ' + lng.toFixed(6) + '</div>' +
+      '<button class="tac-rm-btn" style="border-color:#00e676;color:#00e676" ' +
+      'onclick="window.mapClearStartPosition()">✕ CLEAR START</button></div>'
+    );
+  };
+
+  window.mapClearStartPosition = function() {
+    if (_startMarker) { map.removeLayer(_startMarker); _startMarker = null; }
+    _startLat = null; _startLng = null;
+    _startMapX = null; _startMapY = null;
+    console.log('__mapcb__:' + JSON.stringify({ action: 'clear_start' }));
+  };
+
+  // Called each time new relative position arrives from Python.
+  // x/y are absolute map-frame coordinates (metres from map origin).
+  window.mapUpdateRelativePosition = function(x, y, yaw_deg) {
+    if (_startLat === null || _startMapX === null) return;
+    var dx = x - _startMapX;   // east  (metres)
+    var dy = y - _startMapY;   // north (metres)
+    var lat = _startLat + dy / 111111.0;
+    var lng = _startLng + dx / (111111.0 * Math.cos(_startLat * Math.PI / 180));
+    window.mapSetRobotPosition(lat, lng);
+    if (yaw_deg !== undefined && yaw_deg !== null) window.mapSetRobotYaw(yaw_deg);
   };
 
   // ── Sentinel two-tap state ─────────────────────────────────────────────
@@ -904,6 +960,14 @@
     hideActionWheel();
     showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#34d399');
     _awEmit('mission_relay', lat, lng);
+  });
+
+  document.getElementById('aw-btn-start').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const lat = _awLat, lng = _awLng;
+    hideActionWheel();
+    showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#00e676');
+    _awEmit('set_start', lat, lng);
   });
 
   document.getElementById('aw-btn-pathway').addEventListener('click', function(e) {

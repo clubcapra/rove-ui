@@ -313,13 +313,11 @@
             "initial_lat": 46.759,
             "initial_lng": 7.616,
             "initial_zoom": 15,
-            "tile_source_topic": "map.tile_source",
-            "robot_position_lat_topic": "gnss.latitude",
-            "robot_position_lng_topic": "gnss.longitude",
-            "robot_position_yaw_topic": "gnss.yaw",
-            "click_topic":       "map.click",
-            "poi_topic":         "map.poi",
-            "add_poi_at_topic":  "costmap.poi"
+            "tile_source_topic":  "map.tile_source",
+            "position_source":    "http://192.168.2.3:8888/robot/position",
+            "click_topic":        "map.click",
+            "poi_topic":          "map.poi",
+            "add_poi_at_topic":   "costmap.poi"
           }
         }
       ]
@@ -458,15 +456,13 @@
           "name": "Costmap",
           "label": "COSTMAP",
           "data": {
-            "source": "http://192.168.2.3/minimap",
+            "source":           "http://192.168.2.3:8888/minimap",
+            "position_source":  "http://192.168.2.3:8888/robot/position",
             "cornerPositionWidth": 8,
             "cornerPositionHeight": 8,
             "click_topic":       "costmap.click",
             "poi_topic":         "costmap.poi",
-            "add_poi_gps_topic": "map.poi",
-            "gps_lat_topic":     "gnss.latitude",
-            "gps_lng_topic":     "gnss.longitude",
-            "gps_yaw_topic":     "gnss.yaw"
+            "add_poi_gps_topic": "map.poi"
           },
           "grid": { "row": 0, "column": 0 }
         }

@@ -7,7 +7,9 @@ import tempfile
 import os
 from pathlib import Path
 
-from PySide6.QtCore import QDateTime, QPointF, Qt, QTimer, QUrl
+import json as _json
+
+from PySide6.QtCore import QDateTime, QPoint, QPointF, Qt, QTimer, QUrl
 from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap, QPolygonF, QRegion
 from PySide6.QtNetwork import (
     QHttpMultiPart, QHttpPart,
@@ -639,24 +641,68 @@ class _NamePicker(QDialog):
 # ── Clickable label (with debounce) ───────────────────────────────────────────
 
 class _ClickableLabel(QLabel):
-    def __init__(self, on_click, parent=None):
+    def __init__(self, on_click, parent=None, on_right_click=None):
         super().__init__(parent)
         self._on_click = on_click
+        self._on_right_click = on_right_click
         self._last_click_ms: int = 0
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
+        w, h = self.width(), self.height()
+        if event.button() == Qt.MouseButton.RightButton and self._on_right_click and w > 0 and h > 0:
+            nx = event.position().x() / w
+            ny = event.position().y() / h
+            self._on_right_click(nx, ny, event.globalPosition().toPoint())
+        elif event.button() == Qt.MouseButton.LeftButton:
             now = QDateTime.currentMSecsSinceEpoch()
             if now - self._last_click_ms < 300:
                 super().mousePressEvent(event)
                 return
             self._last_click_ms = now
-            w, h = self.width(), self.height()
             if w > 0 and h > 0:
                 nx = event.position().x() / w
                 ny = event.position().y() / h
                 self._on_click(nx, ny)
         super().mousePressEvent(event)
+
+
+class _ActionWheel(QWidget):
+    """Frameless tactical popup menu triggered by right-click on the bitmap."""
+
+    def __init__(self, actions: list, screen_pos: QPoint, parent=None):
+        super().__init__(None, Qt.WindowType.Popup)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.setStyleSheet(
+            f"QWidget {{ background: {BG_DEEP}; border: 1px solid {CYAN}; }}"
+            f"QPushButton {{ background: {BG_DARK}; color: {TEXT}; border: none;"
+            f" border-bottom: 1px solid {BORDER_DIM}; padding: 9px 16px;"
+            f" font-family: 'Courier New'; font-size: 11px; letter-spacing: 1px;"
+            f" text-align: left; min-width: 200px; }}"
+            f"QPushButton:hover {{ background: {BG_SURFACE}; color: {CYAN}; }}"
+            f"QPushButton:pressed {{ background: {BG_PANEL}; }}"
+            f"QPushButton:disabled {{ color: {BORDER_DIM}; }}"
+        )
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        hdr = QLabel("◆ ACTION")
+        hdr.setStyleSheet(
+            f"background: {BG_PANEL}; color: {CYAN}; font-family: 'Courier New';"
+            f" font-size: 9px; letter-spacing: 2px; padding: 5px 10px;"
+            f" border-bottom: 1px solid {BORDER};"
+        )
+        root.addWidget(hdr)
+
+        for label, cb, enabled in actions:
+            btn = QPushButton(label)
+            btn.setEnabled(bool(enabled))
+            if cb and enabled:
+                btn.clicked.connect(lambda _, fn=cb: (fn(), self.close()))
+            root.addWidget(btn)
+
+        self.adjustSize()
+        self.move(screen_pos)
 
 
 # ── Bitmap widget ──────────────────────────────────────────────────────────────
@@ -701,6 +747,15 @@ class Bitmap:
         self._robot_lng: float | None = None
         self._robot_yaw: float = 0.0        # degrés (heading from North, clockwise)
 
+        # Relative position state (from mapping API)
+        self._robot_x: float = 0.0          # metres in map frame
+        self._robot_y: float = 0.0
+        self._start_x: float | None = None  # user-set reference "start" position
+        self._start_y: float | None = None
+        self._pos_nam: QNetworkAccessManager | None = None
+        self._pos_timer: QTimer | None = None
+        self._pos_pending: bool = False
+
         # Overlay state
         self._raw_pixmap: QPixmap | None = None
         self._pois: list[dict] = []         # {"nx", "ny", "alt", "label"}
@@ -730,7 +785,9 @@ class Bitmap:
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self._label = _ClickableLabel(self._handle_click, self._widget)
+        self._label = _ClickableLabel(
+            self._handle_click, self._widget, on_right_click=self._handle_right_click
+        )
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._label.setScaledContents(True)
         layout.addWidget(self._label)
@@ -752,6 +809,16 @@ class Bitmap:
         else:
             self._raw_pixmap = self._make_placeholder_pixmap(640, 420)
             self._update_display()
+
+        pos_src = str(self.config.get("position_source", "")).strip()
+        if pos_src:
+            self._pos_nam = QNetworkAccessManager(self._widget)
+            self._pos_nam.finished.connect(self._on_pos_reply)
+            self._pos_timer = QTimer(self._widget)
+            self._pos_timer.timeout.connect(self._fetch_pos)
+            pos_interval_ms = max(100, int(self.config.get("pos_poll_interval_ms", 200)))
+            self._pos_timer.start(pos_interval_ms)
+            self._fetch_pos()
 
     # ── GPS tracking ───────────────────────────────────────────────────────────
 
@@ -1002,6 +1069,64 @@ class Bitmap:
 
     # ── Overlay rendering ──────────────────────────────────────────────────────
 
+    # ── Position source (mapping API) ─────────────────────────────────────────
+
+    def _fetch_pos(self) -> None:
+        if self._pos_pending or self._pos_nam is None:
+            return
+        src = str(self.config.get("position_source", "")).strip()
+        if not src:
+            return
+        req = QNetworkRequest(QUrl(src))
+        req.setRawHeader(b"Cache-Control", b"no-cache")
+        self._pos_nam.get(req)
+        self._pos_pending = True
+
+    def _on_pos_reply(self, reply: QNetworkReply) -> None:
+        self._pos_pending = False
+        if reply.error() == QNetworkReply.NetworkError.NoError:
+            try:
+                data = _json.loads(bytes(reply.readAll()))
+                self._robot_x = float(data.get("x", self._robot_x))
+                self._robot_y = float(data.get("y", self._robot_y))
+                if "yaw_deg" in data:
+                    self._robot_yaw = float(data["yaw_deg"])
+                elif "yaw_rad" in data:
+                    self._robot_yaw = math.degrees(float(data["yaw_rad"]))
+                elif "yaw" in data:
+                    self._robot_yaw = math.degrees(float(data["yaw"]))
+                self._update_display()
+            except Exception:
+                pass
+        reply.deleteLater()
+
+    # ── Right-click action wheel ───────────────────────────────────────────────
+
+    def _handle_right_click(self, nx: float, ny: float, screen_pos: QPoint) -> None:
+        has_start = self._start_x is not None
+        actions = [
+            ("◈  SET START POSITION", self._set_start_position, True),
+            ("✕  CLEAR START",        self._clear_start_position, has_start),
+        ]
+        _ActionWheel(actions, screen_pos, self._widget)
+
+    def _set_start_position(self) -> None:
+        self._start_x = self._robot_x
+        self._start_y = self._robot_y
+        self.event_bus.publish_sync(
+            "log",
+            f"[Bitmap:{self.name}] Start set: x={self._start_x:.3f} m, y={self._start_y:.3f} m",
+        )
+        self._update_display()
+
+    def _clear_start_position(self) -> None:
+        self._start_x = None
+        self._start_y = None
+        self.event_bus.publish_sync("log", f"[Bitmap:{self.name}] Start position cleared")
+        self._update_display()
+
+    # ── Overlay rendering ──────────────────────────────────────────────────────
+
     def _update_display(self) -> None:
         if self._raw_pixmap is None or self._raw_pixmap.isNull() or self._label is None:
             return
@@ -1010,9 +1135,70 @@ class Bitmap:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = result.width(), result.height()
         self._draw_pois(painter, w, h)
+        if self._start_x is not None:
+            self._draw_start_marker(painter, w, h)
         self._draw_robot_cursor(painter, w // 2, h // 2, self._robot_yaw, min(w, h) // 10)
+        self._draw_position_overlay(painter, w, h)
         painter.end()
         self._label.setPixmap(result)
+
+    def _draw_start_marker(self, painter: QPainter, w: int, h: int) -> None:
+        """Green X marker showing where the start position is relative to the robot."""
+        span_x = float(self.config.get("cornerPositionWidth",  8.0))
+        span_y = float(self.config.get("cornerPositionHeight", 8.0))
+        dx = self._start_x - self._robot_x
+        dy = self._start_y - self._robot_y
+        nx = 0.5 + dx / span_x
+        ny = 0.5 - dy / span_y   # y inverted (image down = map south)
+        if not (0.0 <= nx <= 1.0 and 0.0 <= ny <= 1.0):
+            return
+        cx, cy = int(nx * w), int(ny * h)
+        s = max(8, min(w, h) // 30)
+        painter.save()
+        pen = QPen(QColor(0x00, 0xe6, 0x76, 230), 2)
+        painter.setPen(pen)
+        painter.drawLine(cx - s, cy - s, cx + s, cy + s)
+        painter.drawLine(cx + s, cy - s, cx - s, cy + s)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(QColor(0x00, 0xe6, 0x76, 160), 1))
+        painter.drawEllipse(cx - s, cy - s, s * 2, s * 2)
+        font_size = max(7, min(w, h) // 55)
+        painter.setFont(QFont("Courier New", font_size, QFont.Weight.Bold))
+        painter.setPen(QPen(QColor(0, 0, 0, 160), 1))
+        painter.drawText(cx + s + 3, cy + font_size // 2 + 1, "START")
+        painter.setPen(QPen(QColor(0x00, 0xe6, 0x76), 1))
+        painter.drawText(cx + s + 2, cy + font_size // 2, "START")
+        painter.restore()
+
+    def _draw_position_overlay(self, painter: QPainter, w: int, h: int) -> None:
+        """Top-left position readout; shows relative coords when start is set."""
+        if self._start_x is None:
+            return
+        dx = self._robot_x - self._start_x
+        dy = self._robot_y - self._start_y
+        dist = math.sqrt(dx * dx + dy * dy)
+        lines = [
+            ("FROM START", QColor(CYAN)),
+            (f"X: {dx:+.2f} m", QColor(TEXT)),
+            (f"Y: {dy:+.2f} m", QColor(TEXT)),
+            (f"D: {dist:.2f} m",  QColor(TEXT)),
+        ]
+        font_size = max(8, min(w, h) // 45)
+        painter.setFont(QFont("Courier New", font_size, QFont.Weight.Bold))
+        line_h  = font_size + 5
+        pad     = 8
+        box_w   = max(120, font_size * 11)
+        box_h   = len(lines) * line_h + pad * 2
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(0x08, 0x08, 0x08, 200))
+        painter.drawRect(pad, pad, box_w, box_h)
+        painter.setPen(QPen(QColor(CYAN), 1))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRect(pad, pad, box_w, box_h)
+        for i, (text, color) in enumerate(lines):
+            y = pad * 2 + i * line_h + font_size
+            painter.setPen(QPen(color, 1))
+            painter.drawText(pad + 6, y, text)
 
     def _load_image(self, config_key: str, tried_flag: str, cache_attr: str) -> QPixmap | None:
         if getattr(self, tried_flag):

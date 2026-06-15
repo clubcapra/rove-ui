@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import math
 import time
 from pathlib import Path
 
 import json as _json
 from PySide6.QtCore import QUrl, Signal, Slot, QTimer
+from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QDialog
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -65,6 +67,15 @@ class MapWidget(QWidget):
         self._mission_seq = 0
         self._js_queue.connect(self._exec_js)
 
+        # Relative position state (mapping API)
+        self._robot_x: float = 0.0
+        self._robot_y: float = 0.0
+        self._start_map_x: float | None = None   # map-frame coords when start was set
+        self._start_map_y: float | None = None
+        self._pos_nam: QNetworkAccessManager | None = None
+        self._pos_timer: QTimer | None = None
+        self._pos_pending: bool = False
+
     def _load_html(self) -> str:
         try:
             return self._html_template.read_text(encoding="utf-8")
@@ -90,6 +101,7 @@ class MapWidget(QWidget):
         self._register_position_tracking()
         self._register_poi_button()
         self._register_tile_source()
+        self._register_relative_position()
 
     def _on_load_finished(self, ok: bool) -> None:
         self._is_ready = bool(ok)
@@ -242,6 +254,55 @@ class MapWidget(QWidget):
 
         self._event_bus.subscribe("mission.marker_remove", _on_marker_remove)
 
+    def _register_relative_position(self) -> None:
+        pos_src = str(self._config.get("position_source", "")).strip()
+        if not pos_src:
+            return
+        self._pos_nam = QNetworkAccessManager(self)
+        self._pos_nam.finished.connect(self._on_pos_reply)
+        self._pos_timer = QTimer(self)
+        self._pos_timer.timeout.connect(self._fetch_pos)
+        interval_ms = max(100, int(self._config.get("pos_poll_interval_ms", 200)))
+        self._pos_timer.start(interval_ms)
+        self._fetch_pos()
+        self._event_bus.publish_sync("log", f"MapWidget: relative position source {pos_src}")
+
+    def _fetch_pos(self) -> None:
+        if self._pos_pending or self._pos_nam is None:
+            return
+        src = str(self._config.get("position_source", "")).strip()
+        if not src:
+            return
+        req = QNetworkRequest(QUrl(src))
+        req.setRawHeader(b"Cache-Control", b"no-cache")
+        self._pos_nam.get(req)
+        self._pos_pending = True
+
+    def _on_pos_reply(self, reply: QNetworkReply) -> None:
+        self._pos_pending = False
+        if reply.error() == QNetworkReply.NetworkError.NoError:
+            try:
+                data = _json.loads(bytes(reply.readAll()))
+                self._robot_x = float(data.get("x", self._robot_x))
+                self._robot_y = float(data.get("y", self._robot_y))
+                if "yaw_deg" in data:
+                    yaw = float(data["yaw_deg"])
+                elif "yaw_rad" in data:
+                    yaw = math.degrees(float(data["yaw_rad"]))
+                elif "yaw" in data:
+                    yaw = math.degrees(float(data["yaw"]))
+                else:
+                    yaw = None
+                if self._start_map_x is not None:
+                    yaw_arg = f"{yaw:.4f}" if yaw is not None else "null"
+                    self.run_js(
+                        f"window.mapUpdateRelativePosition("
+                        f"{self._robot_x:.4f}, {self._robot_y:.4f}, {yaw_arg});"
+                    )
+            except Exception:
+                pass
+        reply.deleteLater()
+
     def _handle_map_action(self, data: dict) -> None:
         """Dispatches action-wheel selections from JS."""
         action = str(data.get("action", "poi"))
@@ -253,6 +314,32 @@ class MapWidget(QWidget):
                 poi_topic = str(self._config.get("poi_remove_topic", "")).strip()
                 if poi_topic:
                     self._event_bus.publish_sync(poi_topic, {"poi_id": poi_id})
+            return
+
+        if action == "set_start":
+            try:
+                lat = float(data["lat"])
+                lng = float(data["lng"])
+            except (KeyError, TypeError, ValueError):
+                return
+            self._start_map_x = self._robot_x
+            self._start_map_y = self._robot_y
+            self.run_js(
+                f"window.mapSetStartPosition("
+                f"{lat:.8f}, {lng:.8f}, "
+                f"{self._robot_x:.4f}, {self._robot_y:.4f});"
+            )
+            self._event_bus.publish_sync(
+                "log",
+                f"[Map] Start set: GPS=({lat:.6f},{lng:.6f}) "
+                f"map=({self._robot_x:.3f},{self._robot_y:.3f})",
+            )
+            return
+
+        if action == "clear_start":
+            self._start_map_x = None
+            self._start_map_y = None
+            self._event_bus.publish_sync("log", "[Map] Start position cleared")
             return
 
         try:
