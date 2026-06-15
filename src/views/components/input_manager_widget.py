@@ -169,14 +169,14 @@ class InputManagerWidget(QWidget):
         ctrl.addWidget(self._status_label, 1)
 
         self._start_btn = QPushButton("START")
-        self._start_btn.setMinimumHeight(44)
-        self._start_btn.setStyleSheet(_btn_style("#44ff44"))
+        self._start_btn.setMinimumHeight(60)
+        self._start_btn.setStyleSheet(_btn_style("#44ff44", large=True))
         self._start_btn.clicked.connect(self._start)
         ctrl.addWidget(self._start_btn)
 
         self._stop_btn = QPushButton("STOP")
-        self._stop_btn.setMinimumHeight(44)
-        self._stop_btn.setStyleSheet(_btn_style("#ff6666"))
+        self._stop_btn.setMinimumHeight(60)
+        self._stop_btn.setStyleSheet(_btn_style("#ff6666", large=True))
         self._stop_btn.setEnabled(False)
         self._stop_btn.clicked.connect(self._stop)
         ctrl.addWidget(self._stop_btn)
@@ -448,13 +448,16 @@ def _input_style() -> str:
     )
 
 
-def _btn_style(accent: str = "") -> str:
+def _btn_style(accent: str = "", large: bool = False) -> str:
     c = accent or theme.TEXT_DIM
+    padding = "12px 24px" if large else "8px 18px"
+    font_size = "15px" if large else "13px"
+    border = f"2px solid {theme.BORDER_DIM}" if large else f"1px solid {theme.BORDER_DIM}"
     return (
         f"QPushButton {{ background: {theme.BG_DARK}; color: {c}; "
-        f"border: 1px solid {theme.BORDER_DIM}; border-radius: 4px; "
-        f"padding: 8px 18px; font-size: 13px; font-family: 'Courier New'; }}"
-        f"QPushButton:hover {{ border-color: {c}; }}"
+        f"border: {border}; border-radius: 4px; "
+        f"padding: {padding}; font-size: {font_size}; font-weight: bold; font-family: 'Courier New'; }}"
+        f"QPushButton:hover {{ border-color: {c}; background: {theme.BG_SURFACE}; }}"
         f"QPushButton:pressed {{ background: {theme.BG_PANEL}; }}"
         f"QPushButton:disabled {{ color: {theme.TEXT_DIM}; border-color: {theme.BORDER_DIM}; }}"
     )
