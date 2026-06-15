@@ -24,8 +24,8 @@
       "discovery_port_field": "data_port",
       "topic": "odrive.32", "topic_prefix": "odrive.32",
       "proto_type": "DriveNodeState", "publish_field_topics": true,
-      "poll_interval_ms": 1000, "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 300, "enabled": true
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
     },
     {
       "type": "udp_poll", "name": "odrive_33",
@@ -35,8 +35,8 @@
       "discovery_port_field": "data_port",
       "topic": "odrive.33", "topic_prefix": "odrive.33",
       "proto_type": "DriveNodeState", "publish_field_topics": true,
-      "poll_interval_ms": 1000, "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 300, "enabled": true
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
     },
     {
       "type": "udp_poll", "name": "odrive_34",
@@ -46,8 +46,8 @@
       "discovery_port_field": "data_port",
       "topic": "odrive.34", "topic_prefix": "odrive.34",
       "proto_type": "DriveNodeState", "publish_field_topics": true,
-      "poll_interval_ms": 1000, "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 300, "enabled": true
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
     },
     {
       "type": "udp_poll", "name": "odrive_31",
@@ -57,8 +57,8 @@
       "discovery_port_field": "data_port",
       "topic": "odrive.31", "topic_prefix": "odrive.31",
       "proto_type": "DriveNodeState", "publish_field_topics": true,
-      "poll_interval_ms": 1000, "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 300, "enabled": true
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
     },
     {
       "type": "udp_poll", "name": "odrive_41",
@@ -68,8 +68,8 @@
       "discovery_port_field": "data_port",
       "topic": "odrive.41", "topic_prefix": "odrive.41",
       "proto_type": "DriveNodeState", "publish_field_topics": true,
-      "poll_interval_ms": 1000, "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 300, "enabled": true
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
     },
     {
       "type": "udp_poll", "name": "odrive_42",
@@ -79,8 +79,8 @@
       "discovery_port_field": "data_port",
       "topic": "odrive.42", "topic_prefix": "odrive.42",
       "proto_type": "DriveNodeState", "publish_field_topics": true,
-      "poll_interval_ms": 1000, "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 300, "enabled": true
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
     },
     {
       "type": "udp_poll", "name": "odrive_43",
@@ -90,8 +90,8 @@
       "discovery_port_field": "data_port",
       "topic": "odrive.43", "topic_prefix": "odrive.43",
       "proto_type": "DriveNodeState", "publish_field_topics": true,
-      "poll_interval_ms": 1000, "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 300, "enabled": true
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
     },
     {
       "type": "udp_poll", "name": "odrive_44",
@@ -112,8 +112,8 @@
       "discovery_port_field": "data_port",
       "topic": "gnss", "topic_prefix": "gnss",
       "proto_type": "Vn300", "publish_field_topics": true,
-      "poll_interval_ms": 1000, "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 300, "enabled": true
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
     },
     {
       "type": "udp_poll", "name": "kinova_arm",
@@ -123,8 +123,8 @@
       "discovery_port_field": "data_port",
       "topic": "kinova_arm", "topic_prefix": "kinova_arm",
       "publish_field_topics": true,
-      "poll_interval_ms": 1000, "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 300, "enabled": true
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
     }
   ],
 
@@ -345,8 +345,8 @@
           "name": "Carte GPS",
           "style": { "x": 0, "y": 0, "width": "100%", "height": "100%", "z_index": 0 },
           "data": {
-            "initial_lat": 46.759,
-            "initial_lng": 7.616,
+            "initial_lat": 46.756389,
+            "initial_lng": 7.594452,
             "initial_zoom": 15,
             "tile_source_topic":  "map.tile_source",
             "position_source":    "http://192.168.2.3:8888/robot/position",
