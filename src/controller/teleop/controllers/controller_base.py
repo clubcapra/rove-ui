@@ -64,7 +64,6 @@ class ControllerBase(ABC):
         send_heartbeat_s: float = 0.1,
         change_epsilon: float = 0.02,
         on_frame_sent: "Callable[[object, bool], None] | None" = None,
-        initial_gripper_position: int = 0,
     ) -> None:
         self._sender = sender
         self._strategy = strategy
@@ -77,7 +76,7 @@ class ControllerBase(ABC):
         self._stop = False
         self._stick_deadzone = stick_deadzone
         self._trigger_deadzone = trigger_deadzone
-        self._gripper_latch: int = initial_gripper_position  # persists across strategy switches and restarts
+        self._gripper_latch: int = 0  # persists across strategy switches
         # Send gate: the UI's Control tab flips this true; everywhere else
         # in the UI the operator is in Settings/Data and we must not move
         # the robot. If unset (CLI without UI), default-open.
@@ -252,11 +251,6 @@ class ControllerBase(ABC):
 
     def is_estopped(self) -> bool:
         return self._estopped
-
-    @property
-    def gripper_position(self) -> int:
-        """Last known gripper position (0–255). Thread-safe read."""
-        return self._gripper_latch
 
     def set_strategy(self, strategy: ControlStrategy) -> None:
         """Hot-swap the active strategy."""
