@@ -823,28 +823,41 @@ class Bitmap:
     # ── GPS tracking ───────────────────────────────────────────────────────────
 
     def _register_gps_tracking(self) -> None:
-        lat_topic = str(self.config.get("gps_lat_topic", "gnss.latitude")).strip()
-        lng_topic = str(self.config.get("gps_lng_topic", "gnss.longitude")).strip()
-        yaw_topic = str(self.config.get("gps_yaw_topic", "gnss.yaw")).strip()
+        lat_topic = str(self.config.get("gps_lat_topic", "")).strip()
+        lng_topic = str(self.config.get("gps_lng_topic", "")).strip()
+        yaw_topic = str(self.config.get("gps_yaw_topic", "")).strip()
 
-        def _on_lat(v):
-            try: self._robot_lat = float(v)
-            except (TypeError, ValueError): pass
+        if lat_topic:
+            def _on_lat(v):
+                try: self._robot_lat = float(v)
+                except (TypeError, ValueError): pass
+            self.event_bus.subscribe(lat_topic, _on_lat)
 
-        def _on_lng(v):
-            try: self._robot_lng = float(v)
-            except (TypeError, ValueError): pass
+        if lng_topic:
+            def _on_lng(v):
+                try: self._robot_lng = float(v)
+                except (TypeError, ValueError): pass
+            self.event_bus.subscribe(lng_topic, _on_lng)
 
-        def _on_yaw(v):
+        if yaw_topic:
+            def _on_yaw(v):
+                try:
+                    self._robot_yaw = float(v)
+                    self._update_display()
+                except (TypeError, ValueError):
+                    pass
+            self.event_bus.subscribe(yaw_topic, _on_yaw)
+
+        # Computed GPS from relative-position system (map_widget publishes this)
+        def _on_gps(payload: dict) -> None:
+            if not isinstance(payload, dict):
+                return
             try:
-                self._robot_yaw = float(v)
-                self._update_display()      # refresh cursor heading
-            except (TypeError, ValueError):
+                self._robot_lat = float(payload["lat"])
+                self._robot_lng = float(payload["lng"])
+            except (KeyError, TypeError, ValueError):
                 pass
-
-        self.event_bus.subscribe(lat_topic, _on_lat)
-        self.event_bus.subscribe(lng_topic, _on_lng)
-        self.event_bus.subscribe(yaw_topic, _on_yaw)
+        self.event_bus.subscribe("robot.gps_position", _on_gps)
 
     # ── GPS POI sync (map → costmap) ──────────────────────────────────────────
 

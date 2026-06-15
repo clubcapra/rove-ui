@@ -358,6 +358,12 @@ class LayoutPanel:
             self._register_child(name, widget)
             return widget
 
+        if vtype == "sar_export":
+            from .components.sar_export_widget import SARExportWidget
+            widget = SARExportWidget(data, event_bus=self.event_bus)
+            self._register_child(name, widget)
+            return widget
+
         # Placeholder for other view types (table, map, point_cloud, etc.)
         lbl = QLabel(f"Placeholder {vtype}: {name}")
         return lbl

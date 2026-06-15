@@ -72,6 +72,8 @@ class MapWidget(QWidget):
         self._robot_y: float = 0.0
         self._start_map_x: float | None = None   # map-frame coords when start was set
         self._start_map_y: float | None = None
+        self._start_lat: float | None = None     # GPS anchor when start was set
+        self._start_lng: float | None = None
         self._pos_nam: QNetworkAccessManager | None = None
         self._pos_timer: QTimer | None = None
         self._pos_pending: bool = False
@@ -293,7 +295,18 @@ class MapWidget(QWidget):
                     yaw = math.degrees(float(data["yaw"]))
                 else:
                     yaw = None
-                if self._start_map_x is not None:
+                if self._start_map_x is not None and self._start_lat is not None:
+                    # Compute GPS from relative displacement + anchor
+                    dx = self._robot_x - self._start_map_x
+                    dy = self._robot_y - self._start_map_y
+                    robot_lat = self._start_lat + dy / 111_111.0
+                    robot_lng = self._start_lng + dx / (
+                        111_111.0 * math.cos(math.radians(self._start_lat))
+                    )
+                    # Publish for SAR recorder and other subscribers
+                    self._event_bus.publish_sync("robot.gps_position", {
+                        "lat": robot_lat, "lng": robot_lng, "ts": time.time()
+                    })
                     yaw_arg = f"{yaw:.4f}" if yaw is not None else "null"
                     self.run_js(
                         f"window.mapUpdateRelativePosition("
@@ -324,6 +337,8 @@ class MapWidget(QWidget):
                 return
             self._start_map_x = self._robot_x
             self._start_map_y = self._robot_y
+            self._start_lat   = lat
+            self._start_lng   = lng
             self.run_js(
                 f"window.mapSetStartPosition("
                 f"{lat:.8f}, {lng:.8f}, "
@@ -339,6 +354,8 @@ class MapWidget(QWidget):
         if action == "clear_start":
             self._start_map_x = None
             self._start_map_y = None
+            self._start_lat   = None
+            self._start_lng   = None
             self._event_bus.publish_sync("log", "[Map] Start position cleared")
             return
 

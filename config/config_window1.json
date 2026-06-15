@@ -525,6 +525,25 @@
       ]
     },
 
+    "SAR EXPORT": {
+      "type": "layout",
+      "diaposition": "vertical",
+      "content": [
+        {
+          "type": "sar_export",
+          "name": "sar_export",
+          "data": {
+            "output_dir":          "sar_export",
+            "path_min_distance_m": 1.0,
+            "path_max_interval_s": 5.0,
+            "webdav_url":          "",
+            "webdav_user":         "",
+            "webdav_password":     ""
+          }
+        }
+      ]
+    },
+
     "EXIT": {
       "type": "layout",
       "diaposition": "vertical",
