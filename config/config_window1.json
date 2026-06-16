@@ -112,25 +112,38 @@
       "discovery_port_field": "data_port",
       "topic": "gnss", "topic_prefix": "gnss",
       "proto_type": "Vn300", "publish_field_topics": true,
+      "exclude_fields": ["position.lat", "position.lon"],
       "poll_interval_ms": 100, "recv_timeout_s": 2.0,
       "rediscovery_interval_s": 30, "enabled": true
     },
     {
-      "type": "udp_poll", "name": "kinova_arm",
-      "base_url": "http://192.168.2.2:8080",
-      "discovery_endpoint": "/discover",
-      "discovery_sensor_id": "kinova_arm",
-      "discovery_port_field": "data_port",
-      "topic": "kinova_arm", "topic_prefix": "kinova_arm",
+      "type": "udp", "name": "gps_restreamer",
+      "source": "udp://0.0.0.0:7010",
+      "topic": "gnss",
+      "topic_prefix": "gnss",
+      "parse_json": true,
       "publish_field_topics": true,
-      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 30, "enabled": true
+      "field_map": {
+        "lat": "latitude",
+        "lon": "longitude",
+        "alt_msl": "altitude"
+      },
+      "enabled": true
     }
   ],
 
   "ros2_clients": [],
 
   "http_clients": [
+    {
+      "type": "http_action",
+      "name": "poi_rest",
+      "base_url": "http://192.168.2.3:8888",
+      "actions": [
+        {"topic": "costmap.click", "method": "POST", "endpoint": "/poi",     "body": "$payload"},
+        {"topic": "map.poi",       "method": "POST", "endpoint": "/poi/gps", "body": "$payload"}
+      ]
+    },
     {
       "type": "http_action",
       "name": "mapping",
@@ -209,7 +222,6 @@
             "vtx_host": "192.168.2.2",
             "vtx_port": 5540,
             "cameras": [
-              {"name": "ARM_CAM",   "udp_vtx_id": 0, "rtsp_ip": "192.168.2.36"},
               {"name": "REAR_CAM",  "udp_vtx_id": 1, "rtsp_ip": "192.168.2.31"},
               {"name": "LEFT_CAM",  "udp_vtx_id": 2, "rtsp_ip": "192.168.2.32"},
               {"name": "RIGHT_CAM", "udp_vtx_id": 3, "rtsp_ip": "192.168.2.33"},

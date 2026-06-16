@@ -15,7 +15,7 @@ from PySide6.QtWidgets import QVBoxLayout, QWidget
 from src.controller.event_bus import EventBus
 
 TEMPLATE_PATH = Path(__file__).resolve().parent / "html" / "urdfViewer.html"
-FALLBACK_HTML = "<html><body style='color:red;background:#111'>urdfViewer.html template missing</body></html>"
+FALLBACK_HTML = "<html><body style='color:#c92b2b;background:#f0f2f5'>urdfViewer.html template missing</body></html>"
 
 
 def _temp_to_hex(t: float, min_t: float, max_t: float) -> str:

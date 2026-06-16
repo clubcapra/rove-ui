@@ -954,9 +954,10 @@ class Bitmap:
         local_y = (0.5 - ny) * 2.0 * radius_y
 
         payload: dict = {
-            "x": round(local_x, 3),
-            "y": round(local_y, 3),
-            "z": round(altitude, 2),
+            "x":    round(local_x, 3),
+            "y":    round(local_y, 3),
+            "z":    round(altitude, 2),
+            "tilt": round(self._robot_yaw, 2),
         }
 
         poi_topic = str(self.config.get("poi_topic", "")).strip()

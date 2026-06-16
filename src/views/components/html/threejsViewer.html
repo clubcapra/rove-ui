@@ -9,7 +9,7 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background: #1a1a2e;
+            background: #f0f2f5;
         }
         #canvas-container {
             width: 100%;
@@ -26,9 +26,9 @@
             gap: 8px;
             padding: 8px;
             border-radius: 8px;
-            background: rgba(8, 12, 28, 0.72);
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            color: #f4f7ff;
+            background: rgba(240, 242, 245, 0.88);
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            color: #1a1d22;
             font: 12px/1.2 "Segoe UI", sans-serif;
             pointer-events: none;
             z-index: 10;
@@ -39,13 +39,13 @@
             gap: 6px;
             padding: 3px 6px;
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.06);
+            background: rgba(0, 0, 0, 0.06);
         }
         .legend-swatch {
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            border: 1px solid rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(0, 0, 0, 0.4);
         }
         #edit-panel {
             position: absolute;
@@ -54,9 +54,9 @@
             width: 260px;
             padding: 10px;
             border-radius: 8px;
-            background: rgba(8, 12, 28, 0.82);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #f4f7ff;
+            background: rgba(240, 242, 245, 0.94);
+            border: 1px solid rgba(0, 0, 0, 0.14);
+            color: #1a1d22;
             font: 12px/1.4 "Segoe UI", sans-serif;
             z-index: 20;
             user-select: none;
@@ -75,7 +75,7 @@
         }
         #save-pivot-btn {
             appearance: none;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            border: 1px solid rgba(0, 0, 0, 0.2);
             border-radius: 6px;
             padding: 6px 10px;
             background: #1f8f6b;
@@ -122,7 +122,7 @@
 
     // Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1a2e);
+    scene.background = new THREE.Color(0xf0f2f5);
 
     // Camera
     const camera = new THREE.PerspectiveCamera(

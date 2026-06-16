@@ -48,19 +48,19 @@ class _PingSignals(QObject):
 
 _BTN_INACTIVE = """
     QPushButton {
-        background: #292928; color: #e0e0e0;
-        border: 1px solid #444; border-radius: 5px;
+        background: #d8dae0; color: #1a1d22;
+        border: 1px solid #bfc5cf; border-radius: 5px;
         font-size: 12px; padding: 2px 6px;
         text-align: left;
     }
-    QPushButton:hover   { background: #3a3a38; border-color: #555; }
-    QPushButton:pressed { background: #444; }
+    QPushButton:hover   { background: #c8cdd5; border-color: #a8b1bc; }
+    QPushButton:pressed { background: #b8c0ca; }
 """
 
 _BTN_ACTIVE = """
     QPushButton {
-        background: #3a3a38; color: #eb4034;
-        border: 1px solid #eb4034; border-radius: 5px;
+        background: #c8cdd5; color: #cc2a20;
+        border: 1px solid #cc2a20; border-radius: 5px;
         font-size: 12px; font-weight: 700; padding: 2px 6px;
         text-align: left;
     }
@@ -191,7 +191,7 @@ class CameraWidget:
 
     def _build_sidebar(self) -> QWidget:
         inner = QWidget()
-        inner.setStyleSheet("background: #1c1c1b;")
+        inner.setStyleSheet("background: #e8ebef;")
 
         col = QVBoxLayout(inner)
         col.setContentsMargins(6, 8, 6, 8)
@@ -204,7 +204,7 @@ class CameraWidget:
             dot = QLabel("●")
             dot.setFixedSize(12, 12)
             dot.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            dot.setStyleSheet("color: #888; font-size: 9px; background: transparent;")
+            dot.setStyleSheet("color: #7a8591; font-size: 9px; background: transparent;")
             self._ping_dots.append(dot)
 
             btn = QPushButton(cam_name)
@@ -233,7 +233,7 @@ class CameraWidget:
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setFixedWidth(148)
         scroll.setStyleSheet(
-            "QScrollArea { border: none; border-right: 1px solid #292928; background: #1c1c1b; }"
+            "QScrollArea { border: none; border-right: 1px solid #d0d5de; background: #e8ebef; }"
         )
         return scroll
 
@@ -242,14 +242,14 @@ class CameraWidget:
     def _build_mode_bar(self) -> QWidget:
         bar = QWidget()
         bar.setFixedHeight(30)
-        bar.setStyleSheet("background: #292928; border-bottom: 1px solid #1c1c1b;")
+        bar.setStyleSheet("background: #dde1e8; border-bottom: 1px solid #bfc5cf;")
 
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(10, 0, 10, 0)
         layout.setSpacing(8)
 
         self._mode_label = QLabel("● RTSP")
-        self._mode_label.setStyleSheet("color: #eb4034; font-size: 12px; font-weight: 700; background: transparent;")
+        self._mode_label.setStyleSheet("color: #cc2a20; font-size: 12px; font-weight: 700; background: transparent;")
         layout.addWidget(self._mode_label)
 
         layout.addStretch()
@@ -258,12 +258,12 @@ class CameraWidget:
         self._toggle_btn.setFixedHeight(20)
         self._toggle_btn.setStyleSheet("""
             QPushButton {
-                background: #292928; color: #e0e0e0;
-                border: 1px solid #555; border-radius: 4px;
+                background: #dde1e8; color: #1a1d22;
+                border: 1px solid #a8b1bc; border-radius: 4px;
                 font-size: 11px; padding: 0 8px;
             }
-            QPushButton:hover   { background: #3a3a38; border-color: #777; }
-            QPushButton:pressed { background: #444; }
+            QPushButton:hover   { background: #d0d5de; border-color: #7a8591; }
+            QPushButton:pressed { background: #bfc5cf; }
         """)
         self._toggle_btn.clicked.connect(self._on_toggle_mode)
         layout.addWidget(self._toggle_btn)
@@ -275,7 +275,7 @@ class CameraWidget:
             return
         if self._active_mode == "rtsp":
             self._mode_label.setText("● RTSP")
-            self._mode_label.setStyleSheet("color: #eb4034; font-size: 12px; font-weight: 700; background: transparent;")
+            self._mode_label.setStyleSheet("color: #cc2a20; font-size: 12px; font-weight: 700; background: transparent;")
             self._toggle_btn.setText("→ VTX")
         else:
             self._mode_label.setText("● VTX")
@@ -301,7 +301,7 @@ class CameraWidget:
 
     def _on_ping_result(self, idx: int, ok: bool) -> None:
         if 0 <= idx < len(self._ping_dots):
-            color = "#22c55e" if ok else "#555"
+            color = "#22c55e" if ok else "#a8b1bc"
             self._ping_dots[idx].setStyleSheet(f"color: {color}; font-size: 9px; background: transparent;")
 
         prev = self._rtsp_flags[idx] if idx < len(self._rtsp_flags) else None

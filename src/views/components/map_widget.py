@@ -12,7 +12,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from src.controller.event_bus import EventBus
 
 
-FALLBACK_HTML = """<!DOCTYPE html><html><body style="background:#080808;color:#4a6880;font-family:monospace">Missing template: src/views/components/html/map.html</body></html>"""
+FALLBACK_HTML = """<!DOCTYPE html><html><body style="background:#f0f2f5;color:#606870;font-family:monospace">Missing template: src/views/components/html/map.html</body></html>"""
 
 
 def _center_dialog(dialog, parent: QWidget) -> None:

@@ -1,26 +1,26 @@
-# Tactical dark theme constants — Rove Mission Control UI
+# Light theme constants — Rove Mission Control UI
 
 # ── Background layers ─────────────────────────────────────────────────────────
-BG_DEEP    = "#080808"   # window / outermost background
-BG_DARK    = "#0f0f0f"   # panel background
-BG_PANEL   = "#161616"   # elevated surface (header bars, nav)
-BG_SURFACE = "#1e1e1e"   # interactive cells, hover areas
+BG_DEEP    = "#f0f2f5"   # window / outermost background
+BG_DARK    = "#e8ebef"   # panel background
+BG_PANEL   = "#dde1e8"   # elevated surface (header bars, nav)
+BG_SURFACE = "#d0d5de"   # interactive cells, hover areas
 
 # ── Borders ───────────────────────────────────────────────────────────────────
-BORDER_DIM    = "#222222"   # inactive / decorative borders
-BORDER        = "#2e2e2e"   # default borders
-BORDER_BRIGHT = "#484848"   # highlighted / focused borders
+BORDER_DIM    = "#bfc5cf"   # inactive / decorative borders
+BORDER        = "#a8b1bc"   # default borders
+BORDER_BRIGHT = "#7a8591"   # highlighted / focused borders
 
 # ── Accent colors ─────────────────────────────────────────────────────────────
-CYAN   = "#ffae00"   # primary active / selected
-GREEN  = "#00e676"   # ok / connected / nominal
-RED    = "#ff3d3d"   # alert / error / e-stop
-AMBER  = "#ffb300"   # warning / degraded
+CYAN   = "#c07800"   # primary active / selected
+GREEN  = "#00875a"   # ok / connected / nominal
+RED    = "#c92b2b"   # alert / error / e-stop
+AMBER  = "#b86000"   # warning / degraded
 
 # ── Text ──────────────────────────────────────────────────────────────────────
-TEXT       = "#d0d8e0"   # primary readable text
-TEXT_DIM   = "#505050"   # secondary / inactive labels
-TEXT_MUTED = "#282828"   # very dim decorative text
+TEXT       = "#1a1d22"   # primary readable text
+TEXT_DIM   = "#606870"   # secondary / inactive labels
+TEXT_MUTED = "#b8c0ca"   # very dim decorative text
 
 # ── Font ──────────────────────────────────────────────────────────────────────
 FONT_MONO = "'Courier New', monospace"

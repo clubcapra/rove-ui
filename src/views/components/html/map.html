@@ -8,66 +8,66 @@
   <script src="leaflet.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; background: #080808; font-family: 'Courier New', monospace; overflow: hidden; }
+    html, body { height: 100%; background: #f0f2f5; font-family: 'Courier New', monospace; overflow: hidden; }
 
     #map {
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 24px;
-      background: #080808;
+      background: #f0f2f5;
     }
     .leaflet-container { cursor: crosshair !important; }
 
     /* Status bar */
     #status-bar {
       position: absolute; bottom: 0; left: 0; right: 0; height: 24px;
-      background: #0f0f0f; border-top: 1px solid #2e2e2e;
+      background: #e8ebef; border-top: 1px solid #a8b1bc;
       display: flex; align-items: center;
-      font-size: 10px; color: #505050; z-index: 1000; pointer-events: none;
+      font-size: 10px; color: #606870; z-index: 1000; pointer-events: none;
     }
-    .sb { padding: 0 12px; border-right: 1px solid #222222; white-space: nowrap; }
+    .sb { padding: 0 12px; border-right: 1px solid #bfc5cf; white-space: nowrap; }
     .sb:last-child { border-right: none; }
-    #sb-coords { color: #d0d8e0; }
+    #sb-coords { color: #1a1d22; }
     .sb-spacer { flex: 1; }
 
     /* Popup */
     .leaflet-popup-content-wrapper {
-      background: #161616; color: #d0d8e0;
-      border: 1px solid #2e2e2e; border-radius: 0;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.85), 0 0 0 1px rgba(0,212,255,0.06);
+      background: #dde1e8; color: #1a1d22;
+      border: 1px solid #a8b1bc; border-radius: 0;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,212,255,0.06);
       font-family: 'Courier New', monospace; font-size: 11px;
     }
     .leaflet-popup-content { margin: 10px 14px; }
-    .leaflet-popup-tip { background: #161616; }
-    .leaflet-popup-close-button { color: #505050 !important; font-size: 18px !important; }
-    .leaflet-popup-close-button:hover { color: #ffae00 !important; background: transparent !important; }
+    .leaflet-popup-tip { background: #dde1e8; }
+    .leaflet-popup-close-button { color: #606870 !important; font-size: 18px !important; }
+    .leaflet-popup-close-button:hover { color: #c07800 !important; background: transparent !important; }
 
     /* Zoom controls */
     .leaflet-control-zoom a {
-      background: #161616 !important; color: #d0d8e0 !important;
-      border-color: #2e2e2e !important; border-radius: 0 !important;
+      background: #dde1e8 !important; color: #1a1d22 !important;
+      border-color: #a8b1bc !important; border-radius: 0 !important;
       font-family: monospace;
     }
-    .leaflet-control-zoom a:hover { background: #1e1e1e !important; color: #ffae00 !important; }
-    .leaflet-bar { border: 1px solid #2e2e2e !important; box-shadow: none !important; }
-    .leaflet-bar a { border-bottom-color: #2e2e2e !important; }
+    .leaflet-control-zoom a:hover { background: #d0d5de !important; color: #c07800 !important; }
+    .leaflet-bar { border: 1px solid #a8b1bc !important; box-shadow: none !important; }
+    .leaflet-bar a { border-bottom-color: #a8b1bc !important; }
     .leaflet-control-attribution {
-      background: rgba(6,10,15,0.8) !important; color: #1e3040 !important;
+      background: rgba(240,242,245,0.8) !important; color: #507090 !important;
       font-family: monospace; font-size: 9px;
     }
-    .leaflet-control-attribution a { color: #484848 !important; }
+    .leaflet-control-attribution a { color: #7a8591 !important; }
 
     /* POI popup content */
     .tac-popup { display: flex; flex-direction: column; gap: 4px; }
-    .tac-label { color: #ffae00; font-weight: 700; letter-spacing: 1px; }
-    .tac-coords { color: #505050; font-size: 10px; }
-    .tac-popup img { max-width: 200px; max-height: 150px; margin-top: 6px; border: 1px solid #2e2e2e; }
+    .tac-label { color: #c07800; font-weight: 700; letter-spacing: 1px; }
+    .tac-coords { color: #606870; font-size: 10px; }
+    .tac-popup img { max-width: 200px; max-height: 150px; margin-top: 6px; border: 1px solid #a8b1bc; }
     .tac-rm-btn {
       margin-top: 4px; padding: 4px 10px;
-      background: transparent; border: 1px solid #ff3d3d;
-      color: #ff3d3d; font-family: 'Courier New', monospace;
+      background: transparent; border: 1px solid #c92b2b;
+      color: #c92b2b; font-family: 'Courier New', monospace;
       font-size: 10px; letter-spacing: 1.5px; cursor: pointer;
     }
-    .tac-rm-btn:hover { background: rgba(255,61,61,0.12); }
+    .tac-rm-btn:hover { background: rgba(201,43,43,0.12); }
 
     /* Click flash */
     @keyframes flash {
@@ -77,7 +77,7 @@
     }
     .click-flash {
       position: absolute; width: 14px; height: 14px;
-      border: 1px solid #ffae00;
+      border: 1px solid #c07800;
       pointer-events: none;
       animation: flash 0.45s ease-out forwards;
       margin-left: -7px; margin-top: -7px; z-index: 2000;
@@ -89,20 +89,20 @@
       top: 80px; left: 10px;
       z-index: 1000;
       width: 26px; height: 26px;
-      background: #161616;
-      border: 1px solid #2e2e2e;
-      color: #505050;
+      background: #dde1e8;
+      border: 1px solid #a8b1bc;
+      color: #606870;
       font-size: 14px;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: color 0.15s, border-color 0.15s, background 0.15s;
     }
     #btn-recenter:hover {
-      background: #1e1e1e;
-      border-color: #ffae00;
-      color: #ffae00;
+      background: #d0d5de;
+      border-color: #c07800;
+      color: #c07800;
     }
-    #btn-recenter:active { background: #080808; }
+    #btn-recenter:active { background: #f0f2f5; }
 
     /* ── Action wheel ───────────────────────────────────────────── */
     #action-wheel {
@@ -114,7 +114,7 @@
     #aw-backdrop {
       position: absolute;
       top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.30);
+      background: rgba(0, 0, 0, 0.15);
       cursor: default;
     }
     #aw-ring {
@@ -125,9 +125,9 @@
     #aw-coords-box {
       position: absolute;
       transform: translate(-50%, -50%);
-      background: #0a0a0a;
-      border: 1px solid #2e2e2e;
-      color: #484848;
+      background: #eef0f3;
+      border: 1px solid #a8b1bc;
+      color: #7a8591;
       font-size: 9px;
       font-family: 'Courier New', monospace;
       padding: 4px 8px;
@@ -140,9 +140,9 @@
       position: absolute;
       width: 64px; height: 64px;
       border-radius: 50%;
-      background: #0f0f0f;
-      border: 1.5px solid #2e2e2e;
-      color: #d0d8e0;
+      background: #e8ebef;
+      border: 1.5px solid #a8b1bc;
+      color: #1a1d22;
       font-family: 'Courier New', monospace;
       cursor: pointer;
       display: flex; flex-direction: column;
@@ -154,20 +154,20 @@
       -webkit-tap-highlight-color: transparent;
     }
     .aw-btn:hover, .aw-btn:active {
-      background: #1a1a1a;
-      border-color: #ffae00;
-      color: #ffae00;
-      box-shadow: 0 0 16px rgba(255,174,0,0.25);
+      background: #d0d5de;
+      border-color: #c07800;
+      color: #c07800;
+      box-shadow: 0 0 16px rgba(192,120,0,0.25);
     }
     .aw-btn.aw-goto:hover, .aw-btn.aw-goto:active {
-      border-color: #00e676;
-      color: #00e676;
-      box-shadow: 0 0 16px rgba(0,230,118,0.2);
+      border-color: #00875a;
+      color: #00875a;
+      box-shadow: 0 0 16px rgba(0,135,90,0.2);
     }
     .aw-btn.aw-cancel:hover, .aw-btn.aw-cancel:active {
-      border-color: #ff3d3d;
-      color: #ff3d3d;
-      box-shadow: 0 0 16px rgba(255,61,61,0.2);
+      border-color: #c92b2b;
+      color: #c92b2b;
+      box-shadow: 0 0 16px rgba(201,43,43,0.2);
     }
     .aw-btn.aw-sentinel:hover, .aw-btn.aw-sentinel:active {
       border-color: #22d3ee; color: #22d3ee;
@@ -189,7 +189,7 @@
       display: none;
       position: absolute;
       top: 50px; left: 50%; transform: translateX(-50%);
-      background: #080808; border: 1px solid #22d3ee;
+      background: #f0f2f5; border: 1px solid #22d3ee;
       color: #22d3ee; font-family: 'Courier New', monospace;
       font-size: 10px; letter-spacing: 2px; font-weight: 700;
       padding: 6px 18px; z-index: 3500; pointer-events: none;
@@ -199,7 +199,7 @@
       display: none;
       position: absolute;
       top: 50px; left: 50%; transform: translateX(-50%);
-      background: #080808; border: 1px solid #f7d412;
+      background: #f0f2f5; border: 1px solid #f7d412;
       color: #f7d412; font-family: 'Courier New', monospace;
       font-size: 10px; letter-spacing: 2px; font-weight: 700;
       padding: 6px 14px 6px 18px; z-index: 3500;
@@ -254,15 +254,15 @@
       position: absolute;
       top: 10px; right: 10px;
       z-index: 1000;
-      background: #0f0f0f;
-      border: 1px solid #2e2e2e;
+      background: #e8ebef;
+      border: 1px solid #a8b1bc;
       min-width: 200px;
       font-family: 'Courier New', monospace;
     }
     #filter-title {
-      background: #080808;
-      border-bottom: 1px solid #2e2e2e;
-      color: #505050;
+      background: #f0f2f5;
+      border-bottom: 1px solid #a8b1bc;
+      color: #606870;
       font-size: 16px;
       letter-spacing: 1.5px;
       padding: 4px 8px;
@@ -275,15 +275,15 @@
       cursor: pointer;
       font-size: 16px;
       letter-spacing: 1px;
-      border-bottom: 1px solid #161616;
-      color: #a0a0a0;
+      border-bottom: 1px solid #dde1e8;
+      color: #404850;
       user-select: none;
       transition: background 0.1s, color 0.1s;
     }
     .filter-row:last-child { border-bottom: none; }
-    .filter-row:hover { background: #1a1a1a; color: #d0d8e0; }
+    .filter-row:hover { background: #d0d5de; color: #1a1d22; }
     .filter-dot { width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0; }
-    .filter-row.off { color: #383838; }
+    .filter-row.off { color: #b0b8c0; }
     .filter-row.off .filter-dot { opacity: 0.2; }
   </style>
 </head>
@@ -296,7 +296,7 @@
   <span class="sb" id="sb-pois">0 WAYPOINTS</span>
   <span class="sb" id="sb-steps">0 STEPS</span>
   <span class="sb-spacer"></span>
-  <span class="sb" style="color:#222222;">&#9658; TAP TO PLACE ACTION</span>
+  <span class="sb" style="color:#b8c0ca;">&#9658; TAP TO PLACE ACTION</span>
 </div>
 
 <!-- Action wheel overlay -->
@@ -826,7 +826,7 @@
       const x2 = Math.round(Math.cos(rad) * (_AW_RADIUS - 32));
       const y2 = Math.round(Math.sin(rad) * (_AW_RADIUS - 32));
       svgContent += '<line x1="0" y1="0" x2="' + x2 + '" y2="' + y2 +
-        '" stroke="#2e2e2e" stroke-width="1" stroke-dasharray="3 3"/>';
+        '" stroke="#a8b1bc" stroke-width="1" stroke-dasharray="3 3"/>';
     }
     svg.innerHTML = svgContent;
 

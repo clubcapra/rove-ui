@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from socket import AF_INET, SO_REUSEADDR, SOCK_DGRAM, SOL_SOCKET, socket, timeout
 from threading import Event, Thread
 from typing import Any
@@ -53,6 +53,8 @@ class UDPClientConfig:
     publish_node_data: bool = True
     publish_field_topics: bool = True
     port: int = 0
+    exclude_fields: tuple[str, ...] = ()
+    field_map: dict[str, str] = dc_field(default_factory=dict)
 
 
 class UDPClient:
@@ -82,6 +84,8 @@ class UDPClient:
             publish_node_data=bool(config.get("publish_node_data", True)),
             publish_field_topics=bool(config.get("publish_field_topics", True)),
             port=int(config.get("port", 0)),
+            exclude_fields=tuple(str(f) for f in config.get("exclude_fields", [])),
+            field_map={str(k): str(v) for k, v in config.get("field_map", {}).items()},
         )
         self.event_bus = event_bus or EventBus()
         self._raw_config = config
@@ -151,6 +155,17 @@ class UDPClient:
 
     # ── Loops ──────────────────────────────────────────────────────────────
 
+    def _publish_fields(self, message: dict) -> None:
+        prefix = self.config.topic_prefix
+        exclude = self.config.exclude_fields
+        fmap = self.config.field_map
+        for key, value in message.items():
+            if key in exclude:
+                continue
+            mapped = fmap.get(key, key)
+            if isinstance(value, (int, float, str, bool)):
+                self.event_bus.publish_sync(f"{prefix}.{mapped}" if prefix else mapped, value)
+
     def _listen_loop(self) -> None:
         assert self._socket is not None
         while not self._stop_event.is_set():
@@ -160,7 +175,10 @@ class UDPClient:
                 continue
             except OSError:
                 break
-            self.event_bus.publish_sync(self.config.topic, self._decode_text(payload))
+            decoded = self._decode_text(payload)
+            self.event_bus.publish_sync(self.config.topic, decoded)
+            if self.config.publish_field_topics and isinstance(decoded, dict):
+                self._publish_fields(decoded)
 
     def _poll_nested_loop(self) -> None:
         """Poll {outer_key: {field: value}} → publish {prefix}.{outer_key}.{field}."""
@@ -342,10 +360,7 @@ class UDPClient:
 
             self.event_bus.publish_sync(self.config.topic, message)
             if self.config.publish_field_topics and isinstance(message, dict):
-                prefix = self.config.topic_prefix
-                for field, value in message.items():
-                    if isinstance(value, (int, float, str, bool)):
-                        self.event_bus.publish_sync(f"{prefix}.{field}" if prefix else field, value)
+                self._publish_fields(message)
 
             if not _first_published:
                 _first_published = True
