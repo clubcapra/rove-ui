@@ -234,9 +234,9 @@ class SARRecorder:
     SAR trial files (path.txt, opi_list.txt, path_map.jpg, OPI images).
 
     Subscribes (via EventBus) to:
-      "robot.gps_position" — dict {lat, lng, ts}
-      "map.poi"            — dict {lat, lng, label, photo?, ts?}
-      "costmap.poi"        — dict {lat, lng, label, photo?, ts?}
+      gps_topic (default "gnss") — dict with lat_field/lng_field (default "latitude"/"longitude")
+      "map.poi"                  — dict {lat, lng, label, photo?, ts?}
+      "costmap.poi"              — dict {lat, lng, label, photo?, ts?}
     """
 
     def __init__(self, event_bus, config: dict | None = None):
@@ -254,13 +254,16 @@ class SARRecorder:
 
         self._min_dist_m   = float(self._cfg.get("path_min_distance_m", 1.0))
         self._max_interval = float(self._cfg.get("path_max_interval_s", 5.0))
+        self._gps_topic    = str(self._cfg.get("gps_topic",   "gnss"))
+        self._lat_field    = str(self._cfg.get("lat_field",   "latitude"))
+        self._lng_field    = str(self._cfg.get("lng_field",   "longitude"))
 
         self._status_cbs: list[Callable] = []
         self._log_cbs:    list[Callable] = []
 
-        self._bus.subscribe("robot.gps_position", self._on_position)
-        self._bus.subscribe("map.poi",            self._on_poi)
-        self._bus.subscribe("costmap.poi",        self._on_poi)
+        self._bus.subscribe(self._gps_topic,  self._on_position)
+        self._bus.subscribe("map.poi",        self._on_poi)
+        self._bus.subscribe("costmap.poi",    self._on_poi)
 
     # ── Callbacks ─────────────────────────────────────────────────────────
 
@@ -335,8 +338,8 @@ class SARRecorder:
         if not self._recording:
             return
         try:
-            lat = float(payload["lat"])
-            lng = float(payload["lng"])
+            lat = float(payload[self._lat_field])
+            lng = float(payload[self._lng_field])
             ts  = float(payload.get("ts", time.time()))
         except (TypeError, KeyError, ValueError):
             return

@@ -173,7 +173,7 @@
           "toggle": true,
           "color": "#ff3d3d"
         },
-        {"label": "MAPPING START",    "event": "mapping.go",      "value": "1", "color": "#00e676"},
+        {"label": "MAPPING START", "event": "mapping.go",      "value": "1", "color": "#00e676"},
         {"label": "MAPPING PAUSE", "event": "mapping.pause",   "value": "1", "color": "#ffae00"},
         {"label": "EXPORT MAP",    "event": "mapping.export",  "value": "1", "color": "#1a6fff"},
         {"label": "RESTART MAP",   "event": "mapping.restart", "value": "1", "color": "#ff3d3d"}
