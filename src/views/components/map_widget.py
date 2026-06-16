@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import datetime
 import json
 import time
 from pathlib import Path
@@ -63,6 +65,7 @@ class MapWidget(QWidget):
         self._first_center_done = False
         self._poi_seq = 0
         self._mission_seq = 0
+        self._pois: dict[str, dict] = {}  # poi_id → {label, lat, lng, alt, photo}
         self._js_queue.connect(self._exec_js)
 
     def _load_html(self) -> str:
@@ -90,6 +93,7 @@ class MapWidget(QWidget):
         self._register_position_tracking()
         self._register_poi_button()
         self._register_tile_source()
+        self._register_export()
 
     def _on_load_finished(self, ok: bool) -> None:
         self._is_ready = bool(ok)
@@ -231,6 +235,11 @@ class MapWidget(QWidget):
                     self.run_js(
                         f"window.mapAttachPhoto({json.dumps(poi_id)}, {json.dumps(photo)});"
                     )
+                if poi_id:
+                    self._pois[poi_id] = {
+                        "label": label, "lat": lat, "lng": lng,
+                        "alt": float(payload.get("alt", 0.0)), "photo": photo,
+                    }
 
             self._event_bus.subscribe(at_topic, _on_poi_at)
             self._event_bus.publish_sync("log", f"MapWidget: add-POI-at bound to '{at_topic}'")
@@ -250,6 +259,7 @@ class MapWidget(QWidget):
             poi_id = str(data.get("poi_id", ""))
             if poi_id:
                 self.run_js(f"window.mapRemovePOI({json.dumps(poi_id)});")
+                self._pois.pop(poi_id, None)
                 poi_topic = str(self._config.get("poi_remove_topic", "")).strip()
                 if poi_topic:
                     self._event_bus.publish_sync(poi_topic, {"poi_id": poi_id})
@@ -329,6 +339,11 @@ class MapWidget(QWidget):
         if photo_url:
             self.run_js(f"window.mapAttachPhoto({json.dumps(poi_id)}, {json.dumps(photo_url)});")
 
+        self._pois[poi_id] = {
+            "label": label, "lat": lat, "lng": lng,
+            "alt": altitude, "photo": photo_url or "",
+        }
+
         poi_topic = str(self._config.get("poi_topic", "")).strip()
         if poi_topic:
             payload: dict = {"lat": lat, "lng": lng, "label": label, "alt": altitude, "poi_id": poi_id}
@@ -339,6 +354,53 @@ class MapWidget(QWidget):
         self._event_bus.publish_sync(
             "log",
             f"[Map] POI {self._poi_seq} «{label}» → GPS=({lat:.6f},{lng:.6f}) alt={altitude:.2f}m",
+        )
+
+    def _register_export(self) -> None:
+        topic = str(self._config.get("map_export_topic", "")).strip()
+        if not topic:
+            return
+        self._event_bus.subscribe(topic, lambda _: QTimer.singleShot(0, self._do_export))
+        self._event_bus.publish_sync("log", f"MapWidget: export bound to '{topic}'")
+
+    def _do_export(self) -> None:
+        stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        folder = Path("exports") / f"run_{stamp}"
+        folder.mkdir(parents=True, exist_ok=True)
+
+        # ── pois.txt ─────────────────────────────────────────────────────
+        txt_path = folder / "pois.txt"
+        with open(txt_path, "w", encoding="utf-8") as f:
+            f.write(f"Export POI — {stamp}\n")
+            f.write("=" * 42 + "\n\n")
+            if not self._pois:
+                f.write("Aucun POI enregistré.\n")
+            for i, (poi_id, poi) in enumerate(self._pois.items(), 1):
+                f.write(f"[{i:03d}]  {poi['label']}\n")
+                f.write(f"       GPS  : {poi['lat']:.6f}, {poi['lng']:.6f}\n")
+                f.write(f"       Alt  : {poi['alt']:.2f} m\n")
+                f.write(f"       ID   : {poi_id}\n\n")
+
+        # ── photos ───────────────────────────────────────────────────────
+        for i, (poi_id, poi) in enumerate(self._pois.items(), 1):
+            photo = poi.get("photo", "")
+            if not photo or not photo.startswith("data:image"):
+                continue
+            try:
+                _, b64 = photo.split(",", 1)
+                img_bytes = base64.b64decode(b64)
+            except Exception:
+                continue
+            safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in poi["label"])
+            (folder / f"poi_{i:03d}_{safe}.jpg").write_bytes(img_bytes)
+
+        # ── map screenshot ────────────────────────────────────────────────
+        if self._view:
+            pix = self._view.grab()
+            pix.save(str(folder / "map.png"), "PNG")
+
+        self._event_bus.publish_sync(
+            "log", f"[Map] Export → {folder.resolve()}  ({len(self._pois)} POI(s))"
         )
 
     def _handle_goto(self, lat: float, lng: float) -> None:
