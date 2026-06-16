@@ -12,6 +12,11 @@
       "active_color":   "#ff3d3d",
       "inactive_color": "#00e676",
       "topic": "estop_status"
+    },
+    "mapping_status": {
+      "state_topic": "mapping.state",
+      "nodes_topic": "mapping.nodes",
+      "lc_topic":    "mapping.loop_closures"
     }
   },
 
@@ -117,6 +122,22 @@
       "rediscovery_interval_s": 30, "enabled": true
     },
     {
+      "type": "json_http_flat",
+      "name": "mapping_status",
+      "source": "http://192.168.2.3:8888/mapping/status",
+      "topic_prefix": "mapping",
+      "poll_interval_ms": 1000,
+      "enabled": true
+    },
+    {
+      "type": "json_http_topic",
+      "name": "minimap_poller",
+      "source": "http://192.168.2.3:8888/minimap",
+      "topic": "costmap.grid",
+      "poll_interval_ms": 200,
+      "enabled": true
+    },
+    {
       "type": "udp", "name": "gps_restreamer",
       "source": "udp://0.0.0.0:7010",
       "topic": "gnss",
@@ -140,8 +161,9 @@
       "name": "poi_rest",
       "base_url": "http://192.168.2.3:8888",
       "actions": [
-        {"topic": "costmap.click", "method": "POST", "endpoint": "/poi",     "body": "$payload"},
-        {"topic": "map.poi",       "method": "POST", "endpoint": "/poi/gps", "body": "$payload"}
+        {"topic": "costmap.poi",    "method": "POST", "endpoint": "/pois/add",    "body": {"name": "$label"}},
+        {"topic": "map.poi",        "method": "POST", "endpoint": "/pois/add",    "body": {"name": "$label"}},
+        {"topic": "map.poi_remove", "method": "POST", "endpoint": "/pois/delete", "body": {"id":   "$poi_id"}}
       ]
     },
     {
@@ -149,8 +171,11 @@
       "name": "mapping",
       "base_url": "http://192.168.2.3:8888",
       "actions": [
+        {"topic": "mapping.launch",  "method": "POST", "endpoint": "/mapping/launch"},
+        {"topic": "mapping.stop",    "method": "POST", "endpoint": "/mapping/stop"},
         {"topic": "mapping.go",      "method": "POST", "endpoint": "/mapping/go"},
         {"topic": "mapping.pause",   "method": "POST", "endpoint": "/mapping/pause"},
+        {"topic": "mapping.new_map", "method": "POST", "endpoint": "/mapping/new_map"},
         {"topic": "mapping.restart", "method": "POST", "endpoint": "/mapping/restart"},
         {"topic": "mapping.export",  "method": "POST", "endpoint": "/mapping/export"}
       ]
@@ -197,9 +222,13 @@
           "toggle": true,
           "color": "#ff3d3d"
         },
-        {"label": "EXPORT MAP",       "event": "map.export",      "value": "1", "color": "#1a6fff"},
-        {"label": "MAPPING START",    "event": "mapping.go",      "value": "1", "color": "#00e676"},
-        {"label": "MAPPING PAUSE", "event": "mapping.pause",   "value": "1", "color": "#ffae00"},
+        {"label": "EXPORT MAP",    "event": "map.export",      "value": "1", "color": "#1a6fff"},
+        {"label": "LAUNCH",        "event": "mapping.launch",  "value": "1", "color": "#00e676"},
+        {"label": "STOP LAUNCH",   "event": "mapping.stop",    "value": "1", "color": "#c92b2b"},
+        {"label": "MAP START",     "event": "mapping.go",      "value": "1", "color": "#00875a"},
+        {"label": "MAP PAUSE",     "event": "mapping.pause",   "value": "1", "color": "#ffae00"},
+        {"label": "NEW MAP",       "event": "mapping.new_map", "value": "1", "color": "#7c5cfc"},
+        {"label": "EXPORT SCAN",   "event": "mapping.export",  "value": "1", "color": "#1a6fff"},
         {"label": "RESTART MAP",   "event": "mapping.restart", "value": "1", "color": "#ff3d3d"}
       ]
     }
@@ -331,6 +360,7 @@
             "robot_position_yaw_topic": "gnss.yaw",
             "click_topic":       "map.click",
             "poi_topic":         "map.poi",
+            "poi_remove_topic":  "map.poi_remove",
             "add_poi_at_topic":  "costmap.poi",
             "map_export_topic":  "map.export"
           }
@@ -471,7 +501,7 @@
           "name": "Costmap",
           "label": "COSTMAP",
           "data": {
-            "source": "http://192.168.2.3/minimap",
+            "data_topic":        "costmap.grid",
             "cornerPositionWidth": 8,
             "cornerPositionHeight": 8,
             "click_topic":       "costmap.click",

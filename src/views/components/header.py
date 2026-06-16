@@ -42,6 +42,7 @@ class Header(QWidget):
     _battery_signal: Signal = Signal(int, float)
     _ping_signal:    Signal = Signal(int, str, object)
     _estop_signal:   Signal = Signal(bool)
+    _mapping_signal: Signal = Signal(str, str)   # (text, css-color)
 
     _STYLE = f"""
         Header {{
@@ -94,6 +95,11 @@ class Header(QWidget):
             f"color: {theme.GREEN}; font-weight: 700; letter-spacing: 1px;"
         )
         left.addWidget(self._estop_label)
+
+        self._mapping_label = QLabel("[MAP  --]")
+        self._mapping_label.setStyleSheet(f"color: {theme.TEXT_DIM};")
+        left.addWidget(self._mapping_label)
+
         left.addStretch()
 
         left_w = QWidget()
@@ -145,6 +151,7 @@ class Header(QWidget):
         self._battery_signal.connect(self._do_update_battery)
         self._ping_signal.connect(self._do_update_ping)
         self._estop_signal.connect(self._do_update_estop)
+        self._mapping_signal.connect(self._do_update_mapping)
 
         self._clock = QTimer(self)
         self._clock.timeout.connect(
@@ -169,6 +176,49 @@ class Header(QWidget):
         if event_bus:
             estop_topic = estop_cfg.get("topic", "estop_status")
             event_bus.subscribe(estop_topic, self.update_estop)
+
+            mapping_cfg = settings.get("mapping_status", {})
+            state_topic = str(mapping_cfg.get("state_topic", "")).strip()
+            nodes_topic = str(mapping_cfg.get("nodes_topic", "")).strip()
+            lc_topic    = str(mapping_cfg.get("lc_topic",    "")).strip()
+            if state_topic or nodes_topic:
+                self._map_state = "--"
+                self._map_nodes: str = "--"
+                self._map_lc:    str = "--"
+
+                def _push_map():
+                    s = self._map_state
+                    color = (theme.GREEN if s == "running"
+                             else theme.AMBER if s in ("paused", "initializing")
+                             else theme.TEXT_DIM)
+                    txt = f"[MAP  {s.upper()}"
+                    if self._map_nodes != "--":
+                        txt += f"  {self._map_nodes}n"
+                    if self._map_lc != "--":
+                        txt += f"  {self._map_lc}lc"
+                    txt += "]"
+                    self._mapping_signal.emit(txt, color)
+
+                if state_topic:
+                    event_bus.subscribe(
+                        state_topic,
+                        lambda v: (setattr(self, "_map_state", str(v).lower()), _push_map()),
+                    )
+                if nodes_topic:
+                    event_bus.subscribe(
+                        nodes_topic,
+                        lambda v: (setattr(self, "_map_nodes",
+                                           str(int(v)) if isinstance(v, (int, float)) else str(v)),
+                                   _push_map()),
+                    )
+                if lc_topic:
+                    event_bus.subscribe(
+                        lc_topic,
+                        lambda v: (setattr(self, "_map_lc",
+                                           str(int(v)) if isinstance(v, (int, float)) else str(v)),
+                                   _push_map()),
+                    )
+
             for bat_idx, bat in enumerate(batteries_cfg):
                 topic = str(bat.get("topic", "")).strip()
                 if not topic:
@@ -238,6 +288,11 @@ class Header(QWidget):
             color = theme.GREEN if ms < 50 else theme.AMBER if ms < 150 else theme.RED
             lbl.setText(f"[LINK {name}  {ms:.0f}ms]")
             lbl.setStyleSheet(f"color: {color};")
+
+    @Slot(str, str)
+    def _do_update_mapping(self, text: str, color: str) -> None:
+        self._mapping_label.setText(text)
+        self._mapping_label.setStyleSheet(f"color: {color};")
 
     @Slot(bool)
     def _do_update_estop(self, active: bool) -> None:

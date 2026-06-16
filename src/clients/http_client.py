@@ -48,7 +48,7 @@ class HttpClient:
             def _on_event(value, _url=url, _method=method, _body=body, _timeout=timeout, _trigger=trigger):
                 if _trigger is not None and str(value) != str(_trigger):
                     return
-                actual_body = value if _body == "$payload" else _body
+                actual_body = self._resolve_body(_body, value)
                 threading.Thread(
                     target=self._fire,
                     args=(_url, _method, actual_body, _timeout),
@@ -62,6 +62,23 @@ class HttpClient:
 
     def stop(self) -> None:
         pass
+
+    @staticmethod
+    def _resolve_body(body: Any, payload: Any) -> Any:
+        """Resolve body template against a payload dict.
+
+        - "$payload"           → forward the whole payload as-is
+        - {"key": "$field"}    → replace "$field" with payload["field"]
+        - anything else        → return unchanged
+        """
+        if body == "$payload":
+            return payload
+        if isinstance(body, dict) and isinstance(payload, dict):
+            return {
+                k: (payload.get(v[1:], v) if isinstance(v, str) and v.startswith("$") else v)
+                for k, v in body.items()
+            }
+        return body
 
     def _fire(self, url: str, method: str, body: Any, timeout: float) -> None:
         try:

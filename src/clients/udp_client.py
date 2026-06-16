@@ -124,6 +124,12 @@ class UDPClient:
             self.event_bus.publish_sync("log", f"HTTP named-list client '{self.config.name}' polling {self.config.source}")
             return
 
+        if self.config.client_type == "json_http_topic":
+            self._thread = Thread(target=self._poll_topic_loop, name=self.config.name, daemon=True)
+            self._thread.start()
+            self.event_bus.publish_sync("log", f"HTTP topic client '{self.config.name}' polling {self.config.source} → {self.config.topic}")
+            return
+
         if self.config.client_type == "udp_poll":
             self._thread = Thread(target=self._subscribe_loop, name=self.config.name, daemon=True)
             self._thread.start()
@@ -242,6 +248,26 @@ class UDPClient:
                             f"{prefix}.{item_name}.{field}" if prefix else f"{item_name}.{field}",
                             value,
                         )
+            time.sleep(interval)
+
+    def _poll_topic_loop(self) -> None:
+        """Poll a JSON endpoint and publish the full response (or one key) to a single topic.
+
+        Useful for endpoints that return a matrix/list that can't be flattened into scalar topics.
+        Optional config key ``json_key``: if set, publish ``data[json_key]`` instead of the full response.
+        """
+        interval = self.config.poll_interval_ms / 1000
+        key = str(self._raw_config.get("json_key", "")).strip()
+        while not self._stop_event.is_set():
+            try:
+                data = self._http_get_json(self.config.source)
+            except Exception as exc:
+                self.event_bus.publish_sync("log", f"'{self.config.name}' fetch failed: {exc}")
+                time.sleep(interval)
+                continue
+            value = data.get(key) if key and isinstance(data, dict) else data
+            if value is not None:
+                self.event_bus.publish_sync(self.config.topic, value)
             time.sleep(interval)
 
     def _poll_odrive_loop(self) -> None:
