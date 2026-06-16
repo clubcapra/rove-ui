@@ -63,7 +63,7 @@ def apply_flippers(inp: ControllerInput, msg) -> None:
     r5 = inp.is_pressed(Button.R5)
     none_selected = not (l4 or r4 or l5 or r5)
     msg.flippers.fl = dpad_dir if (l4 or none_selected) else 0
-    msg.flippers.fr = dpad_dir if (r4 or none_selected) else 0
+    msg.flippers.fr = -dpad_dir if (r4 or none_selected) else 0
     msg.flippers.rl = dpad_dir if (l5 or none_selected) else 0
     msg.flippers.rr = dpad_dir if (r5 or none_selected) else 0
 
