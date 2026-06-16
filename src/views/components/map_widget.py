@@ -3,11 +3,12 @@ from __future__ import annotations
 import base64
 import datetime
 import json
+import queue
 import time
 from pathlib import Path
 
 import json as _json
-from PySide6.QtCore import QUrl, Signal, Slot, QTimer
+from PySide6.QtCore import QUrl, QTimer
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QDialog
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -48,7 +49,6 @@ class _MapPage(QWebEnginePage):
 
 
 class MapWidget(QWidget):
-    _js_queue: Signal = Signal(str)
 
     def __init__(self, config: dict | None = None, event_bus: EventBus | None = None):
         super().__init__()
@@ -66,7 +66,7 @@ class MapWidget(QWidget):
         self._poi_seq = 0
         self._mission_seq = 0
         self._pois: dict[str, dict] = {}  # poi_id → {label, lat, lng, alt, photo}
-        self._js_queue.connect(self._exec_js)
+        self._js_q: queue.SimpleQueue[str] = queue.SimpleQueue()
 
     def _load_html(self) -> str:
         try:
@@ -89,6 +89,11 @@ class MapWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._view)
+
+        self._flush_timer = QTimer(self)
+        self._flush_timer.setInterval(20)
+        self._flush_timer.timeout.connect(self._flush_js_queue)
+        self._flush_timer.start()
 
         self._register_position_tracking()
         self._register_poi_button()
@@ -170,11 +175,15 @@ class MapWidget(QWidget):
                 self.run_js(f"window.mapSetView({self._robot_lat}, {self._robot_lng});")
 
         if lat_topic:
+            _lat_logged = [False]
             def _on_lat(v):
                 try:
                     self._robot_lat = float(v)
                 except (TypeError, ValueError):
                     return
+                if not _lat_logged[0]:
+                    _lat_logged[0] = True
+                    self._event_bus.publish_sync("log", f"MapWidget: first GPS lat={self._robot_lat:.6f}")
                 _push()
             self._event_bus.subscribe(lat_topic, _on_lat)
 
@@ -445,10 +454,15 @@ class MapWidget(QWidget):
         })
         self._event_bus.publish_sync("log", f"[Map] → mission queue: {command}")
 
-    @Slot(str)
-    def _exec_js(self, script: str) -> None:
-        if self._view:
-            self._view.page().runJavaScript(script)
+    def _flush_js_queue(self) -> None:
+        if not self._view or not self._is_ready:
+            return
+        page = self._view.page()
+        while True:
+            try:
+                page.runJavaScript(self._js_q.get_nowait())
+            except queue.Empty:
+                break
 
     def run_js(self, script: str) -> None:
         if not self._view:
@@ -456,7 +470,7 @@ class MapWidget(QWidget):
         if not self._is_ready:
             self._pending_scripts.append(script)
             return
-        self._js_queue.emit(script)
+        self._js_q.put(script)
 
     def recenter(self) -> None: self.run_js("window.mapRecenter();")
 

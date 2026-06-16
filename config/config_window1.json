@@ -117,7 +117,7 @@
       "discovery_port_field": "data_port",
       "topic": "gnss", "topic_prefix": "gnss",
       "proto_type": "Vn300", "publish_field_topics": true,
-      "exclude_fields": ["position.lat", "position.lon"],
+      "exclude_fields": ["position.lat", "position.lon", "latitude", "longitude", "altitude", "lat", "lon"],
       "poll_interval_ms": 100, "recv_timeout_s": 2.0,
       "rediscovery_interval_s": 30, "enabled": true
     },
