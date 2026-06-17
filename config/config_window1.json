@@ -210,12 +210,35 @@
       "base_url": "http://192.168.2.2:8088",
       "actions": [
         {
-          "topic":    "map.goto",
-          "method":   "POST",
-          "endpoint": "/api/v1/goto",
-          "body":     {"east": "$east", "north": "$north"}
+          "topic":        "map.goto",
+          "method":       "POST",
+          "endpoint":     "/api/v1/goto",
+          "body":         {"lat": "$lat", "lon": "$lng"},
+          "log_response": true
+        },
+        {
+          "topic":        "path.goto_step",
+          "method":       "POST",
+          "endpoint":     "/api/v1/goto",
+          "body":         {"lat": "$lat", "lon": "$lng"},
+          "log_response": true
         }
       ]
+    }
+  ],
+
+  "path_recorders": [
+    {
+      "name":                 "main",
+      "lat_topic":            "gnss.latitude",
+      "lng_topic":            "gnss.longitude",
+      "record_topic":         "path.record",
+      "play_topic":           "path.play",
+      "goto_dispatch_topic":  "path.goto_step",
+      "waypoints_topic":      "path.waypoints",
+      "sample_interval_s":    1.0,
+      "min_distance_m":       0.5,
+      "step_delay_ms":        0
     }
   ],
 
@@ -245,13 +268,12 @@
           "color": "#ff3d3d"
         },
         {"label": "EXPORT MAP",    "event": "map.export",      "value": "1", "color": "#1a6fff"},
-        {"label": "LAUNCH",        "event": "mapping.launch",  "value": "1", "color": "#00e676"},
-        {"label": "STOP LAUNCH",   "event": "mapping.stop",    "value": "1", "color": "#c92b2b"},
+        {"label": "START MAPPING", "event": "mapping.launch",  "value": "1", "color": "#00e676"},
+        {"label": "STOP MAPPING",   "event": "mapping.stop",    "value": "1", "color": "#c92b2b"},
         {"label": "MAP START",     "event": "mapping.go",      "value": "1", "color": "#00875a"},
         {"label": "MAP PAUSE",     "event": "mapping.pause",   "value": "1", "color": "#ffae00"},
-        {"label": "NEW MAP",       "event": "mapping.new_map", "value": "1", "color": "#7c5cfc"},
-        {"label": "EXPORT SCAN",   "event": "mapping.export",  "value": "1", "color": "#1a6fff"},
         {"label": "RESTART MAP",   "event": "mapping.restart", "value": "1", "color": "#ff3d3d"}
+        
       ]
     }
   ],
@@ -421,6 +443,7 @@
             "robot_position_lat_topic": "gnss.latitude",
             "robot_position_lng_topic": "gnss.longitude",
             "robot_position_yaw_topic": "gnss.yaw",
+            "robot_yaw_offset": -90,
             "click_topic":       "map.click",
             "poi_topic":         "map.poi",
             "poi_remove_topic":  "map.poi_remove",

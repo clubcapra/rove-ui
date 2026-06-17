@@ -43,15 +43,17 @@ class HttpClient:
 
             url = self._base_url + endpoint
 
-            trigger = action.get("trigger_value", None)
+            trigger      = action.get("trigger_value", None)
+            log_response = bool(action.get("log_response", False))
 
-            def _on_event(value, _url=url, _method=method, _body=body, _timeout=timeout, _trigger=trigger):
+            def _on_event(value, _url=url, _method=method, _body=body, _timeout=timeout,
+                          _trigger=trigger, _log_resp=log_response):
                 if _trigger is not None and str(value) != str(_trigger):
                     return
                 actual_body = self._resolve_body(_body, value)
                 threading.Thread(
                     target=self._fire,
-                    args=(_url, _method, actual_body, _timeout),
+                    args=(_url, _method, actual_body, _timeout, _log_resp),
                     daemon=True,
                 ).start()
 
@@ -80,14 +82,19 @@ class HttpClient:
             }
         return body
 
-    def _fire(self, url: str, method: str, body: Any, timeout: float) -> None:
+    def _fire(self, url: str, method: str, body: Any, timeout: float,
+              log_response: bool = False) -> None:
         try:
             data = json.dumps(body).encode() if body is not None else b""
             headers = {"Content-Type": "application/json"} if data else {}
             req = Request(url, data=data or None, headers=headers, method=method)
             with urlopen(req, timeout=timeout) as resp:
                 status = resp.status
-            self._event_bus.publish_sync("log", f"[HttpClient:{self._name}] {method} {url} → {status}")
+                resp_body = resp.read().decode("utf-8", errors="replace").strip() if log_response else ""
+            msg = f"[HttpClient:{self._name}] {method} {url} → {status}"
+            if resp_body:
+                msg += f"  ← {resp_body[:300]}"
+            self._event_bus.publish_sync("log", msg)
         except URLError as exc:
             self._event_bus.publish_sync("log", f"[HttpClient:{self._name}] {method} {url} ERROR: {exc}")
         except Exception as exc:

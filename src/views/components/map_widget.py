@@ -6,6 +6,7 @@ import json
 import math
 import queue
 import time
+import utm
 from pathlib import Path
 
 import json as _json
@@ -66,7 +67,10 @@ class MapWidget(QWidget):
         self._first_center_done = False
         self._poi_seq = 0
         self._mission_seq = 0
-        self._pois: dict[str, dict] = {}  # poi_id → {label, lat, lng, alt, photo}
+        self._pois: dict[str, dict] = {}  # poi_id → {label, lat, lng, alt, photo, ts}
+        self._robot_path: list[dict] = []   # [{ts, lat, lng}] — GPS trail for SAR export
+        self._last_path_sample_t: float = 0.0
+        self._path_sample_interval: float = float(self._config.get("path_sample_interval_s", 1.0))
         self._js_q: queue.SimpleQueue[str] = queue.SimpleQueue()
 
     def _load_html(self) -> str:
@@ -170,6 +174,10 @@ class MapWidget(QWidget):
             if now - self._last_position_push < 0.05:  # throttle to ~20 fps
                 return
             self._last_position_push = now
+            wall = time.time()
+            if wall - self._last_path_sample_t >= self._path_sample_interval:
+                self._robot_path.append({"ts": wall, "lat": self._robot_lat, "lng": self._robot_lng})
+                self._last_path_sample_t = wall
             self.run_js(f"window.mapSetRobotPosition({self._robot_lat}, {self._robot_lng});")
             if not self._first_center_done:
                 self._first_center_done = True
@@ -198,9 +206,10 @@ class MapWidget(QWidget):
             self._event_bus.subscribe(lng_topic, _on_lng)
 
         if yaw_topic:
+            yaw_offset = float(self._config.get("robot_yaw_offset", 0.0))
             def _on_yaw(v):
                 try:
-                    yaw = float(v)
+                    yaw = float(v) + yaw_offset
                 except (TypeError, ValueError):
                     return
                 self.run_js(f"window.mapSetRobotYaw({yaw:.4f});")
@@ -249,6 +258,7 @@ class MapWidget(QWidget):
                     self._pois[poi_id] = {
                         "label": label, "lat": lat, "lng": lng,
                         "alt": float(payload.get("alt", 0.0)), "photo": photo,
+                        "ts": float(payload.get("ts", time.time())),
                     }
 
             self._event_bus.subscribe(at_topic, _on_poi_at)
@@ -352,6 +362,7 @@ class MapWidget(QWidget):
         self._pois[poi_id] = {
             "label": label, "lat": lat, "lng": lng,
             "alt": altitude, "photo": photo_url or "",
+            "ts": time.time(),
         }
 
         poi_topic = str(self._config.get("poi_topic", "")).strip()
@@ -378,21 +389,28 @@ class MapWidget(QWidget):
         folder = Path("exports") / f"run_{stamp}"
         folder.mkdir(parents=True, exist_ok=True)
 
-        # ── pois.txt ─────────────────────────────────────────────────────
-        txt_path = folder / "pois.txt"
-        with open(txt_path, "w", encoding="utf-8") as f:
-            f.write(f"Export POI — {stamp}\n")
-            f.write("=" * 42 + "\n\n")
-            if not self._pois:
-                f.write("Aucun POI enregistré.\n")
-            for i, (poi_id, poi) in enumerate(self._pois.items(), 1):
-                f.write(f"[{i:03d}]  {poi['label']}\n")
-                f.write(f"       GPS  : {poi['lat']:.6f}, {poi['lng']:.6f}\n")
-                f.write(f"       Alt  : {poi['alt']:.2f} m\n")
-                f.write(f"       ID   : {poi_id}\n\n")
+        def _to_utm(lat: float, lng: float):
+            return utm.from_latlon(lat, lng, force_zone_number=32, force_zone_letter='U')
 
-        # ── photos ───────────────────────────────────────────────────────
-        for i, (poi_id, poi) in enumerate(self._pois.items(), 1):
+        def _utm_line(ts: float, lat: float, lng: float) -> str:
+            e, n, zn, zl = _to_utm(lat, lng)
+            return f"{ts:.6f} {zn}{zl} {e:.2f} {n:.2f}"
+
+        # ── path.txt — robot GPS trail ────────────────────────────────────
+        with open(folder / "path.txt", "w", encoding="utf-8") as f:
+            f.write("# UTM (WGS84)\n")
+            for pt in self._robot_path:
+                f.write(_utm_line(pt["ts"], pt["lat"], pt["lng"]) + "\n")
+
+        # ── pois.txt — OPI list ───────────────────────────────────────────
+        with open(folder / "pois.txt", "w", encoding="utf-8") as f:
+            f.write("# UTM (WGS84)\n")
+            for poi in self._pois.values():
+                ts = poi.get("ts", time.time())
+                f.write(_utm_line(ts, poi["lat"], poi["lng"]) + "\n")
+
+        # ── OPI photos — named timestamp_ZONEeasting_northing.jpg ─────────
+        for poi in self._pois.values():
             photo = poi.get("photo", "")
             if not photo or not photo.startswith("data:image"):
                 continue
@@ -401,16 +419,14 @@ class MapWidget(QWidget):
                 img_bytes = base64.b64decode(b64)
             except Exception:
                 continue
-            safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in poi["label"])
-            (folder / f"poi_{i:03d}_{safe}.jpg").write_bytes(img_bytes)
-
-        # ── map screenshot ────────────────────────────────────────────────
-        if self._view:
-            pix = self._view.grab()
-            pix.save(str(folder / "map.png"), "PNG")
+            ts = poi.get("ts", time.time())
+            e, n, zn, zl = _to_utm(poi["lat"], poi["lng"])
+            fname = f"{ts:.6f}_{zn}{zl}{e:.2f}_{n:.2f}.jpg"
+            (folder / fname).write_bytes(img_bytes)
 
         self._event_bus.publish_sync(
-            "log", f"[Map] Export → {folder.resolve()}  ({len(self._pois)} POI(s))"
+            "log",
+            f"[Map] Export → {folder.resolve()}  ({len(self._pois)} POI(s), {len(self._robot_path)} path pts)",
         )
 
     def _latlon_to_en(self, lat: float, lng: float) -> tuple[float, float]:

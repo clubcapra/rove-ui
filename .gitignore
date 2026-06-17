@@ -1,5 +1,6 @@
 # Build directories
 build/
+exports/*
 build_standalone/
 install/
 log/
