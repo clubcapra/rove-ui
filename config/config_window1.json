@@ -166,6 +166,15 @@
         {"topic": "map.poi_remove", "method": "POST", "endpoint": "/pois/delete", "body": {"id":   "$poi_id"}}
       ]
     },
+    
+    {
+      "type": "http_action",
+      "name": "send_mission",
+      "base_url": "http://192.168.2.2:8080",
+      "actions": [
+          {"topic": "mission.send",    "method": "POST", "endpoint": "/mission",    "body": "$payload"}
+      ]
+    },
     {
       "type": "http_action",
       "name": "mapping",
@@ -193,6 +202,19 @@
         {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_42/estop"},
         {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_43/estop"},
         {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_44/estop"}
+      ]
+    },
+    {
+      "type": "http_action",
+      "name": "goto",
+      "base_url": "http://192.168.2.2:8088",
+      "actions": [
+        {
+          "topic":    "map.goto",
+          "method":   "POST",
+          "endpoint": "/api/v1/goto",
+          "body":     {"east": "$east", "north": "$north"}
+        }
       ]
     }
   ],
@@ -341,6 +363,47 @@
         }
       ]
     },
+    "SURVEILLANCE" :{
+      "type": "layout",
+      "diaposition": "absolute",
+      "content": [
+        {
+          "type": "vision_camera",
+          "name": "surveillance",
+          "data": {
+            "rtsp_source": "rtsp://192.168.2.34",
+            "detection_topic": "vision.person_detected",
+            "offset": 0.15,
+            "detection_interval": 5,
+            "min_confidence": 0.3,
+            "positions": {
+
+              "pose_1": [
+                6.643990516662598,
+                9.699331283569336,
+                37.727455139160156,
+                51.811920166015625,
+                173.47943115234375,
+                174.77928161621094,
+                178.0933837890625,
+                173.54034423828125
+              ],
+              "pose_2": [
+                54.570613861083984,
+                75.04276275634766,
+                170.56460571289062,
+                171.6024932861328,
+                179.97201538085938,
+                165.5309295654297,
+                85.61358642578125,
+                165.81454467773438
+              ]
+            }
+            }
+          }
+      ]
+    },
+
 
     "MISSION": {
       "type": "layout",
@@ -362,7 +425,8 @@
             "poi_topic":         "map.poi",
             "poi_remove_topic":  "map.poi_remove",
             "add_poi_at_topic":  "costmap.poi",
-            "map_export_topic":  "map.export"
+            "map_export_topic":  "map.export",
+            "goto_topic":        "map.goto"
           }
         }
       ]

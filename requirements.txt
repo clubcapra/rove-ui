@@ -1,3 +1,4 @@
 PySide6
 PySide6-Addons
 pygame
+opencv-python

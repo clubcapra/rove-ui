@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import datetime
 import json
+import math
 import queue
 import time
 from pathlib import Path
@@ -412,10 +413,22 @@ class MapWidget(QWidget):
             "log", f"[Map] Export → {folder.resolve()}  ({len(self._pois)} POI(s))"
         )
 
+    def _latlon_to_en(self, lat: float, lng: float) -> tuple[float, float]:
+        """Convert GPS lat/lng to local East/North metres relative to goto_origin."""
+        lat0 = float(self._config.get("goto_origin_lat", self._robot_lat or lat))
+        lng0 = float(self._config.get("goto_origin_lng", self._robot_lng or lng))
+        north = (lat - lat0) * 111_320.0
+        east  = (lng - lng0) * 111_320.0 * math.cos(math.radians(lat0))
+        return round(east, 4), round(north, 4)
+
     def _handle_goto(self, lat: float, lng: float) -> None:
         goto_topic = str(self._config.get("goto_topic", "")).strip()
         if goto_topic:
-            self._event_bus.publish_sync(goto_topic, {"lat": lat, "lng": lng})
+            east, north = self._latlon_to_en(lat, lng)
+            self._event_bus.publish_sync(
+                goto_topic,
+                {"lat": lat, "lng": lng, "east": east, "north": north},
+            )
         self._event_bus.publish_sync("log", f"[Map] GOTO → ({lat:.6f},{lng:.6f})")
 
     def _handle_orbit(self, lat: float, lng: float) -> None:
