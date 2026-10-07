@@ -17,6 +17,7 @@ python -m grpc_tools.protoc \
     proto/core/Position.proto \
     proto/core/Orientation.proto \
     proto/core/Vector3.proto \
-    proto/core/JointState.proto
+    proto/core/JointState.proto \
+    proto/Recording.proto
 
 echo "Proto stubs generated in src/proto_gen/"

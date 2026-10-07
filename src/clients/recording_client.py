@@ -7,7 +7,11 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from google.protobuf.json_format import MessageToDict
+from google.protobuf.message import DecodeError, Message
+
 from src.controller.event_bus import EventBus
+from src.proto_gen.proto import Recording_pb2
 
 
 class RecordingClient:
@@ -27,6 +31,8 @@ class RecordingClient:
         timeout_s: 5.0
 
     Results and errors are written to the "log" topic (console).
+    Responses may be JSON or protobuf (proto/Recording.proto); both are
+    normalised to the same dict shape (proto3 JSON mapping).
     """
 
     def __init__(self, config: dict[str, Any], event_bus: EventBus | None = None):
@@ -82,7 +88,7 @@ class RecordingClient:
             self._set_status("PENDING")
             self._log(f"START {session_id} → POST {self._start_url}")
 
-            resp = self._post(self._start_url, body)
+            resp = self._post(self._start_url, body, Recording_pb2.StartRecordingResponse)
             if resp is None:
                 self._set_status("ERROR")
                 return
@@ -128,7 +134,7 @@ class RecordingClient:
             }
             self._log(f"STOP {self._session_id} → POST {self._stop_url}")
 
-            resp = self._post(self._stop_url, body)
+            resp = self._post(self._stop_url, body, Recording_pb2.StopRecordingResponse)
             if resp is None:
                 # Keep the session id so STOP can be retried.
                 self._set_status("ERROR")
@@ -158,7 +164,7 @@ class RecordingClient:
         finally:
             self._busy.release()
 
-    def _post(self, url: str, body: dict) -> dict | None:
+    def _post(self, url: str, body: dict, resp_cls: type[Message]) -> dict | None:
         """POST JSON and return the parsed response, or None (error logged)."""
         try:
             req = Request(
@@ -168,18 +174,28 @@ class RecordingClient:
                 method="POST",
             )
             with urlopen(req, timeout=self._timeout) as resp:
-                raw = resp.read().decode("utf-8", errors="replace")
-            return json.loads(raw)
+                content_type = resp.headers.get("Content-Type", "")
+                raw = resp.read()
+            return self._decode(raw, content_type, resp_cls)
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace").strip()[:300]
             self._log(f"ERROR: HTTP {exc.code} {exc.reason} — {detail}")
         except URLError as exc:
             self._log(f"ERROR: robot injoignable ({exc.reason})")
-        except json.JSONDecodeError:
-            self._log("ERROR: réponse non-JSON")
+        except (json.JSONDecodeError, DecodeError):
+            self._log("ERROR: réponse illisible (ni JSON ni protobuf valide)")
         except Exception as exc:
             self._log(f"ERROR: {exc}")
         return None
+
+    @staticmethod
+    def _decode(raw: bytes, content_type: str, resp_cls: type[Message]) -> dict:
+        """Decode a JSON or protobuf body into the proto3 JSON dict shape."""
+        if "json" in content_type or raw.lstrip().startswith(b"{"):
+            return json.loads(raw.decode("utf-8", errors="replace"))
+        msg = resp_cls()
+        msg.ParseFromString(raw)
+        return MessageToDict(msg, preserving_proto_field_name=True)
 
     def _check_url(self, url: str, key: str) -> bool:
         if url.startswith(("http://", "https://")):
