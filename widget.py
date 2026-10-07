@@ -27,6 +27,7 @@ from src.clients.udp_client import UDPClient
 from src.clients.ros2_client import ROS2Client
 from src.clients.http_client import HttpClient
 from src.clients.path_recorder import PathRecorder
+from src.clients.recording_client import RecordingClient
 
 
 class Widget(QWidget):
@@ -57,6 +58,7 @@ class Widget(QWidget):
         self._ros2_clients: list[ROS2Client] = []
         self._http_clients: list[HttpClient] = []
         self._path_recorders: list[PathRecorder] = []
+        self._recording_clients: list[RecordingClient] = []
         self._bottom_bar: QWidget | None = None
 
 
@@ -114,6 +116,7 @@ class Widget(QWidget):
         self._restart_ros2_clients(config.get("ros2_clients", []))
         self._restart_http_clients(config.get("http_clients", []))
         self._restart_path_recorders(config.get("path_recorders", []))
+        self._restart_recording_clients(config.get("recording_clients", []))
 
     def _rebuild_bottom_bar(self, bar_cfg) -> None:
         if self._bottom_bar is not None:
@@ -188,6 +191,15 @@ class Widget(QWidget):
             recorder.start()
             self._path_recorders.append(recorder)
 
+    def _restart_recording_clients(self, client_configs: list[dict[str, Any]]) -> None:
+        for client in self._recording_clients:
+            client.stop()
+        self._recording_clients = []
+        for cfg in client_configs:
+            client = RecordingClient(cfg, self.event_bus)
+            client.start()
+            self._recording_clients.append(client)
+
     def _restart_ros2_clients(self, client_configs: list[dict[str, Any]]) -> None:
         for client in self._ros2_clients:
             client.stop()
@@ -211,6 +223,9 @@ class Widget(QWidget):
         for recorder in self._path_recorders:
             recorder.stop()
         self._path_recorders = []
+        for client in self._recording_clients:
+            client.stop()
+        self._recording_clients = []
         super().closeEvent(event)
 
 

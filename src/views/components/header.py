@@ -43,6 +43,7 @@ class Header(QWidget):
     _ping_signal:    Signal = Signal(int, str, object)
     _estop_signal:   Signal = Signal(bool)
     _mapping_signal: Signal = Signal(str, str)   # (text, css-color)
+    _rec_signal:     Signal = Signal(str)
 
     _STYLE = f"""
         Header {{
@@ -100,6 +101,11 @@ class Header(QWidget):
         self._mapping_label.setStyleSheet(f"color: {theme.TEXT_DIM};")
         left.addWidget(self._mapping_label)
 
+        self._rec_label = QLabel("[REC  --]")
+        self._rec_label.setStyleSheet(f"color: {theme.TEXT_DIM};")
+        self._rec_label.setVisible(bool(settings.get("recording_status")))
+        left.addWidget(self._rec_label)
+
         left.addStretch()
 
         left_w = QWidget()
@@ -152,6 +158,7 @@ class Header(QWidget):
         self._ping_signal.connect(self._do_update_ping)
         self._estop_signal.connect(self._do_update_estop)
         self._mapping_signal.connect(self._do_update_mapping)
+        self._rec_signal.connect(self._do_update_rec)
 
         self._clock = QTimer(self)
         self._clock.timeout.connect(
@@ -218,6 +225,11 @@ class Header(QWidget):
                                            str(int(v)) if isinstance(v, (int, float)) else str(v)),
                                    _push_map()),
                     )
+
+            rec_cfg = settings.get("recording_status", {})
+            rec_topic = str(rec_cfg.get("state_topic", "")).strip()
+            if rec_topic:
+                event_bus.subscribe(rec_topic, lambda v: self._rec_signal.emit(str(v)))
 
             for bat_idx, bat in enumerate(batteries_cfg):
                 topic = str(bat.get("topic", "")).strip()
@@ -293,6 +305,25 @@ class Header(QWidget):
     def _do_update_mapping(self, text: str, color: str) -> None:
         self._mapping_label.setText(text)
         self._mapping_label.setStyleSheet(f"color: {color};")
+
+    @Slot(str)
+    def _do_update_rec(self, state: str) -> None:
+        state = state.upper()
+        if state == "ACTIVE":
+            self._rec_label.setText("[● REC  ACTIVE]")
+            self._rec_label.setStyleSheet(
+                f"color: {theme.BG_DEEP}; background: {theme.RED}; "
+                f"font-weight: 700; padding: 0 10px; letter-spacing: 1px;"
+            )
+            return
+        color = {
+            "PENDING": theme.AMBER,
+            "PARTIAL": theme.AMBER,
+            "ERROR":   theme.RED,
+            "STOPPED": theme.GREEN,
+        }.get(state, theme.TEXT_DIM)
+        self._rec_label.setText(f"[REC  {state}]")
+        self._rec_label.setStyleSheet(f"color: {color}; background: transparent;")
 
     @Slot(bool)
     def _do_update_estop(self, active: bool) -> None:

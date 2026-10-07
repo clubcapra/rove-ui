@@ -17,6 +17,9 @@
       "state_topic": "mapping.state",
       "nodes_topic": "mapping.nodes",
       "lc_topic":    "mapping.loop_closures"
+    },
+    "recording_status": {
+      "state_topic": "recording.status"
     }
   },
 
@@ -227,6 +230,22 @@
     }
   ],
 
+  "recording_clients": [
+    {
+      "name":              "sensors",
+      "start_url":         "ENDPOINT_URL",
+      "stop_url":          "ENDPOINT_URL",
+      "start_topic":       "recording.start",
+      "stop_topic":        "recording.stop",
+      "status_topic":      "recording.status",
+      "config_profile_id": "perception_hd_30fps",
+      "sensor_ids":        ["cam_front_center", "cam_rear_left", "lidar_top_mid360"],
+      "session_metadata":  {"environment": "outdoor_daylight", "operator": "dev_node_01"},
+      "stop_reason":       "run_completed",
+      "timeout_s":         5.0
+    }
+  ],
+
   "path_recorders": [
     {
       "name":                 "main",
@@ -247,6 +266,7 @@
   "bottom_bar": [
     {
       "height": 40,
+      "align": "center",
       "buttons": [
         {"label": "REAR CAM",  "event": "camera.select", "value": "REAR_CAM",  "active_topic": "camera.select"},
         {"label": "ARM CAM",   "event": "camera.select", "value": "ARM_CAM",   "active_topic": "camera.select"},
@@ -272,7 +292,9 @@
         {"label": "STOP MAPPING",   "event": "mapping.stop",    "value": "1", "color": "#c92b2b"},
         {"label": "MAP START",     "event": "mapping.go",      "value": "1", "color": "#00875a"},
         {"label": "MAP PAUSE",     "event": "mapping.pause",   "value": "1", "color": "#ffae00"},
-        {"label": "RESTART MAP",   "event": "mapping.restart", "value": "1", "color": "#ff3d3d"}
+        {"label": "RESTART MAP",   "event": "mapping.restart", "value": "1", "color": "#ff3d3d"},
+        {"label": "START REC",     "event": "recording.start", "value": "1", "color": "#00e676"},
+        {"label": "STOP REC",      "event": "recording.stop",  "value": "1", "color": "#c92b2b"}
         
       ]
     }
@@ -385,48 +407,6 @@
         }
       ]
     },
-    "SURVEILLANCE" :{
-      "type": "layout",
-      "diaposition": "absolute",
-      "content": [
-        {
-          "type": "vision_camera",
-          "name": "surveillance",
-          "data": {
-            "rtsp_source": "rtsp://192.168.2.34",
-            "detection_topic": "vision.person_detected",
-            "offset": 0.15,
-            "detection_interval": 5,
-            "min_confidence": 0.3,
-            "positions": {
-
-              "pose_1": [
-                6.643990516662598,
-                9.699331283569336,
-                37.727455139160156,
-                51.811920166015625,
-                173.47943115234375,
-                174.77928161621094,
-                178.0933837890625,
-                173.54034423828125
-              ],
-              "pose_2": [
-                54.570613861083984,
-                75.04276275634766,
-                170.56460571289062,
-                171.6024932861328,
-                179.97201538085938,
-                165.5309295654297,
-                85.61358642578125,
-                165.81454467773438
-              ]
-            }
-            }
-          }
-      ]
-    },
-
-
     "MISSION": {
       "type": "layout",
       "diaposition": "absolute",

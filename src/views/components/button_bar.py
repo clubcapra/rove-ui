@@ -66,6 +66,7 @@ class ButtonBar(QWidget):
       orientation  — "horizontal" (default) or "vertical"
       label        — optional text label shown before the buttons
       height       — fixed height in px (default: 44)
+      align        — "left" (default) or "center"
       buttons      — list of { label, event, value, active_topic? }
     """
 
@@ -98,6 +99,9 @@ class ButtonBar(QWidget):
             layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 5, 10, 5)
         layout.setSpacing(6)
+
+        if self.config.get("align") == "center":
+            layout.addStretch()
 
         if bar_label:
             lbl = QLabel(bar_label.upper())
