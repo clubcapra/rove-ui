@@ -9,6 +9,7 @@ cd "$(dirname "$0")/.."
 python -m grpc_tools.protoc \
     -I. \
     --python_out=src/proto_gen \
+    proto/Mission.proto \
     proto/RoveTelemetry.proto \
     proto/Battery.proto \
     proto/DriveNodeState.proto \

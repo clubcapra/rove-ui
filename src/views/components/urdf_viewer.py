@@ -13,6 +13,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from src.controller.event_bus import EventBus
+from .offline_assets import local_viewer_imports
 
 TEMPLATE_PATH = Path(__file__).resolve().parent / "html" / "urdfViewer.html"
 FALLBACK_HTML = "<html><body style='color:#c92b2b;background:#f0f2f5'>urdfViewer.html template missing</body></html>"
@@ -201,7 +202,7 @@ class URDFViewer(QWidget):
             return
 
         try:
-            template = TEMPLATE_PATH.read_text(encoding="utf-8")
+            template = local_viewer_imports(TEMPLATE_PATH.read_text(encoding="utf-8"))
         except OSError:
             self._event_bus.publish_sync("log", f"URDFViewer[{self.name}]: template missing at {TEMPLATE_PATH}")
             template = FALLBACK_HTML

@@ -2,6 +2,38 @@
 
 Interface de contrôle mission pour le rover CAPRA — PySide6, architecture config-driven, multi-écrans.
 
+## Atelier Wi-Fi and robot hotspot
+
+The default configuration uses `${ROBOT_HOST}` for services running on the
+Jetson and for the Input Manager. At startup the UI probes HALo `/discover`
+on `192.168.2.2` (atelier) and `192.168.1.2` (hotspot), then shares the selected
+address across every window. If both respond, it prefers the address on the
+Deck's directly connected /24 subnet. Ambiguous or unreachable discovery reports
+an error instead of starting controls against an arbitrary address.
+
+To choose explicitly, or open the UI while HALo is offline:
+
+```sh
+ROVE_ROBOT_HOST=192.168.2.2 ./run.sh   # atelier
+ROVE_ROBOT_HOST=192.168.1.2 ./run.sh   # hotspot
+```
+
+Restart the UI after changing networks; it keeps the selected host for the
+session. The Input Manager sends raw RoveControl protobuf to UDP `5050`.
+MissionBuilder sends raw Mission protobuf to UDP `5051` and reads the bridge's
+acknowledgement. HALo sensor discovery and E-stop use HTTP `8080`; GoTo uses
+bridge HTTP `8088`; the IK viewer is at `http://<robot-host>:9101/`.
+
+Three.js and its loaders are bundled under
+`src/views/components/html/vendor/three`, so the robot viewers work without
+internet. Regenerate those pinned modules on an internet connection with
+`python3 scripts/vendor_three.py`. Generated pages resolve absolute local file
+URLs because the pages themselves are written to the temporary directory.
+
+Camera, radio, and mapping-computer addresses are separate hardware endpoints;
+they retain their configured IPs and need routing from the operator network.
+External map imagery still needs internet or downloaded tiles.
+
 ## Prérequis
 
 - Ubuntu / WSL

@@ -25,7 +25,9 @@ from src.views.components.header import Header
 from src.views.components.nav_bar import NavBar
 from src.clients.udp_client import UDPClient
 from src.clients.ros2_client import ROS2Client
+from src.robot_network import resolve_config
 from src.clients.http_client import HttpClient
+from src.clients.mission_client import MissionClient
 from src.clients.path_recorder import PathRecorder
 from src.clients.recording_client import RecordingClient
 
@@ -64,10 +66,11 @@ class Widget(QWidget):
 
     def load_config(self, configFile):
         """Load JSON from a path and build the interface."""
+        data = configFile
         if isinstance(configFile, str):
             with open(configFile, "r", encoding="utf-8") as f:
                 data = load(f)
-        return data
+        return resolve_config(data)
 
     def buildInterface(self, config: dict):
         """Construct the main interface from the config."""
@@ -178,7 +181,11 @@ class Widget(QWidget):
             client.stop()
         self._http_clients = []
         for client_config in client_configs:
-            client = HttpClient(client_config, self.event_bus)
+            client = (
+                MissionClient(client_config, self.event_bus)
+                if client_config.get("type") == "udp_mission"
+                else HttpClient(client_config, self.event_bus)
+            )
             client.start()
             self._http_clients.append(client)
 
