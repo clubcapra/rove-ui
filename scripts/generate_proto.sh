@@ -9,6 +9,7 @@ cd "$(dirname "$0")/.."
 python -m grpc_tools.protoc \
     -I. \
     --python_out=src/proto_gen \
+    proto/Mission.proto \
     proto/RoveTelemetry.proto \
     proto/Battery.proto \
     proto/DriveNodeState.proto \
@@ -17,6 +18,7 @@ python -m grpc_tools.protoc \
     proto/core/Position.proto \
     proto/core/Orientation.proto \
     proto/core/Vector3.proto \
-    proto/core/JointState.proto
+    proto/core/JointState.proto \
+    proto/Recording.proto
 
 echo "Proto stubs generated in src/proto_gen/"

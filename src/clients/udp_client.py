@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from socket import AF_INET, SO_REUSEADDR, SOCK_DGRAM, SOL_SOCKET, socket, timeout
 from threading import Event, Thread
 from typing import Any
@@ -53,6 +53,8 @@ class UDPClientConfig:
     publish_node_data: bool = True
     publish_field_topics: bool = True
     port: int = 0
+    exclude_fields: tuple[str, ...] = ()
+    field_map: dict[str, str] = dc_field(default_factory=dict)
 
 
 class UDPClient:
@@ -82,6 +84,8 @@ class UDPClient:
             publish_node_data=bool(config.get("publish_node_data", True)),
             publish_field_topics=bool(config.get("publish_field_topics", True)),
             port=int(config.get("port", 0)),
+            exclude_fields=tuple(str(f) for f in config.get("exclude_fields", [])),
+            field_map={str(k): str(v) for k, v in config.get("field_map", {}).items()},
         )
         self.event_bus = event_bus or EventBus()
         self._raw_config = config
@@ -120,6 +124,12 @@ class UDPClient:
             self.event_bus.publish_sync("log", f"HTTP named-list client '{self.config.name}' polling {self.config.source}")
             return
 
+        if self.config.client_type == "json_http_topic":
+            self._thread = Thread(target=self._poll_topic_loop, name=self.config.name, daemon=True)
+            self._thread.start()
+            self.event_bus.publish_sync("log", f"HTTP topic client '{self.config.name}' polling {self.config.source} → {self.config.topic}")
+            return
+
         if self.config.client_type == "udp_poll":
             self._thread = Thread(target=self._subscribe_loop, name=self.config.name, daemon=True)
             self._thread.start()
@@ -151,6 +161,17 @@ class UDPClient:
 
     # ── Loops ──────────────────────────────────────────────────────────────
 
+    def _publish_fields(self, message: dict) -> None:
+        prefix = self.config.topic_prefix
+        exclude = self.config.exclude_fields
+        fmap = self.config.field_map
+        for key, value in message.items():
+            if key in exclude:
+                continue
+            mapped = fmap.get(key, key)
+            if isinstance(value, (int, float, str, bool)):
+                self.event_bus.publish_sync(f"{prefix}.{mapped}" if prefix else mapped, value)
+
     def _listen_loop(self) -> None:
         assert self._socket is not None
         while not self._stop_event.is_set():
@@ -160,7 +181,10 @@ class UDPClient:
                 continue
             except OSError:
                 break
-            self.event_bus.publish_sync(self.config.topic, self._decode_text(payload))
+            decoded = self._decode_text(payload)
+            self.event_bus.publish_sync(self.config.topic, decoded)
+            if self.config.publish_field_topics and isinstance(decoded, dict):
+                self._publish_fields(decoded)
 
     def _poll_nested_loop(self) -> None:
         """Poll {outer_key: {field: value}} → publish {prefix}.{outer_key}.{field}."""
@@ -224,6 +248,26 @@ class UDPClient:
                             f"{prefix}.{item_name}.{field}" if prefix else f"{item_name}.{field}",
                             value,
                         )
+            time.sleep(interval)
+
+    def _poll_topic_loop(self) -> None:
+        """Poll a JSON endpoint and publish the full response (or one key) to a single topic.
+
+        Useful for endpoints that return a matrix/list that can't be flattened into scalar topics.
+        Optional config key ``json_key``: if set, publish ``data[json_key]`` instead of the full response.
+        """
+        interval = self.config.poll_interval_ms / 1000
+        key = str(self._raw_config.get("json_key", "")).strip()
+        while not self._stop_event.is_set():
+            try:
+                data = self._http_get_json(self.config.source)
+            except Exception as exc:
+                self.event_bus.publish_sync("log", f"'{self.config.name}' fetch failed: {exc}")
+                time.sleep(interval)
+                continue
+            value = data.get(key) if key and isinstance(data, dict) else data
+            if value is not None:
+                self.event_bus.publish_sync(self.config.topic, value)
             time.sleep(interval)
 
     def _poll_odrive_loop(self) -> None:
@@ -342,10 +386,7 @@ class UDPClient:
 
             self.event_bus.publish_sync(self.config.topic, message)
             if self.config.publish_field_topics and isinstance(message, dict):
-                prefix = self.config.topic_prefix
-                for field, value in message.items():
-                    if isinstance(value, (int, float, str, bool)):
-                        self.event_bus.publish_sync(f"{prefix}.{field}" if prefix else field, value)
+                self._publish_fields(message)
 
             if not _first_published:
                 _first_published = True

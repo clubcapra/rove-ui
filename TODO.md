@@ -24,4 +24,10 @@
 - [ ] Quand on tombe en mode Bras, on switch de view et on affiches les composants pour le Bras (URDF, Monitoring et caméra à la palce de la bitmap)
 - [x] Pour le endpoint UDP, on envoie "0x01" au port udp afficher et l'api retourne la data au port mirroir sur mon device
 - [x] réception et traitement des protobufs
-- [ ] 
+
+# TODO - 12 Juin
+- [x] Setup la barre de bouton supplémentaire
+- [x] Changer l'Affordance pour setup la hauteur des POIs en la rendant tactile friendly
+- [x] Mettre des claviers pour tout les inputs textes
+- [x] augmenter un peu la taille des boutons
+- [x] regarder pour le glitchy load sur la map (lourd)

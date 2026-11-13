@@ -16,9 +16,27 @@ from src.views.rtsp_view import RTSPView
 from src.views.web_camera_view import WebCameraView
 
 
-def _rtsp_reachable(ip: str, port: int = 554, timeout: float = 1.5) -> bool:
+def _parse_rtsp_ip(rtsp_ip: str) -> tuple[str, int, str]:
+    """Parse 'host', 'host:port', or 'host:port/path' → (host, port, path)."""
+    path = ""
+    if "/" in rtsp_ip:
+        host_part, path = rtsp_ip.split("/", 1)
+        path = "/" + path
+    else:
+        host_part = rtsp_ip
+    if ":" in host_part:
+        host, port_str = host_part.rsplit(":", 1)
+        try:
+            return host, int(port_str), path
+        except ValueError:
+            pass
+    return host_part, 554, path
+
+
+def _rtsp_reachable(rtsp_ip: str, timeout: float = 1.5) -> bool:
+    host, port, _ = _parse_rtsp_ip(rtsp_ip)
     try:
-        with socket.create_connection((ip, port), timeout=timeout):
+        with socket.create_connection((host, port), timeout=timeout):
             return True
     except OSError:
         return False
@@ -30,19 +48,19 @@ class _PingSignals(QObject):
 
 _BTN_INACTIVE = """
     QPushButton {
-        background: #292928; color: #e0e0e0;
-        border: 1px solid #444; border-radius: 5px;
+        background: #d8dae0; color: #1a1d22;
+        border: 1px solid #bfc5cf; border-radius: 5px;
         font-size: 12px; padding: 2px 6px;
         text-align: left;
     }
-    QPushButton:hover   { background: #3a3a38; border-color: #555; }
-    QPushButton:pressed { background: #444; }
+    QPushButton:hover   { background: #c8cdd5; border-color: #a8b1bc; }
+    QPushButton:pressed { background: #b8c0ca; }
 """
 
 _BTN_ACTIVE = """
     QPushButton {
-        background: #3a3a38; color: #eb4034;
-        border: 1px solid #eb4034; border-radius: 5px;
+        background: #c8cdd5; color: #cc2a20;
+        border: 1px solid #cc2a20; border-radius: 5px;
         font-size: 12px; font-weight: 700; padding: 2px 6px;
         text-align: left;
     }
@@ -84,6 +102,8 @@ class CameraWidget:
         self._cameras: list[dict] = list(config.get("cameras", []))
         self._vtx_host: str = str(config.get("vtx_host", "192.168.2.2"))
         self._vtx_port: int = int(config.get("vtx_port", 5540))
+        self._hide_controls: bool = bool(config.get("hide_controls", False))
+        self._select_topic: str | None = config.get("select_topic")
 
         self._ping_dots: list[QLabel] = []
         self._cam_buttons: list[QPushButton] = []
@@ -119,11 +139,19 @@ class CameraWidget:
             self._stack = QStackedWidget(self._widget)
             layout.addWidget(self._stack, 1)
         else:
-            # ── Multi-camera mode: sidebar + viewer ───────────────────────
+            # ── Multi-camera mode: sidebar (optional) + viewer ────────────
             root = QHBoxLayout(self._widget)
             root.setContentsMargins(0, 0, 0, 0)
             root.setSpacing(0)
-            root.addWidget(self._build_sidebar())
+
+            if not self._hide_controls:
+                root.addWidget(self._build_sidebar())
+            else:
+                # Still start ping watchers for auto-fallback even without UI
+                for idx, cam in enumerate(self._cameras):
+                    rtsp_ip = str(cam.get("rtsp_ip", ""))
+                    if rtsp_ip:
+                        self._start_ping_watcher(idx, rtsp_ip)
 
             right = QWidget()
             right_layout = QVBoxLayout(right)
@@ -156,12 +184,14 @@ class CameraWidget:
         self.event_bus.publish_sync("log", f"CameraWidget[{self.name}] ready (mode: {mode})")
 
         self.event_bus.subscribe("camera.snapshot_request", self._do_snapshot)
+        if self._select_topic:
+            self.event_bus.subscribe(self._select_topic, self._on_select_event)
 
     # ── Sidebar ───────────────────────────────────────────────────────────
 
     def _build_sidebar(self) -> QWidget:
         inner = QWidget()
-        inner.setStyleSheet("background: #1c1c1b;")
+        inner.setStyleSheet("background: #e8ebef;")
 
         col = QVBoxLayout(inner)
         col.setContentsMargins(6, 8, 6, 8)
@@ -174,7 +204,7 @@ class CameraWidget:
             dot = QLabel("●")
             dot.setFixedSize(12, 12)
             dot.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            dot.setStyleSheet("color: #888; font-size: 9px; background: transparent;")
+            dot.setStyleSheet("color: #7a8591; font-size: 9px; background: transparent;")
             self._ping_dots.append(dot)
 
             btn = QPushButton(cam_name)
@@ -203,7 +233,7 @@ class CameraWidget:
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setFixedWidth(148)
         scroll.setStyleSheet(
-            "QScrollArea { border: none; border-right: 1px solid #292928; background: #1c1c1b; }"
+            "QScrollArea { border: none; border-right: 1px solid #d0d5de; background: #e8ebef; }"
         )
         return scroll
 
@@ -212,14 +242,14 @@ class CameraWidget:
     def _build_mode_bar(self) -> QWidget:
         bar = QWidget()
         bar.setFixedHeight(30)
-        bar.setStyleSheet("background: #292928; border-bottom: 1px solid #1c1c1b;")
+        bar.setStyleSheet("background: #dde1e8; border-bottom: 1px solid #bfc5cf;")
 
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(10, 0, 10, 0)
         layout.setSpacing(8)
 
         self._mode_label = QLabel("● RTSP")
-        self._mode_label.setStyleSheet("color: #eb4034; font-size: 12px; font-weight: 700; background: transparent;")
+        self._mode_label.setStyleSheet("color: #cc2a20; font-size: 12px; font-weight: 700; background: transparent;")
         layout.addWidget(self._mode_label)
 
         layout.addStretch()
@@ -228,12 +258,12 @@ class CameraWidget:
         self._toggle_btn.setFixedHeight(20)
         self._toggle_btn.setStyleSheet("""
             QPushButton {
-                background: #292928; color: #e0e0e0;
-                border: 1px solid #555; border-radius: 4px;
+                background: #dde1e8; color: #1a1d22;
+                border: 1px solid #a8b1bc; border-radius: 4px;
                 font-size: 11px; padding: 0 8px;
             }
-            QPushButton:hover   { background: #3a3a38; border-color: #777; }
-            QPushButton:pressed { background: #444; }
+            QPushButton:hover   { background: #d0d5de; border-color: #7a8591; }
+            QPushButton:pressed { background: #bfc5cf; }
         """)
         self._toggle_btn.clicked.connect(self._on_toggle_mode)
         layout.addWidget(self._toggle_btn)
@@ -245,7 +275,7 @@ class CameraWidget:
             return
         if self._active_mode == "rtsp":
             self._mode_label.setText("● RTSP")
-            self._mode_label.setStyleSheet("color: #eb4034; font-size: 12px; font-weight: 700; background: transparent;")
+            self._mode_label.setStyleSheet("color: #cc2a20; font-size: 12px; font-weight: 700; background: transparent;")
             self._toggle_btn.setText("→ VTX")
         else:
             self._mode_label.setText("● VTX")
@@ -271,7 +301,7 @@ class CameraWidget:
 
     def _on_ping_result(self, idx: int, ok: bool) -> None:
         if 0 <= idx < len(self._ping_dots):
-            color = "#22c55e" if ok else "#555"
+            color = "#22c55e" if ok else "#a8b1bc"
             self._ping_dots[idx].setStyleSheet(f"color: {color}; font-size: 9px; background: transparent;")
 
         prev = self._rtsp_flags[idx] if idx < len(self._rtsp_flags) else None
@@ -290,6 +320,14 @@ class CameraWidget:
             self._set_mode("webcamera", force_rebuild=False)
 
     # ── Camera selection ──────────────────────────────────────────────────
+
+    def _on_select_event(self, value) -> None:
+        """Select camera by name received from an EventBus event."""
+        name = str(value)
+        for idx, cam in enumerate(self._cameras):
+            if str(cam.get("name", "")) == name:
+                self._select_camera(idx)
+                return
 
     def _select_camera(self, idx: int) -> None:
         if idx >= len(self._cameras):
@@ -313,7 +351,11 @@ class CameraWidget:
             webcam_view.send_vtx_command(vtx_id, self._vtx_host, self._vtx_port)
 
         if rtsp_ip:
-            rtsp_source = cam.get("rtsp_source", f"rtsp://{rtsp_ip}:554/")
+            if "rtsp_source" in cam:
+                rtsp_source = cam["rtsp_source"]
+            else:
+                host, port, path = _parse_rtsp_ip(rtsp_ip)
+                rtsp_source = f"rtsp://{host}:{port}{path or '/'}"
             rtsp_view: RTSPView = self._views["rtsp"]  # type: ignore[assignment]
             rtsp_view.set_source(rtsp_source)
 

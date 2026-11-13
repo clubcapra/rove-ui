@@ -395,13 +395,19 @@ gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad\n\n
         # GstRTSPLowerTrans flags: UDP=4, TCP=16
         protocols_flag = 4 if transport == "udp" else 16
 
+        codec = str(self.config.get("codec", "h264")).strip().lower()
+        if codec == "h265":
+            depay_name, parse_name, decode_name = "rtph265depay", "h265parse", "avdec_h265"
+        else:  # h264 default
+            depay_name, parse_name, decode_name = "rtph264depay", "h264parse", "avdec_h264"
+
         try:
             pipeline = Gst.Pipeline.new("rtsp-pipeline")  # type: ignore[misc]
 
-            rtspsrc   = Gst.ElementFactory.make("rtspsrc",      "rtspsrc0")   # type: ignore[misc]
-            depay     = Gst.ElementFactory.make("rtph265depay", "depay")       # type: ignore[misc]
-            parse     = Gst.ElementFactory.make("h265parse",    "h265parse")   # type: ignore[misc]
-            decode    = Gst.ElementFactory.make("avdec_h265",   "decode")      # type: ignore[misc]
+            rtspsrc   = Gst.ElementFactory.make("rtspsrc",    "rtspsrc0")   # type: ignore[misc]
+            depay     = Gst.ElementFactory.make(depay_name,   "depay")       # type: ignore[misc]
+            parse     = Gst.ElementFactory.make(parse_name,   "vidparse")    # type: ignore[misc]
+            decode    = Gst.ElementFactory.make(decode_name,  "decode")      # type: ignore[misc]
             tee       = Gst.ElementFactory.make("tee",          "tee")         # type: ignore[misc]
             # Display branch
             q_disp    = Gst.ElementFactory.make("queue",        "q_disp")      # type: ignore[misc]

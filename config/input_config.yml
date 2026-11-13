@@ -1,0 +1,169 @@
+# Input Manager Config
+# Buttons and axes ordered to match JoyFrame struct.
+#
+# axis_ranges: declares the raw integer range evdev sends for non-standard axes.
+#   Default normalization is raw / 32767 (sticks).
+#   Declare [raw_min, raw_max] to override, e.g. D-PAD sends -1/0/1, triggers send 0/1023.
+#
+# axes_as_buttons: mirrors an axis to two button slots.
+#   neg_button fires when val < -threshold, pos_button when val > +threshold.
+#   Threshold is in final [-1, 1] space.
+#   Set neg_button or pos_button to -1 to ignore that direction.
+
+devices:
+
+  - name: "XBOX Controller (Bluetooth)"
+    udev_path: "/dev/input/xbox_bl_controller_laptop"
+    id: "045e:028e"
+    alias: "xbox_bl_controller_laptop"
+    enabled: true
+    sanitize: true
+    deadzone: 0.05
+    mapping:
+      buttons:
+        0:  304  # A
+        1:  305  # B
+        2:  307  # X
+        3:  308  # Y
+        4:  310  # LB
+        5:  311  # RB
+        6:  314  # VIEW   (Select)
+        7:  315  # MENU   (Start)
+        8:  316  # SUPER  (Home)
+        9:  317  # LS_BTN
+        10: 318  # RS_BTN
+        11: 167  # SHARE  (Special — also triggers F12 keyboard event)
+        # 12-17: filled by axes_as_buttons (DPAD + LT/RT as buttons)
+      axes:
+        0: 0   # LS_X   (ABS_X)
+        1: 1   # LS_Y   (ABS_Y)
+        2: 2   # LT     (ABS_Z)       [-1 released → 1 full]
+        3: 3   # RS_X   (ABS_RX)
+        4: 4   # RS_Y   (ABS_RY)
+        5: 5   # RT     (ABS_RZ)      [-1 released → 1 full]
+        6: 16  # D_PAD_X (ABS_HAT0X)
+        7: 17  # D_PAD_Y (ABS_HAT0Y)
+      axis_ranges:
+        2:  [0, 1023]  # LT: evdev sends 0 (released) to 1023 (full)
+        5:  [0, 1023]  # RT: evdev sends 0 (released) to 1023 (full)
+        16: [-1, 1]    # D_PAD_X: evdev sends -1 / 0 / 1
+        17: [-1, 1]    # D_PAD_Y: evdev sends -1 / 0 / 1
+      axes_as_buttons:
+        - axis_code: 17   # D_PAD_Y
+          neg_button: 12  # DPAD_UP   (negative = up)
+          pos_button: 13  # DPAD_DOWN
+          threshold: 0.5
+        - axis_code: 16   # D_PAD_X
+          neg_button: 14  # DPAD_LEFT
+          pos_button: 15  # DPAD_RIGHT
+          threshold: 0.5
+        - axis_code: 2    # LT
+          neg_button: -1  # released side — not used
+          pos_button: 16  # LT_BTN
+          threshold: 0.5
+        - axis_code: 5    # RT
+          neg_button: -1  # released side — not used
+          pos_button: 17  # RT_BTN
+          threshold: 0.5
+
+  - name: "XBOX Controller (USB)"
+    udev_path: "/dev/input/xbox_usb_controller_laptop"
+    id: "045e:0b12"
+    alias: "xbox_usb_controller_laptop"
+    enabled: true
+    sanitize: true
+    deadzone: 0.05
+    mapping:
+      buttons:
+        0:  304  # A
+        1:  305  # B
+        2:  307  # X
+        3:  308  # Y
+        4:  310  # LB
+        5:  311  # RB
+        6:  314  # VIEW
+        7:  315  # MENU
+        8:  316  # SUPER
+        9:  317  # LS_BTN
+        10: 318  # RS_BTN
+        11: 88   # SHARE
+      axes:
+        0: 0   # LS_X
+        1: 1   # LS_Y
+        2: 2   # LT
+        3: 3   # RS_X
+        4: 4   # RS_Y
+        5: 5   # RT
+        6: 16  # D_PAD_X
+        7: 17  # D_PAD_Y
+      axis_ranges:
+        2:  [0, 1023]
+        5:  [0, 1023]
+        16: [-1, 1]
+        17: [-1, 1]
+      axes_as_buttons:
+        - axis_code: 17
+          neg_button: 12  # DPAD_UP
+          pos_button: 13  # DPAD_DOWN
+          threshold: 0.5
+        - axis_code: 16
+          neg_button: 14  # DPAD_LEFT
+          pos_button: 15  # DPAD_RIGHT
+          threshold: 0.5
+        - axis_code: 2
+          neg_button: -1
+          pos_button: 16  # LT_BTN
+          threshold: 0.5
+        - axis_code: 5
+          neg_button: -1
+          pos_button: 17  # RT_BTN
+          threshold: 0.5
+
+  - name: "Steam Deck"
+    udev_path: "/dev/input/steamdeck"
+    id: "28de:1205"
+    alias: "steamdeck"
+    enabled: true
+    sanitize: true
+    deadzone: 0.05
+    mapping:
+      buttons:
+        0:  304  # A
+        1:  305  # B
+        2:  307  # X
+        3:  308  # Y
+        4:  310  # LB
+        5:  311  # RB
+        6:  314  # VIEW
+        7:  315  # MENU
+        8:  316  # SUPER  (Steam button)
+        9:  317  # LS_BTN
+        10: 318  # RS_BTN
+        11: 294  # SHARE  (triple-dot button)
+        12: 544  # DPAD_UP
+        13: 545  # DPAD_DOWN
+        14: 546  # DPAD_LEFT
+        15: 547  # DPAD_RIGHT
+        16: 312  # LT_BTN (left trigger as button)
+        17: 313  # RT_BTN (right trigger as button)
+        18: 704  # LB4
+        19: 706  # LB5
+        20: 705  # RB4
+        21: 707  # RB5
+        22: 289  # L_TPAD_BTN
+        23: 290  # R_TPAD_BTN
+      axes:
+        0:  0   # LS_X
+        1:  1   # LS_Y
+        2:  21  # LT
+        3:  3   # RS_X
+        4:  4   # RS_Y
+        5:  20  # RT
+        # indices 6, 7 (D_PAD_X/Y) left empty — Steam Deck D-PAD is buttons only
+        8:  16  # L_TPAD_X
+        9:  17  # L_TPAD_Y
+        10: 18  # R_TPAD_X
+        11: 19  # R_TPAD_Y
+      axis_ranges:
+        21: [0, 32767]  # LT
+        20: [0, 32767]  # RT

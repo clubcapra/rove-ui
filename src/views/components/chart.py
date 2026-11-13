@@ -13,26 +13,29 @@ from PySide6.QtCharts import (
     QValueAxis,
 )
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QBrush, QColor, QPen
+from PySide6.QtGui import QBrush, QColor, QFont, QPen
 
 from src.controller.event_bus import EventBus
+from src.views import theme
 
-# ── Theme ──────────────────────────────────────────────────────────────────────
-_C_BG     = QColor("#1c1c1b")
-_C_BG_LT  = QColor("#292928")
-_C_TEXT   = QColor("#e0e0e0")
-_C_GRID   = QColor("#3a3a38")
+_S_BG    = theme.BG_DARK
+_S_BG_LT = theme.BG_PANEL
+_S_TEXT  = theme.TEXT_DIM
+_S_GRID  = theme.BORDER_DIM
 
-_PALETTE = [
-    QColor("#eb4034"),  # red (accent)
-    QColor("#60a5fa"),  # blue
-    QColor("#22c55e"),  # green
-    QColor("#f59e0b"),  # amber
-    QColor("#a78bfa"),  # purple
-    QColor("#f472b6"),  # pink
-    QColor("#34d399"),  # teal
-    QColor("#fb923c"),  # orange
+_PALETTE_HEX = [
+    "#00d4ff",  # cyan (primary)
+    "#00e676",  # green
+    "#ffb300",  # amber
+    "#ff3d3d",  # red
+    "#a78bfa",  # purple
+    "#ff6b9d",  # pink
+    "#22d3ee",  # teal
+    "#fb923c",  # orange
 ]
+
+_AXIS_FONT = QFont("Courier New")
+_AXIS_FONT.setPointSize(8)
 
 
 class ChartWidget(QWidget):
@@ -107,43 +110,61 @@ class ChartWidget(QWidget):
         self.chart.setTitle(title)
 
     def _apply_base_theme(self) -> None:
-        self.chart.setBackgroundBrush(QBrush(_C_BG))
-        self.chart.setPlotAreaBackgroundBrush(QBrush(_C_BG_LT))
+        bg    = QColor(_S_BG)
+        bg_lt = QColor(_S_BG_LT)
+        text  = QColor(_S_TEXT)
+        self.chart.setBackgroundBrush(QBrush(bg))
+        self.chart.setPlotAreaBackgroundBrush(QBrush(bg_lt))
         self.chart.setPlotAreaBackgroundVisible(True)
-        self.chart.setTitleBrush(QBrush(_C_TEXT))
+        title_font = QFont("Courier New")
+        title_font.setPointSize(9)
+        title_font.setBold(True)
+        self.chart.setTitleFont(title_font)
+        self.chart.setTitleBrush(QBrush(QColor(theme.TEXT_DIM)))
         self.chart.setDropShadowEnabled(False)
         legend = self.chart.legend()
-        legend.setLabelColor(_C_TEXT)
+        legend.setLabelColor(text)
         legend.setBackgroundVisible(False)
-        self.view.setBackgroundBrush(QBrush(_C_BG))
-        self.view.setStyleSheet("border: none;")
+        legend.setFont(_AXIS_FONT)
+        self.view.setBackgroundBrush(QBrush(bg))
+        self.view.setStyleSheet(
+            f"border: 1px solid {theme.BORDER_DIM}; background: {_S_BG};"
+        )
 
     def _apply_axes_and_series_theme(self) -> None:
-        grid_pen  = QPen(_C_GRID, 1)
-        minor_pen = QPen(_C_GRID, 1, Qt.PenStyle.DotLine)
-        axis_pen  = QPen(_C_GRID, 1)
+        text      = QColor(_S_TEXT)
+        grid      = QColor(_S_GRID)
+        bg_lt     = QColor(_S_BG_LT)
+        grid_pen  = QPen(grid, 1)
+        minor_pen = QPen(grid, 1, Qt.PenStyle.DotLine)
+        axis_pen  = QPen(QColor(theme.BORDER_DIM), 1)
         for axis in self.chart.axes():
-            axis.setLabelsBrush(QBrush(_C_TEXT))
-            axis.setTitleBrush(QBrush(_C_TEXT))
+            axis.setLabelsBrush(QBrush(text))
+            axis.setTitleBrush(QBrush(text))
             axis.setGridLinePen(grid_pen)
             axis.setMinorGridLinePen(minor_pen)
             axis.setLinePen(axis_pen)
             axis.setShadesVisible(False)
+            axis.setLabelsFont(_AXIS_FONT)
+            axis.setTitleFont(_AXIS_FONT)
 
         for i, series in enumerate(self.chart.series()):
-            color = _PALETTE[i % len(_PALETTE)]
+            color = QColor(_PALETTE_HEX[i % len(_PALETTE_HEX)])
             if isinstance(series, QLineSeries):
-                series.setPen(QPen(color, 2))
+                pen = QPen(color, 2)
+                pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+                series.setPen(pen)
                 series.setColor(color)
             elif isinstance(series, (QBarSeries, QHorizontalBarSeries)):
                 for bar_set in series.barSets():
                     bar_set.setColor(color)
-                    bar_set.setBorderColor(_C_BG_LT)
-                    bar_set.setLabelColor(_C_TEXT)
+                    bar_set.setBorderColor(bg_lt)
+                    bar_set.setLabelColor(text)
             elif isinstance(series, QPieSeries):
                 for j, slice_ in enumerate(series.slices()):
-                    slice_.setColor(_PALETTE[j % len(_PALETTE)])
-                    slice_.setLabelColor(_C_TEXT)
+                    slice_.setColor(QColor(_PALETTE_HEX[j % len(_PALETTE_HEX)]))
+                    slice_.setLabelColor(text)
 
     def _load_from_config(self):
         rows = self.config.get("data", [])

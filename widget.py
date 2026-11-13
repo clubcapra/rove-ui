@@ -18,56 +18,59 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QIcon
 from pathlib import Path
 
-# Import view skeletons (high-level)
-from src.views.console_view import DebugConsole
-from src.views.rtsp_view import RTSPView
 from src.views.layout_pannel import LayoutPanel
+from src.views import theme
 from src.controller.event_bus import EventBus
 from src.views.components.header import Header
 from src.views.components.nav_bar import NavBar
 from src.clients.udp_client import UDPClient
 from src.clients.ros2_client import ROS2Client
+from src.robot_network import resolve_config
+from src.clients.http_client import HttpClient
+from src.clients.mission_client import MissionClient
+from src.clients.path_recorder import PathRecorder
+from src.clients.recording_client import RecordingClient
 
 
 class Widget(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, event_bus: EventBus | None = None):
         super().__init__(parent)
         self.setWindowTitle("Rove - UI")
+
+        self.event_bus = event_bus or EventBus()
 
         self._header = Header(parent=self)
         self._nav = NavBar(self)
         self._central = QWidget(self)
         self._central_layout = QVBoxLayout(self._central)
         self._central_layout.setContentsMargins(0, 0, 0, 0)
-        # stacked widget for top-level pages (dashboard, logs, ...)
         self._stack = QStackedWidget(self._central)
         self._central_layout.addWidget(self._stack)
-        self.event_bus = EventBus()
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        layout.addWidget(self._header)
-        layout.addWidget(self._nav)
-        layout.addWidget(self._central)
-        #layout.addWidget(self._console)
+        self._main_layout = QVBoxLayout(self)
+        self._main_layout.setContentsMargins(0, 0, 0, 0)
+        self._main_layout.setSpacing(0)
+        self._main_layout.addWidget(self._header)
+        self._main_layout.addWidget(self._nav)
+        self._main_layout.addWidget(self._central)
 
         self._views: list[Any] = []
         self._pages: dict[str, int] = {}
         self._udp_clients: list[UDPClient] = []
         self._ros2_clients: list[ROS2Client] = []
-
-
-        # Application-wide EventBus (can be shared or passed to orchestrator)
-        self.event_bus = EventBus()
+        self._http_clients: list[HttpClient] = []
+        self._path_recorders: list[PathRecorder] = []
+        self._recording_clients: list[RecordingClient] = []
+        self._bottom_bar: QWidget | None = None
 
 
     def load_config(self, configFile):
         """Load JSON from a path and build the interface."""
+        data = configFile
         if isinstance(configFile, str):
             with open(configFile, "r", encoding="utf-8") as f:
                 data = load(f)
-        return data
+        return resolve_config(data)
 
     def buildInterface(self, config: dict):
         """Construct the main interface from the config."""
@@ -109,8 +112,53 @@ class Widget(QWidget):
             self._stack.setCurrentIndex(0)
             self._nav.activate_first()
 
+        self._nav.setVisible(self._stack.count() > 1)
+
+        self._rebuild_bottom_bar(config.get("bottom_bar"))
         self._restart_udp_clients(config.get("udp_clients", []))
         self._restart_ros2_clients(config.get("ros2_clients", []))
+        self._restart_http_clients(config.get("http_clients", []))
+        self._restart_path_recorders(config.get("path_recorders", []))
+        self._restart_recording_clients(config.get("recording_clients", []))
+
+    def _rebuild_bottom_bar(self, bar_cfg) -> None:
+        if self._bottom_bar is not None:
+            self._bottom_bar.setParent(None)
+            self._bottom_bar.deleteLater()
+            self._bottom_bar = None
+        if not bar_cfg:
+            return
+        from PySide6.QtWidgets import QVBoxLayout
+        from src.views.components.button_bar import ButtonBar
+        bars = bar_cfg if isinstance(bar_cfg, list) else [bar_cfg]
+        container = QWidget(self)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        for cfg in bars:
+            layout.addWidget(ButtonBar(cfg, event_bus=self.event_bus))
+        self._bottom_bar = container
+        self._bottom_bar.show()
+        self._bottom_bar.raise_()
+        self._reposition_bottom_bar()
+
+    def _reposition_bottom_bar(self) -> None:
+        if self._bottom_bar is None:
+            return
+        hint = self._bottom_bar.sizeHint()
+        w, h = hint.width(), hint.height()
+        x = (self.width() - w) // 2
+        y = self.height() - h
+        self._bottom_bar.setGeometry(x, y, w, h)
+        self._bottom_bar.raise_()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reposition_bottom_bar()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._reposition_bottom_bar()
 
     def update_header_time(self, time_value: str):
         self._header.update_time(time_value)
@@ -127,6 +175,37 @@ class Widget(QWidget):
             client = UDPClient(client_config, self.event_bus)
             client.start()
             self._udp_clients.append(client)
+
+    def _restart_http_clients(self, client_configs: list[dict[str, Any]]) -> None:
+        for client in self._http_clients:
+            client.stop()
+        self._http_clients = []
+        for client_config in client_configs:
+            client = (
+                MissionClient(client_config, self.event_bus)
+                if client_config.get("type") == "udp_mission"
+                else HttpClient(client_config, self.event_bus)
+            )
+            client.start()
+            self._http_clients.append(client)
+
+    def _restart_path_recorders(self, recorder_configs: list[dict[str, Any]]) -> None:
+        for recorder in self._path_recorders:
+            recorder.stop()
+        self._path_recorders = []
+        for cfg in recorder_configs:
+            recorder = PathRecorder(cfg, self.event_bus)
+            recorder.start()
+            self._path_recorders.append(recorder)
+
+    def _restart_recording_clients(self, client_configs: list[dict[str, Any]]) -> None:
+        for client in self._recording_clients:
+            client.stop()
+        self._recording_clients = []
+        for cfg in client_configs:
+            client = RecordingClient(cfg, self.event_bus)
+            client.start()
+            self._recording_clients.append(client)
 
     def _restart_ros2_clients(self, client_configs: list[dict[str, Any]]) -> None:
         for client in self._ros2_clients:
@@ -145,6 +224,15 @@ class Widget(QWidget):
         for client in self._ros2_clients:
             client.stop()
         self._ros2_clients = []
+        for client in self._http_clients:
+            client.stop()
+        self._http_clients = []
+        for recorder in self._path_recorders:
+            recorder.stop()
+        self._path_recorders = []
+        for client in self._recording_clients:
+            client.stop()
+        self._recording_clients = []
         super().closeEvent(event)
 
 
@@ -165,33 +253,30 @@ if __name__ == "__main__":
     window = Widget()
     if _app_icon:
         window.setWindowIcon(_app_icon)
+    app.setStyleSheet(theme.GLOBAL)
+
     window.buildInterface("./config/config_window1.json")
-    window.showMaximized()
-    # FORCER le bakcground en BLANC
-    window.setStyleSheet("background-color: #1c1c1b; color: #e0e0e0;")
+    window.showFullScreen()
+    window.setStyleSheet(f"background: {theme.BG_DEEP};")
     screens = app.screens()
     primary_screen = app.primaryScreen()
 
-    # Mettre window sur l'écran principal
     window.move(primary_screen.geometry().topLeft())
-    # Chercher un écran secondaire
     secondary_screens = [s for s in screens if s != primary_screen]
-    # Si il  y a un config window 2 existe, on affiche un autre window pour le second écran
-    # (ex: config_window2.json)
+
     if os.path.exists("./config/config_window2.json"):
-        window2 = Widget()
+        window2 = Widget(event_bus=window.event_bus)
         if _app_icon:
             window2.setWindowIcon(_app_icon)
         window2.buildInterface("./config/config_window2.json")
         screens = app.screens()
-        #Si il y a un autre écran, 
         if len(screens) > 1:
             second_screen = secondary_screens[0]
             window2.move(second_screen.geometry().topLeft())
             asyncio.run(window.event_bus.publish("log", "Window : Application has started on the second screen."))
 
-        window2.showMaximized()
-        window2.setStyleSheet("background-color: #1c1c1b; color: #e0e0e0;")
+        window2.showFullScreen()
+        window2.setStyleSheet(f"background: {theme.BG_DEEP};")
 
         
     try:

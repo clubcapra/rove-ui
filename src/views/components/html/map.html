@@ -1,172 +1,969 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8" />
-    <title>Map</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <style>
-        html, body, #map {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            background: #0f172a;
-        }
-        .poi-popup img {
-            max-width: 200px;
-            max-height: 150px;
-            display: block;
-            margin-top: 6px;
-            border-radius: 4px;
-        }
-        .robot-cursor-wrap {
-            display: flex; align-items: center; justify-content: center;
-            transform-origin: center center;
-        }
-    </style>
+  <meta charset="utf-8"/>
+  <title>MAP</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <link rel="stylesheet" href="leaflet.min.css"/>
+  <script src="leaflet.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #f0f2f5; font-family: 'Courier New', monospace; overflow: hidden; }
+
+    #map {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 24px;
+      background: #f0f2f5;
+    }
+    .leaflet-container { cursor: crosshair !important; }
+
+    /* Status bar */
+    #status-bar {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 24px;
+      background: #e8ebef; border-top: 1px solid #a8b1bc;
+      display: flex; align-items: center;
+      font-size: 10px; color: #606870; z-index: 1000; pointer-events: none;
+    }
+    .sb { padding: 0 12px; border-right: 1px solid #bfc5cf; white-space: nowrap; }
+    .sb:last-child { border-right: none; }
+    #sb-coords { color: #1a1d22; }
+    .sb-spacer { flex: 1; }
+
+    /* Popup */
+    .leaflet-popup-content-wrapper {
+      background: #dde1e8; color: #1a1d22;
+      border: 1px solid #a8b1bc; border-radius: 0;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,212,255,0.06);
+      font-family: 'Courier New', monospace; font-size: 11px;
+    }
+    .leaflet-popup-content { margin: 10px 14px; }
+    .leaflet-popup-tip { background: #dde1e8; }
+    .leaflet-popup-close-button { color: #606870 !important; font-size: 18px !important; }
+    .leaflet-popup-close-button:hover { color: #c07800 !important; background: transparent !important; }
+
+    /* Zoom controls */
+    .leaflet-control-zoom a {
+      background: #dde1e8 !important; color: #1a1d22 !important;
+      border-color: #a8b1bc !important; border-radius: 0 !important;
+      font-family: monospace;
+    }
+    .leaflet-control-zoom a:hover { background: #d0d5de !important; color: #c07800 !important; }
+    .leaflet-bar { border: 1px solid #a8b1bc !important; box-shadow: none !important; }
+    .leaflet-bar a { border-bottom-color: #a8b1bc !important; }
+    .leaflet-control-attribution {
+      background: rgba(240,242,245,0.8) !important; color: #507090 !important;
+      font-family: monospace; font-size: 9px;
+    }
+    .leaflet-control-attribution a { color: #7a8591 !important; }
+
+    /* POI popup content */
+    .tac-popup { display: flex; flex-direction: column; gap: 4px; }
+    .tac-label { color: #c07800; font-weight: 700; letter-spacing: 1px; }
+    .tac-coords { color: #606870; font-size: 10px; }
+    .tac-popup img { max-width: 200px; max-height: 150px; margin-top: 6px; border: 1px solid #a8b1bc; }
+    .tac-rm-btn {
+      margin-top: 4px; padding: 4px 10px;
+      background: transparent; border: 1px solid #c92b2b;
+      color: #c92b2b; font-family: 'Courier New', monospace;
+      font-size: 10px; letter-spacing: 1.5px; cursor: pointer;
+    }
+    .tac-rm-btn:hover { background: rgba(201,43,43,0.12); }
+
+    /* Click flash */
+    @keyframes flash {
+      0%   { opacity: 1; transform: scale(0.4); }
+      60%  { opacity: 0.7; transform: scale(1.8); }
+      100% { opacity: 0; transform: scale(2.4); }
+    }
+    .click-flash {
+      position: absolute; width: 14px; height: 14px;
+      border: 1px solid #c07800;
+      pointer-events: none;
+      animation: flash 0.45s ease-out forwards;
+      margin-left: -7px; margin-top: -7px; z-index: 2000;
+    }
+
+    /* Recenter button */
+    #btn-recenter {
+      position: absolute;
+      top: 80px; left: 10px;
+      z-index: 1000;
+      width: 26px; height: 26px;
+      background: #dde1e8;
+      border: 1px solid #a8b1bc;
+      color: #606870;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    #btn-recenter:hover {
+      background: #d0d5de;
+      border-color: #c07800;
+      color: #c07800;
+    }
+    #btn-recenter:active { background: #f0f2f5; }
+
+    /* ── Action wheel ───────────────────────────────────────────── */
+    #action-wheel {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 3000;
+    }
+    #aw-backdrop {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.15);
+      cursor: default;
+    }
+    #aw-ring {
+      position: absolute;
+      width: 0; height: 0;
+    }
+    /* Coordinates label at center */
+    #aw-coords-box {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      background: #eef0f3;
+      border: 1px solid #a8b1bc;
+      color: #7a8591;
+      font-size: 9px;
+      font-family: 'Courier New', monospace;
+      padding: 4px 8px;
+      white-space: nowrap;
+      pointer-events: none;
+      letter-spacing: 0.5px;
+    }
+    /* Radial buttons */
+    .aw-btn {
+      position: absolute;
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: #e8ebef;
+      border: 1.5px solid #a8b1bc;
+      color: #1a1d22;
+      font-family: 'Courier New', monospace;
+      cursor: pointer;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 3px;
+      transform: translate(-50%, -50%);
+      transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .aw-btn:hover, .aw-btn:active {
+      background: #d0d5de;
+      border-color: #c07800;
+      color: #c07800;
+      box-shadow: 0 0 16px rgba(192,120,0,0.25);
+    }
+    .aw-btn.aw-goto:hover, .aw-btn.aw-goto:active {
+      border-color: #00875a;
+      color: #00875a;
+      box-shadow: 0 0 16px rgba(0,135,90,0.2);
+    }
+    .aw-btn.aw-cancel:hover, .aw-btn.aw-cancel:active {
+      border-color: #c92b2b;
+      color: #c92b2b;
+      box-shadow: 0 0 16px rgba(201,43,43,0.2);
+    }
+    .aw-btn.aw-sentinel:hover, .aw-btn.aw-sentinel:active {
+      border-color: #22d3ee; color: #22d3ee;
+      box-shadow: 0 0 16px rgba(34,211,238,0.22);
+    }
+    .aw-btn.aw-orbit:hover, .aw-btn.aw-orbit:active {
+      border-color: #a78bfa; color: #a78bfa;
+      box-shadow: 0 0 16px rgba(167,139,250,0.20);
+    }
+    .aw-btn.aw-relay:hover, .aw-btn.aw-relay:active {
+      border-color: #34d399; color: #34d399;
+      box-shadow: 0 0 16px rgba(52,211,153,0.20);
+    }
+    .aw-btn.aw-pathway:hover, .aw-btn.aw-pathway:active {
+      border-color: #f7d412; color: #f7d412;
+      box-shadow: 0 0 16px rgba(251,146,60,0.22);
+    }
+    #sentinel-banner {
+      display: none;
+      position: absolute;
+      top: 50px; left: 50%; transform: translateX(-50%);
+      background: #f0f2f5; border: 1px solid #22d3ee;
+      color: #22d3ee; font-family: 'Courier New', monospace;
+      font-size: 10px; letter-spacing: 2px; font-weight: 700;
+      padding: 6px 18px; z-index: 3500; pointer-events: none;
+      white-space: nowrap;
+    }
+    #pathway-banner {
+      display: none;
+      position: absolute;
+      top: 50px; left: 50%; transform: translateX(-50%);
+      background: #f0f2f5; border: 1px solid #f7d412;
+      color: #f7d412; font-family: 'Courier New', monospace;
+      font-size: 10px; letter-spacing: 2px; font-weight: 700;
+      padding: 6px 14px 6px 18px; z-index: 3500;
+      white-space: nowrap; display: none;
+      align-items: center; gap: 14px;
+    }
+    #pathway-count { opacity: 0.6; font-weight: 400; }
+    #pathway-done-btn, #pathway-cancel-btn {
+      background: transparent; border: 1px solid currentColor;
+      color: inherit; font: inherit; letter-spacing: 2px;
+      padding: 2px 10px; cursor: pointer;
+    }
+    #pathway-cancel-btn { color: #f7d412; border-color: #f7d412; }
+    #pathway-done-btn:disabled { opacity: 0.35; cursor: default; }
+    .aw-icon { font-size: 20px; line-height: 1; }
+    .aw-lbl  { font-size: 7px; letter-spacing: 1.5px; font-weight: 700; opacity: 0.85; }
+
+    /* Connector lines from center */
+    #aw-ring svg {
+      position: absolute;
+      overflow: visible;
+      pointer-events: none;
+      left: 0; top: 0;
+    }
+
+    @keyframes aw-pop {
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+      70%  { transform: translate(-50%, -50%) scale(1.08); }
+      100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+    @keyframes aw-pop-coords {
+      0%   { opacity: 0; }
+      40%  { opacity: 0; }
+      100% { opacity: 1; }
+    }
+    #aw-ring.aw-open .aw-btn {
+      animation: aw-pop 0.22s cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
+    }
+    #aw-ring.aw-open #aw-coords-box {
+      animation: aw-pop-coords 0.3s ease forwards;
+    }
+    #aw-btn-poi      { animation-delay: 0ms   !important; }
+    #aw-btn-goto     { animation-delay: 20ms  !important; }
+    #aw-btn-sentinel { animation-delay: 40ms  !important; }
+    #aw-btn-orbit    { animation-delay: 60ms  !important; }
+    #aw-btn-relay    { animation-delay: 80ms  !important; }
+    #aw-btn-cancel   { animation-delay: 100ms !important; }
+    #aw-btn-pathway  { animation-delay: 120ms !important; }
+
+    /* Filter panel */
+    #filter-panel {
+      position: absolute;
+      top: 10px; right: 10px;
+      z-index: 1000;
+      background: #e8ebef;
+      border: 1px solid #a8b1bc;
+      min-width: 200px;
+      font-family: 'Courier New', monospace;
+    }
+    #filter-title {
+      background: #f0f2f5;
+      border-bottom: 1px solid #a8b1bc;
+      color: #606870;
+      font-size: 16px;
+      letter-spacing: 1.5px;
+      padding: 4px 8px;
+    }
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 16px;
+      letter-spacing: 1px;
+      border-bottom: 1px solid #dde1e8;
+      color: #404850;
+      user-select: none;
+      transition: background 0.1s, color 0.1s;
+    }
+    .filter-row:last-child { border-bottom: none; }
+    .filter-row:hover { background: #d0d5de; color: #1a1d22; }
+    .filter-dot { width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0; }
+    .filter-row.off { color: #b0b8c0; }
+    .filter-row.off .filter-dot { opacity: 0.2; }
+  </style>
 </head>
 <body>
 <div id="map"></div>
+<button id="btn-recenter" title="Recentrer sur le robot">⊕</button>
+<div id="status-bar">
+  <span class="sb" id="sb-coords">-- / --</span>
+  <span class="sb" id="sb-zoom">ZOOM --</span>
+  <span class="sb" id="sb-pois">0 WAYPOINTS</span>
+  <span class="sb" id="sb-steps">0 STEPS</span>
+  <span class="sb-spacer"></span>
+  <span class="sb" style="color:#b8c0ca;">&#9658; TAP TO PLACE ACTION</span>
+</div>
+
+<!-- Action wheel overlay -->
+<div id="action-wheel">
+  <div id="aw-backdrop"></div>
+  <div id="aw-ring">
+    <svg id="aw-lines" width="1" height="1"></svg>
+    <div id="aw-coords-box">-- / --</div>
+    <button class="aw-btn aw-poi"    id="aw-btn-poi">
+      <span class="aw-icon">◆</span>
+      <span class="aw-lbl">P.O.I.</span>
+    </button>
+    <button class="aw-btn aw-goto"   id="aw-btn-goto">
+      <span class="aw-icon">⊕</span>
+      <span class="aw-lbl">GOTO</span>
+    </button>
+    <button class="aw-btn aw-sentinel" id="aw-btn-sentinel">
+      <span class="aw-icon">⇄</span>
+      <span class="aw-lbl">SENTINEL</span>
+    </button>
+    <button class="aw-btn aw-orbit" id="aw-btn-orbit">
+      <span class="aw-icon">◎</span>
+      <span class="aw-lbl">ORBIT</span>
+    </button>
+    <button class="aw-btn aw-relay" id="aw-btn-relay">
+      <span class="aw-icon">⊡</span>
+      <span class="aw-lbl">RELAY</span>
+    </button>
+    <button class="aw-btn aw-pathway" id="aw-btn-pathway">
+      <span class="aw-icon">⤳</span>
+      <span class="aw-lbl">PATHWAY</span>
+    </button>
+    <button class="aw-btn aw-cancel" id="aw-btn-cancel">
+      <span class="aw-icon">✕</span>
+      <span class="aw-lbl">ANNULER</span>
+    </button>
+  </div>
+</div>
+<div id="sentinel-banner">◆ TAP MAP — SET POINT B</div>
+<div id="pathway-banner">
+  <span>◆ PATHWAY</span>
+  <span id="pathway-count">0 PTS</span>
+  <button id="pathway-cancel-btn">CANCEL</button>
+  <button id="pathway-done-btn" disabled>DONE</button>
+</div>
+
+<!-- Layer filter panel -->
+<div id="filter-panel">
+  <div id="filter-title">◆ LAYERS</div>
+  <div class="filter-row" id="fl-poi"      onclick="toggleLayer('poi',this)">
+    <span class="filter-dot" style="background:#ffae00"></span>POI
+  </div>
+  <div class="filter-row" id="fl-goto"     onclick="toggleLayer('goto',this)">
+    <span class="filter-dot" style="background:#00e676"></span>GOTO
+  </div>
+  <div class="filter-row" id="fl-sentinel" onclick="toggleLayer('sentinel',this)">
+    <span class="filter-dot" style="background:#22d3ee"></span>SENTINEL
+  </div>
+  <div class="filter-row" id="fl-relay"    onclick="toggleLayer('relay',this)">
+    <span class="filter-dot" style="background:#34d399"></span>RELAY
+  </div>
+  <div class="filter-row" id="fl-orbit"    onclick="toggleLayer('orbit',this)">
+    <span class="filter-dot" style="background:#a78bfa"></span>ORBIT
+  </div>
+  <div class="filter-row" id="fl-pathway"  onclick="toggleLayer('pathway',this)">
+    <span class="filter-dot" style="background:#fb923c"></span>PATHWAY
+  </div>
+</div>
+
 <script>
-    const map = L.map('map', { zoomControl: false }).setView([45.5048, -73.5773], 15);
+  // ── Map ───────────────────────────────────────────────────────────────
+  const map = L.map('map', {
+    zoomControl: true,
+    preferCanvas: true,
+    zoomSnap: 0.5,
+  }).setView([45.5048, -73.5773], 15);
 
-    let currentTileLayer = L.tileLayer(
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        { maxZoom: 19, attribution: '© Esri' }
-    ).addTo(map);
+  let currentTileLayer = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    {
+      maxZoom: 19,
+      attribution: '&copy; Esri',
+      updateWhenIdle: true,
+      updateWhenZooming: false,
+      keepBuffer: 2,
+    }
+  ).addTo(map);
 
-    window.mapSetTileLayer = function(url, opts) {
-        if (currentTileLayer) { map.removeLayer(currentTileLayer); }
-        currentTileLayer = L.tileLayer(url, opts || { maxZoom: 19 }).addTo(map);
-    };
+  const _tileDefaults = { maxZoom: 19, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 2 };
+  window.mapSetTileLayer = function(url, opts) {
+    if (currentTileLayer) map.removeLayer(currentTileLayer);
+    currentTileLayer = L.tileLayer(url, Object.assign({}, _tileDefaults, opts || {})).addTo(map);
+  };
 
-    // --- Custom icon config (set via mapSetRobotIcon / mapSetPOIIcon) ---
-    let _robotIconUrl = null;
-    let _robotIconSize = [36, 36];
-    let _poiIconUrl = null;
-    let _poiIconSize = [24, 32];
+  // ── Mission layer groups ──────────────────────────────────────────────
+  const _layers = {
+    poi:      L.layerGroup().addTo(map),
+    goto:     L.layerGroup().addTo(map),
+    sentinel: L.layerGroup().addTo(map),
+    relay:    L.layerGroup().addTo(map),
+    orbit:    L.layerGroup().addTo(map),
+    pathway:  L.layerGroup().addTo(map),
+  };
+  const _layerVisible = { poi: true, goto: true, sentinel: true, relay: true, orbit: true, pathway: true };
+  const _missionMarkers = {};
 
-    // --- Robot cursor ---
-    let robotYaw = 0;
+  function _updateMissionCount() {
+    const n = Object.keys(_missionMarkers).length;
+    document.getElementById('sb-steps').textContent = n + ' STEP' + (n !== 1 ? 'S' : '');
+  }
 
-    function _robotIconHtml(yaw) {
-        const [w, h] = _robotIconUrl ? _robotIconSize : [36, 36];
-        const inner = _robotIconUrl
-            ? '<img src="' + _robotIconUrl + '" style="width:' + w + 'px;height:' + h + 'px;display:block"/>'
-            : '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="-18 -18 36 36">' +
-              '<circle r="16" fill="rgba(0,0,0,0.35)" stroke="rgba(255,255,255,0.55)" stroke-width="1.5"/>' +
-              '<polygon points="0,-13 -8,7 8,7" fill="#22c55e" stroke="rgba(0,0,0,0.45)" stroke-width="1"/>' +
-              '<circle r="3.5" fill="#ef4444"/>' +
-              '</svg>';
-        return '<div class="robot-cursor-wrap" style="transform:rotate(' + yaw + 'deg);width:' + w + 'px;height:' + h + 'px">' + inner + '</div>';
+  function toggleLayer(type, el) {
+    const vis = !_layerVisible[type];
+    _layerVisible[type] = vis;
+    const lg = _layers[type];
+    if (lg) {
+      if (vis) { if (!map.hasLayer(lg)) map.addLayer(lg); }
+      else     { if (map.hasLayer(lg))  map.removeLayer(lg); }
+    }
+    el.classList.toggle('off', !vis);
+  }
+
+  window.mapSetLayerVisible = function(type, visible) {
+    _layerVisible[type] = visible;
+    const lg = _layers[type];
+    if (lg) {
+      if (visible) { if (!map.hasLayer(lg)) map.addLayer(lg); }
+      else         { if (map.hasLayer(lg))  map.removeLayer(lg); }
+    }
+    const el = document.getElementById('fl-' + type);
+    if (el) el.classList.toggle('off', !visible);
+  };
+
+  // ── Status bar ────────────────────────────────────────────────────────
+  const sbCoords = document.getElementById('sb-coords');
+  const sbZoom   = document.getElementById('sb-zoom');
+  const sbPois   = document.getElementById('sb-pois');
+
+  function updateZoom() { sbZoom.textContent = 'ZOOM ' + map.getZoom(); }
+  updateZoom();
+  map.on('zoomend', updateZoom);
+  let _mmThrottle = 0;
+  map.on('mousemove', function(e) {
+    const now = Date.now();
+    if (now - _mmThrottle < 80) return;
+    _mmThrottle = now;
+    sbCoords.textContent = e.latlng.lat.toFixed(6) + ' / ' + e.latlng.lng.toFixed(6);
+  });
+  function updatePoiCount() {
+    const n = Object.keys(pois).length;
+    sbPois.textContent = n + ' WAYPOINT' + (n !== 1 ? 'S' : '');
+  }
+
+  // ── Icon config ───────────────────────────────────────────────────────
+  let _robotIconUrl = null, _robotIconSize = [36, 36];
+  let _poiIconUrl   = null, _poiIconSize   = [24, 32];
+  let robotYaw = 0;
+
+  function _robotIconHtml(yaw) {
+    const [w, h] = _robotIconUrl ? _robotIconSize : [36, 36];
+    const inner = _robotIconUrl
+      ? '<img src="' + _robotIconUrl + '" style="width:' + w + 'px;height:' + h + 'px;display:block"/>'
+      : '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="-18 -18 36 36">' +
+        '<circle r="16" fill="rgba(0,0,0,0.55)" stroke="#ffae00" stroke-width="1.5"/>' +
+        '<polygon points="0,-13 -7,7 7,7" fill="#ffae00" stroke="rgba(0,0,0,0.4)" stroke-width="1"/>' +
+        '<circle r="3" fill="#ffae00"/></svg>';
+    return '<div class="robot-cursor-wrap" style="transform:rotate(' + yaw + 'deg);width:' + w + 'px;height:' + h + 'px">' + inner + '</div>';
+  }
+
+  let _lastRobotLat = null, _lastRobotLng = null;
+
+  const robotMarker = L.marker([45.5048, -73.5773], {
+    icon: L.divIcon({ html: _robotIconHtml(0), iconSize: [36,36], iconAnchor: [18,18], className: '' }),
+    zIndexOffset: 1000
+  });
+  let robotVisible = false;
+
+  const pois = {};
+  let poiCounter = 0;
+
+  // ── Navigation ────────────────────────────────────────────────────────
+  const PAN_PX = 100;
+  window.mapPanLeft  = () => map.panBy([-PAN_PX, 0]);
+  window.mapPanRight = () => map.panBy([ PAN_PX, 0]);
+  window.mapPanUp    = () => map.panBy([0, -PAN_PX]);
+  window.mapPanDown  = () => map.panBy([0,  PAN_PX]);
+  window.mapZoomIn   = () => map.zoomIn();
+  window.mapZoomOut  = () => map.zoomOut();
+
+  window.mapSetView = function(lat, lng, zoom) {
+    map.setView([lat, lng], zoom !== undefined ? zoom : map.getZoom());
+  };
+
+  window.mapRecenter = function() {
+    if (_lastRobotLat !== null && _lastRobotLng !== null) {
+      map.setView([_lastRobotLat, _lastRobotLng], map.getZoom());
+    }
+  };
+
+  document.getElementById('btn-recenter').addEventListener('click', function(e) {
+    e.stopPropagation();
+    window.mapRecenter();
+  });
+
+  // ── Robot ─────────────────────────────────────────────────────────────
+  window.mapSetRobotPosition = function(lat, lng) {
+    _lastRobotLat = lat;
+    _lastRobotLng = lng;
+    robotMarker.setLatLng([lat, lng]);
+    if (!robotVisible) { robotMarker.addTo(map); robotVisible = true; }
+  };
+  window.mapSetRobotYaw = function(yaw_deg) {
+    robotYaw = yaw_deg;
+    const el = robotMarker.getElement();
+    if (el) {
+      const wrap = el.querySelector('.robot-cursor-wrap');
+      if (wrap) wrap.style.transform = 'rotate(' + yaw_deg + 'deg)';
+    }
+  };
+  window.mapSetRobotIcon = function(url, w, h) {
+    _robotIconUrl = url;
+    if (w && h) _robotIconSize = [w, h];
+    const [iw, ih] = _robotIconSize;
+    robotMarker.setIcon(L.divIcon({
+      html: _robotIconHtml(robotYaw),
+      iconSize: [iw, ih], iconAnchor: [iw/2, ih/2], className: ''
+    }));
+  };
+  window.mapSetPOIIcon = function(url, w, h) {
+    _poiIconUrl = url;
+    if (w && h) _poiIconSize = [w, h];
+  };
+
+  // ── GOTO marker ───────────────────────────────────────────────────────
+  let gotoMarker = null;
+  function _gotoIconHtml() {
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="-14 -14 28 28">' +
+      '<circle r="12" fill="rgba(0,0,0,0.55)" stroke="#00e676" stroke-width="1" stroke-dasharray="3 2"/>' +
+      '<polygon points="0,-8 -5,4 5,4" fill="#00e676" stroke="#080808" stroke-width="0.8"/>' +
+      '<circle r="2" fill="#00e676"/>' +
+      '</svg>';
+  }
+
+  function setGotoMarker(lat, lng) {
+    if (gotoMarker) { map.removeLayer(gotoMarker); }
+    gotoMarker = L.marker([lat, lng], {
+      icon: L.divIcon({ html: _gotoIconHtml(), iconSize: [32,32], iconAnchor: [16,16], className: '' }),
+      zIndexOffset: 900
+    }).addTo(map);
+    gotoMarker.bindPopup(
+      '<div class="tac-popup">' +
+      '<div class="tac-label" style="color:#00e676">⊕ GOTO TARGET</div>' +
+      '<div class="tac-coords">' + lat.toFixed(6) + ' / ' + lng.toFixed(6) + '</div></div>'
+    );
+  }
+
+  // ── POI ───────────────────────────────────────────────────────────────
+  function _poiMarkerIcon() {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="-8 -8 16 16">' +
+      '<polygon points="0,-7 7,0 0,7 -7,0" fill="#ffae00" stroke="#080808" stroke-width="1.2"/>' +
+      '<circle r="2" fill="rgba(255,255,255,0.5)"/>' +
+      '</svg>';
+    return L.divIcon({ html: svg, iconSize: [16,16], iconAnchor: [8,8], className: '' });
+  }
+
+  function _poiPopupHtml(id, label, latStr, lngStr, imgHtml) {
+    return '<div class="tac-popup">' +
+      '<div class="tac-label">&#9670; ' + label + '</div>' +
+      '<div class="tac-coords">' + latStr + ' / ' + lngStr + '</div>' +
+      (imgHtml || '') +
+      '<button class="tac-rm-btn" onclick="mapRemovePOIEmit(\'' + id + '\')">&#10005; RETIRER</button>' +
+      '</div>';
+  }
+
+  window.mapRemovePOIEmit = function(id) {
+    console.log('__mapcb__:' + JSON.stringify({ action: 'remove_poi', poi_id: id }));
+  };
+
+  window.mapAddPOI = function(lat, lng, label, poiId) {
+    const id = (poiId && poiId !== '') ? poiId : ('poi_' + (++poiCounter));
+    const safeLabel = label || id;
+    const latStr = parseFloat(lat).toFixed(6);
+    const lngStr = parseFloat(lng).toFixed(6);
+    const marker = L.marker([lat, lng], { icon: _poiMarkerIcon(), zIndexOffset: 500 });
+    _layers.poi.addLayer(marker);
+    marker.bindPopup(_poiPopupHtml(id, safeLabel, latStr, lngStr, ''));
+    pois[id] = { marker, label: safeLabel, photo: null };
+    updatePoiCount();
+    return id;
+  };
+
+  window.mapRemovePOI = function(id) {
+    if (!pois[id]) return;
+    _layers.poi.removeLayer(pois[id].marker);
+    delete pois[id];
+    updatePoiCount();
+  };
+
+  window.mapAttachPhoto = function(id, dataUrl) {
+    const poi = pois[id];
+    if (!poi) return false;
+    poi.photo = dataUrl;
+    const ll = poi.marker.getLatLng();
+    const img = dataUrl ? '<img src="' + dataUrl + '"/>' : '';
+    poi.marker.setPopupContent(
+      _poiPopupHtml(id, poi.label, ll.lat.toFixed(6), ll.lng.toFixed(6), img)
+    );
+    return true;
+  };
+
+  window.mapGetPOIs = function() {
+    return Object.keys(pois).map(function(id) {
+      const ll = pois[id].marker.getLatLng();
+      return { id, lat: ll.lat, lng: ll.lng, label: pois[id].label, hasPhoto: !!pois[id].photo };
+    });
+  };
+
+  // ── Mission step markers ──────────────────────────────────────────────
+  window.mapAddMissionStep = function(type, id, lat, lng, label, extra) {
+    extra = extra || {};
+    const lg = _layers[type];
+    if (!lg) return;
+    const items = [];
+
+    if (type === 'goto') {
+      const m = L.circleMarker([lat, lng], {
+        radius: 7, fillColor: '#00e676', color: '#080808',
+        weight: 2, fillOpacity: 0.9
+      });
+      m.bindTooltip(label);
+      items.push(m);
+    } else if (type === 'relay') {
+      const svg =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="-6 -6 12 12">' +
+        '<rect x="-5" y="-5" width="10" height="10" fill="#34d399" stroke="#080808" ' +
+        'stroke-width="1.5" rx="1"/></svg>';
+      const m = L.marker([lat, lng], {
+        icon: L.divIcon({ html: svg, iconSize: [12,12], iconAnchor: [6,6], className: '' }),
+        zIndexOffset: 400
+      });
+      m.bindTooltip(label);
+      items.push(m);
+    } else if (type === 'sentinel') {
+      const latB = extra.lat_b, lngB = extra.lng_b;
+      if (latB === undefined || lngB === undefined) return;
+      const line = L.polyline([[lat, lng], [latB, lngB]], {
+        color: '#22d3ee', weight: 2, dashArray: '6 4', opacity: 0.85
+      });
+      line.bindTooltip(label);
+      const dA = L.circleMarker([lat, lng], {
+        radius: 5, fillColor: '#22d3ee', color: '#080808', weight: 2, fillOpacity: 1
+      });
+      dA.bindTooltip(label + ' — A');
+      const dB = L.circleMarker([latB, lngB], {
+        radius: 5, fillColor: '#22d3ee', color: '#080808', weight: 2, fillOpacity: 0.6
+      });
+      dB.bindTooltip(label + ' — B');
+      items.push(line, dA, dB);
+    } else if (type === 'orbit') {
+      const radius = extra.radius || 10;
+      const center = L.circleMarker([lat, lng], {
+        radius: 5, fillColor: '#a78bfa', color: '#080808', weight: 2, fillOpacity: 1
+      });
+      center.bindTooltip(label + ' (r=' + radius + 'm)');
+      const ring = L.circle([lat, lng], {
+        radius: radius, color: '#a78bfa', weight: 1.5,
+        fillOpacity: 0.06, dashArray: '5 4'
+      });
+      items.push(center, ring);
+    } else if (type === 'pathway') {
+      const pts = (extra.points || []).map(function(p) { return [p.lat, p.lng]; });
+      if (pts.length < 2) return;
+      const line = L.polyline(pts, {
+        color: '#fb923c', weight: 2.5, dashArray: '7 4', opacity: 0.85
+      });
+      line.bindTooltip(label + ' (' + pts.length + ' pts)');
+      items.push(line);
+      pts.forEach(function(ll, i) {
+        const dot = L.circleMarker(ll, {
+          radius: i === 0 || i === pts.length - 1 ? 6 : 4,
+          fillColor: '#fb923c', color: '#080808',
+          weight: i === 0 || i === pts.length - 1 ? 2 : 1.5,
+          fillOpacity: i === 0 ? 1 : 0.7
+        });
+        if (i === 0) dot.bindTooltip(label + ' — START');
+        if (i === pts.length - 1) dot.bindTooltip(label + ' — END');
+        items.push(dot);
+      });
     }
 
-    const robotIcon = L.divIcon({
-        html: _robotIconHtml(0),
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
-        className: ''
-    });
-    const robotMarker = L.marker([45.5048, -73.5773], { icon: robotIcon });
-    let robotVisible = false;
+    items.forEach(function(item) { lg.addLayer(item); });
+    _missionMarkers[id] = { items: items, type: type };
+    _updateMissionCount();
+  };
 
-    const pois = {};
-    let poiCounter = 0;
+  window.mapRemoveMissionStep = function(id) {
+    const entry = _missionMarkers[id];
+    if (!entry) return;
+    const lg = _layers[entry.type];
+    if (lg) entry.items.forEach(function(item) { lg.removeLayer(item); });
+    delete _missionMarkers[id];
+    _updateMissionCount();
+  };
 
-    const PAN_PX = 100;
+  // ── Click flash helper ────────────────────────────────────────────────
+  function showClickFlash(pt, color) {
+    const flash = document.createElement('div');
+    flash.className = 'click-flash';
+    flash.style.left = pt.x + 'px';
+    flash.style.top  = pt.y + 'px';
+    if (color) flash.style.borderColor = color;
+    document.getElementById('map').appendChild(flash);
+    setTimeout(function() { if (flash.parentNode) flash.parentNode.removeChild(flash); }, 500);
+  }
 
-    // --- Navigation ---
-    window.mapPanLeft  = function() { map.panBy([-PAN_PX, 0]); };
-    window.mapPanRight = function() { map.panBy([ PAN_PX, 0]); };
-    window.mapPanUp    = function() { map.panBy([0, -PAN_PX]); };
-    window.mapPanDown  = function() { map.panBy([0,  PAN_PX]); };
-    window.mapZoomIn   = function() { map.zoomIn(); };
-    window.mapZoomOut  = function() { map.zoomOut(); };
+  // ── Action wheel ──────────────────────────────────────────────────────
+  let _awLat = null, _awLng = null;
 
-    // --- View ---
-    window.mapSetView = function(lat, lng, zoom) {
-        map.setView([lat, lng], zoom !== undefined ? zoom : map.getZoom());
-    };
+  // 7 buttons at ~51° intervals
+  const _AW_RADIUS = 96;
+  const _AW_ANGLES = {
+    'aw-btn-poi':      -90,
+    'aw-btn-goto':     -38,
+    'aw-btn-pathway':   14,
+    'aw-btn-orbit':     66,
+    'aw-btn-relay':    118,
+    'aw-btn-cancel':   170,
+    'aw-btn-sentinel': -142,
+  };
 
-    // --- Robot position ---
-    window.mapSetRobotPosition = function(lat, lng) {
-        robotMarker.setLatLng([lat, lng]);
-        if (!robotVisible) {
-            robotMarker.addTo(map);
-            robotVisible = true;
-        }
-    };
+  // ── Sentinel two-tap state ─────────────────────────────────────────────
+  let _sentinelMode = false;
+  let _sentinelLatA = null, _sentinelLngA = null, _sentinelMarkerA = null;
 
-    // --- Robot heading ---
-    window.mapSetRobotYaw = function(yaw_deg) {
-        robotYaw = yaw_deg;
-        const el = robotMarker.getElement();
-        if (el) {
-            const wrap = el.querySelector('.robot-cursor-wrap');
-            if (wrap) wrap.style.transform = 'rotate(' + yaw_deg + 'deg)';
-        }
-    };
+  function _exitSentinelMode() {
+    _sentinelMode = false;
+    _sentinelLatA = null; _sentinelLngA = null;
+    if (_sentinelMarkerA) { map.removeLayer(_sentinelMarkerA); _sentinelMarkerA = null; }
+    document.getElementById('sentinel-banner').style.display = 'none';
+  }
 
-    // --- Set custom robot icon (called from Python after map loads) ---
-    window.mapSetRobotIcon = function(url, w, h) {
-        _robotIconUrl = url;
-        if (w && h) _robotIconSize = [w, h];
-        const [iw, ih] = _robotIconSize;
-        robotMarker.setIcon(L.divIcon({
-            html: _robotIconHtml(robotYaw),
-            iconSize: [iw, ih],
-            iconAnchor: [iw / 2, ih / 2],
-            className: ''
-        }));
-    };
+  // ── Pathway multi-tap state ────────────────────────────────────────────
+  let _pathwayMode = false;
+  let _pathwayPoints = [];
+  let _pathwayPolyline = null;
+  let _pathwayDots = [];
+  let _pathwayClickTimer = null;
 
-    // --- Set custom POI icon (used for all future mapAddPOI calls) ---
-    window.mapSetPOIIcon = function(url, w, h) {
-        _poiIconUrl = url;
-        if (w && h) _poiIconSize = [w, h];
-    };
+  function _exitPathwayMode() {
+    _pathwayMode = false;
+    _pathwayPoints = [];
+    if (_pathwayPolyline) { map.removeLayer(_pathwayPolyline); _pathwayPolyline = null; }
+    _pathwayDots.forEach(function(d) { map.removeLayer(d); });
+    _pathwayDots = [];
+    if (_pathwayClickTimer) { clearTimeout(_pathwayClickTimer); _pathwayClickTimer = null; }
+    document.getElementById('pathway-banner').style.display = 'none';
+  }
 
-    // --- POI ---
-    window.mapAddPOI = function(lat, lng, label, poiId) {
-        const id = (poiId && poiId !== '') ? poiId : ('poi_' + (++poiCounter));
-        const opts = {};
-        if (_poiIconUrl) {
-            const [iw, ih] = _poiIconSize;
-            opts.icon = L.icon({
-                iconUrl: _poiIconUrl,
-                iconSize: [iw, ih],
-                iconAnchor: [iw / 2, ih]
-            });
-        }
-        const marker = L.marker([lat, lng], opts).addTo(map);
-        const safeLabel = label || id;
-        marker.bindPopup('<div class="poi-popup"><b>' + safeLabel + '</b><div id="photo_' + id + '"></div></div>');
-        pois[id] = { marker: marker, label: safeLabel, photo: null };
-        return id;
-    };
+  function _pathwayAddPoint(lat, lng) {
+    _pathwayPoints.push({ lat: lat, lng: lng });
+    const lls = _pathwayPoints.map(function(p) { return [p.lat, p.lng]; });
+    if (_pathwayPolyline) {
+      _pathwayPolyline.setLatLngs(lls);
+    } else {
+      _pathwayPolyline = L.polyline(lls, {
+        color: '#fb923c', weight: 2.5, dashArray: '7 4', opacity: 0.9
+      }).addTo(map);
+    }
+    const dot = L.circleMarker([lat, lng], {
+      radius: 5, fillColor: '#fb923c', color: '#080808', weight: 1.5, fillOpacity: 1
+    }).addTo(map);
+    _pathwayDots.push(dot);
+    const n = _pathwayPoints.length;
+    document.getElementById('pathway-count').textContent = n + ' PT' + (n !== 1 ? 'S' : '');
+    document.getElementById('pathway-done-btn').disabled = n < 2;
+  }
 
-    window.mapRemovePOI = function(id) {
-        if (!pois[id]) return;
-        map.removeLayer(pois[id].marker);
-        delete pois[id];
-    };
+  function _finishPathway() {
+    if (_pathwayPoints.length < 2) { _exitPathwayMode(); return; }
+    const points = _pathwayPoints.slice();
+    _exitPathwayMode();
+    _awEmit('mission_pathway', points[0].lat, points[0].lng, { points: points });
+  }
 
-    window.mapAttachPhoto = function(id, dataUrl) {
-        const poi = pois[id];
-        if (!poi) return false;
-        poi.photo = dataUrl;
-        const img = dataUrl ? '<img src="' + dataUrl + '" />' : '';
-        poi.marker.setPopupContent('<div class="poi-popup"><b>' + poi.label + '</b>' + img + '</div>');
-        return true;
-    };
+  document.getElementById('pathway-done-btn').addEventListener('click', function() {
+    _finishPathway();
+  });
+  document.getElementById('pathway-cancel-btn').addEventListener('click', function() {
+    _exitPathwayMode();
+  });
 
-    window.mapGetPOIs = function() {
-        return Object.keys(pois).map(function(id) {
-            const ll = pois[id].marker.getLatLng();
-            return { id: id, lat: ll.lat, lng: ll.lng, label: pois[id].label, hasPhoto: !!pois[id].photo };
-        });
-    };
+  function showActionWheel(lat, lng, containerPoint) {
+    _awLat = lat;
+    _awLng = lng;
+
+    const mapEl = document.getElementById('map');
+    const mw = mapEl.offsetWidth;
+    const mh = mapEl.offsetHeight;
+
+    // Clamp so buttons don't go off-screen
+    const R = _AW_RADIUS + 32;
+    const x = Math.max(R, Math.min(mw - R, containerPoint.x));
+    const y = Math.max(R, Math.min(mh - R - 24, containerPoint.y));
+
+    const ring = document.getElementById('aw-ring');
+    ring.style.left = x + 'px';
+    ring.style.top  = y + 'px';
+
+    document.getElementById('aw-coords-box').textContent =
+      lat.toFixed(6) + ' / ' + lng.toFixed(6);
+
+    // Position each button radially
+    for (const [id, deg] of Object.entries(_AW_ANGLES)) {
+      const rad = deg * Math.PI / 180;
+      const bx = Math.round(Math.cos(rad) * _AW_RADIUS);
+      const by = Math.round(Math.sin(rad) * _AW_RADIUS);
+      const btn = document.getElementById(id);
+      btn.style.left = bx + 'px';
+      btn.style.top  = by + 'px';
+    }
+
+    // Draw connector lines in SVG
+    const svg = document.getElementById('aw-lines');
+    let svgContent = '';
+    for (const deg of Object.values(_AW_ANGLES)) {
+      const rad = deg * Math.PI / 180;
+      const x2 = Math.round(Math.cos(rad) * (_AW_RADIUS - 32));
+      const y2 = Math.round(Math.sin(rad) * (_AW_RADIUS - 32));
+      svgContent += '<line x1="0" y1="0" x2="' + x2 + '" y2="' + y2 +
+        '" stroke="#a8b1bc" stroke-width="1" stroke-dasharray="3 3"/>';
+    }
+    svg.innerHTML = svgContent;
+
+    const wheel = document.getElementById('action-wheel');
+    wheel.style.display = 'block';
+    ring.classList.remove('aw-open');
+    requestAnimationFrame(function() { ring.classList.add('aw-open'); });
+  }
+
+  function hideActionWheel() {
+    document.getElementById('action-wheel').style.display = 'none';
+    document.getElementById('aw-ring').classList.remove('aw-open');
+    _awLat = null;
+    _awLng = null;
+  }
+
+  // Dismiss on backdrop or Escape
+  document.getElementById('aw-backdrop').addEventListener('click', hideActionWheel);
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') hideActionWheel();
+  });
+
+  // ── Wheel button handlers ─────────────────────────────────────────────
+
+  // lat/lng captured BEFORE hideActionWheel() nulls the globals
+  function _awEmit(action, lat, lng, extra) {
+    const payload = Object.assign({ action: action, lat: lat, lng: lng }, extra || {});
+    console.log('__mapcb__:' + JSON.stringify(payload));
+  }
+
+  document.getElementById('aw-btn-poi').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const lat = _awLat, lng = _awLng;
+    hideActionWheel();
+    showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#ffae00');
+    _awEmit('poi', lat, lng);
+  });
+
+  document.getElementById('aw-btn-goto').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const lat = _awLat, lng = _awLng;
+    hideActionWheel();
+    showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#00e676');
+    _awEmit('mission_goto', lat, lng);
+  });
+
+  document.getElementById('aw-btn-sentinel').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const lat = _awLat, lng = _awLng;
+    hideActionWheel();
+    showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#22d3ee');
+    _sentinelLatA = lat; _sentinelLngA = lng;
+    _sentinelMarkerA = L.marker([lat, lng], {
+      icon: L.divIcon({
+        html: '<div style="width:10px;height:10px;background:#22d3ee;border:2px solid #080808;border-radius:50%"></div>',
+        iconSize: [10,10], iconAnchor: [5,5], className: ''
+      })
+    }).addTo(map);
+    _sentinelMode = true;
+    document.getElementById('sentinel-banner').style.display = 'block';
+    _awEmit('mission_sentinel_a', lat, lng);
+  });
+
+  document.getElementById('aw-btn-orbit').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const lat = _awLat, lng = _awLng;
+    hideActionWheel();
+    showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#a78bfa');
+    _awEmit('mission_orbit', lat, lng);
+  });
+
+  document.getElementById('aw-btn-relay').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const lat = _awLat, lng = _awLng;
+    hideActionWheel();
+    showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#34d399');
+    _awEmit('mission_relay', lat, lng);
+  });
+
+  document.getElementById('aw-btn-pathway').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const lat = _awLat, lng = _awLng;
+    hideActionWheel();
+    showClickFlash(map.latLngToContainerPoint(L.latLng(lat, lng)), '#fb923c');
+    _pathwayMode = true;
+    _pathwayAddPoint(lat, lng);
+    const banner = document.getElementById('pathway-banner');
+    banner.style.display = 'flex';
+  });
+
+  document.getElementById('aw-btn-cancel').addEventListener('click', function(e) {
+    e.stopPropagation();
+    hideActionWheel();
+  });
+
+  // ── Map click → pathway / sentinel B capture OR show wheel ───────────
+  map.on('dblclick', function(e) {
+    if (_pathwayMode && _pathwayPoints.length >= 2) {
+      if (_pathwayClickTimer) { clearTimeout(_pathwayClickTimer); _pathwayClickTimer = null; }
+      _finishPathway();
+      L.DomEvent.stopPropagation(e);
+    }
+  });
+
+  map.on('click', function(e) {
+    const lat = e.latlng.lat, lng = e.latlng.lng;
+    const pt  = map.latLngToContainerPoint(e.latlng);
+
+    if (_pathwayMode) {
+      // Debounce to filter out the first click of a double-click
+      if (_pathwayClickTimer) { clearTimeout(_pathwayClickTimer); _pathwayClickTimer = null; }
+      _pathwayClickTimer = setTimeout(function() {
+        _pathwayClickTimer = null;
+        showClickFlash(pt, '#fb923c');
+        _pathwayAddPoint(lat, lng);
+      }, 220);
+      return;
+    }
+
+    if (_sentinelMode) {
+      const latA = _sentinelLatA, lngA = _sentinelLngA;
+      _exitSentinelMode();
+      showClickFlash(pt, '#22d3ee');
+      console.log('__mapcb__:' + JSON.stringify({
+        action: 'mission_sentinel_b',
+        lat_a: latA, lng_a: lngA, lat: lat, lng: lng
+      }));
+      return;
+    }
+
+    if (document.getElementById('action-wheel').style.display === 'block') {
+      hideActionWheel();
+      return;
+    }
+    showClickFlash(pt, '#484848');
+    showActionWheel(lat, lng, pt);
+  });
 </script>
 </body>
 </html>

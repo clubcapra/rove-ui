@@ -1,232 +1,549 @@
 {
   "header_settings": {
     "signals": [
-      {"name": "MicroHard",  "host": "192.168.2.10"}
+      {"name": "MicroHard", "host": "192.168.2.10"}
     ],
     "ping_interval_s": 2,
-    "battery_topic": "battery.percentage",
+    "batteries": [
+      {"name": "ROVE",    "topic": "battery.percentage", "unit": "V"},
+      {"name": "STATION", "topic": "system.battery",     "unit": "%", "source": "system", "poll_interval_s": 30}
+    ],
     "E-Stop": {
-      "active_color": "#ff0000",
-      "inactive_color": "#00ff00",
+      "active_color":   "#ff3d3d",
+      "inactive_color": "#00e676",
       "topic": "estop_status"
+    },
+    "mapping_status": {
+      "state_topic": "mapping.state",
+      "nodes_topic": "mapping.nodes",
+      "lc_topic":    "mapping.loop_closures"
+    },
+    "recording_status": {
+      "state_topic": "recording.status"
     }
   },
+
   "udp_clients": [
     {
-      "type": "udp_poll",
-      "name": "odrive_32",
-      "base_url": "http://192.168.2.2:8080",
+      "type": "udp_poll", "name": "odrive_32",
+      "base_url": "http://${ROBOT_HOST}:8080",
       "discovery_endpoint": "/discover",
       "discovery_sensor_id": "odrive_32",
       "discovery_port_field": "data_port",
-      "topic": "odrive.32",
-      "topic_prefix": "odrive.32",
-      "proto_type": "DriveNodeState",
-      "publish_field_topics": true,
-      "poll_interval_ms": 100,
-      "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 30,
-      "enabled": true
+      "topic": "odrive.32", "topic_prefix": "odrive.32",
+      "proto_type": "DriveNodeState", "publish_field_topics": true,
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
     },
     {
-      "type": "udp_poll",
-      "name": "odrive_33",
-      "base_url": "http://192.168.2.2:8080",
+      "type": "udp_poll", "name": "odrive_33",
+      "base_url": "http://${ROBOT_HOST}:8080",
       "discovery_endpoint": "/discover",
       "discovery_sensor_id": "odrive_33",
       "discovery_port_field": "data_port",
-      "topic": "odrive.33",
-      "topic_prefix": "odrive.33",
-      "proto_type": "DriveNodeState",
-      "publish_field_topics": true,
-      "poll_interval_ms": 100,
-      "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 30,
-      "enabled": true
+      "topic": "odrive.33", "topic_prefix": "odrive.33",
+      "proto_type": "DriveNodeState", "publish_field_topics": true,
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
     },
     {
-      "type": "udp_poll",
-      "name": "odrive_34",
-      "base_url": "http://192.168.2.2:8080",
+      "type": "udp_poll", "name": "odrive_34",
+      "base_url": "http://${ROBOT_HOST}:8080",
       "discovery_endpoint": "/discover",
       "discovery_sensor_id": "odrive_34",
       "discovery_port_field": "data_port",
-      "topic": "odrive.34",
-      "topic_prefix": "odrive.34",
-      "proto_type": "DriveNodeState",
-      "publish_field_topics": true,
-      "poll_interval_ms": 100,
-      "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 30,
-      "enabled": true
+      "topic": "odrive.34", "topic_prefix": "odrive.34",
+      "proto_type": "DriveNodeState", "publish_field_topics": true,
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
     },
     {
-      "type": "udp_poll",
-      "name": "odrive_31",
-      "base_url": "http://192.168.2.2:8080",
+      "type": "udp_poll", "name": "odrive_31",
+      "base_url": "http://${ROBOT_HOST}:8080",
       "discovery_endpoint": "/discover",
       "discovery_sensor_id": "odrive_31",
       "discovery_port_field": "data_port",
-      "topic": "odrive.31",
-      "topic_prefix": "odrive.31",
-      "proto_type": "DriveNodeState",
-      "publish_field_topics": true,
-      "poll_interval_ms": 100,
-      "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 30,
-      "enabled": true
+      "topic": "odrive.31", "topic_prefix": "odrive.31",
+      "proto_type": "DriveNodeState", "publish_field_topics": true,
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
     },
     {
-      "type": "udp_poll",
-      "name": "vn300",
-      "base_url": "http://192.168.2.2:8080",
+      "type": "udp_poll", "name": "odrive_41",
+      "base_url": "http://${ROBOT_HOST}:8080",
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "odrive_41",
+      "discovery_port_field": "data_port",
+      "topic": "odrive.41", "topic_prefix": "odrive.41",
+      "proto_type": "DriveNodeState", "publish_field_topics": true,
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
+    },
+    {
+      "type": "udp_poll", "name": "odrive_42",
+      "base_url": "http://${ROBOT_HOST}:8080",
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "odrive_42",
+      "discovery_port_field": "data_port",
+      "topic": "odrive.42", "topic_prefix": "odrive.42",
+      "proto_type": "DriveNodeState", "publish_field_topics": true,
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
+    },
+    {
+      "type": "udp_poll", "name": "odrive_43",
+      "base_url": "http://${ROBOT_HOST}:8080",
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "odrive_43",
+      "discovery_port_field": "data_port",
+      "topic": "odrive.43", "topic_prefix": "odrive.43",
+      "proto_type": "DriveNodeState", "publish_field_topics": true,
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
+    },
+    {
+      "type": "udp_poll", "name": "odrive_44",
+      "base_url": "http://${ROBOT_HOST}:8080",
+      "discovery_endpoint": "/discover",
+      "discovery_sensor_id": "odrive_44",
+      "discovery_port_field": "data_port",
+      "topic": "odrive.44", "topic_prefix": "odrive.44",
+      "proto_type": "DriveNodeState", "publish_field_topics": true,
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
+    },
+    {
+      "type": "udp_poll", "name": "vn300",
+      "base_url": "http://${ROBOT_HOST}:8080",
       "discovery_endpoint": "/discover",
       "discovery_sensor_id": "vectornav_ttyUSB_VN300",
       "discovery_port_field": "data_port",
-      "topic": "gnss",
-      "topic_prefix": "gnss",
-      "proto_type": "Vn300",
-      "publish_field_topics": true,
-      "poll_interval_ms": 100,
-      "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 30,
+      "topic": "gnss", "topic_prefix": "gnss",
+      "proto_type": "Vn300", "publish_field_topics": true,
+      "exclude_fields": ["position.lat", "position.lon", "latitude", "longitude", "altitude", "lat", "lon"],
+      "poll_interval_ms": 100, "recv_timeout_s": 2.0,
+      "rediscovery_interval_s": 30, "enabled": true
+    },
+    {
+      "type": "json_http_flat",
+      "name": "mapping_status",
+      "source": "http://192.168.2.3:8888/mapping/status",
+      "topic_prefix": "mapping",
+      "poll_interval_ms": 1000,
       "enabled": true
     },
     {
-      "type": "udp_poll",
-      "name": "kinova_arm",
-      "base_url": "http://192.168.2.2:8080",
-      "discovery_endpoint": "/discover",
-      "discovery_sensor_id": "kinova_arm",
-      "discovery_port_field": "data_port",
-      "topic": "kinova_arm",
-      "topic_prefix": "kinova_arm",
+      "type": "json_http_topic",
+      "name": "minimap_poller",
+      "source": "http://192.168.2.3:8888/minimap",
+      "topic": "costmap.grid",
+      "poll_interval_ms": 200,
+      "enabled": true
+    },
+    {
+      "type": "udp", "name": "gps_restreamer",
+      "source": "udp://0.0.0.0:7010",
+      "topic": "gnss",
+      "topic_prefix": "gnss",
+      "parse_json": true,
       "publish_field_topics": true,
-      "poll_interval_ms": 100,
-      "recv_timeout_s": 2.0,
-      "rediscovery_interval_s": 30,
+      "field_map": {
+        "lat": "latitude",
+        "lon": "longitude",
+        "alt_msl": "altitude"
+      },
       "enabled": true
     }
-
   ],
+
   "ros2_clients": [],
+
+  "http_clients": [
+    {
+      "type": "http_action",
+      "name": "poi_rest",
+      "base_url": "http://192.168.2.3:8888",
+      "actions": [
+        {"topic": "costmap.poi",    "method": "POST", "endpoint": "/pois/add",    "body": {"name": "$label"}},
+        {"topic": "map.poi",        "method": "POST", "endpoint": "/pois/add",    "body": {"name": "$label"}},
+        {"topic": "map.poi_remove", "method": "POST", "endpoint": "/pois/delete", "body": {"id":   "$poi_id"}}
+      ]
+    },
+    
+    {
+      "type": "udp_mission",
+      "name": "send_mission",
+      "host": "${ROBOT_HOST}",
+      "port": 5051,
+      "topic": "mission.send"
+    },
+    {
+      "type": "http_action",
+      "name": "mapping",
+      "base_url": "http://192.168.2.3:8888",
+      "actions": [
+        {"topic": "mapping.launch",  "method": "POST", "endpoint": "/mapping/launch"},
+        {"topic": "mapping.stop",    "method": "POST", "endpoint": "/mapping/stop"},
+        {"topic": "mapping.go",      "method": "POST", "endpoint": "/mapping/go"},
+        {"topic": "mapping.pause",   "method": "POST", "endpoint": "/mapping/pause"},
+        {"topic": "mapping.new_map", "method": "POST", "endpoint": "/mapping/new_map"},
+        {"topic": "mapping.restart", "method": "POST", "endpoint": "/mapping/restart"},
+        {"topic": "mapping.export",  "method": "POST", "endpoint": "/mapping/export"}
+      ]
+    },
+    {
+      "type": "http_action",
+      "name": "odrive_estop",
+      "base_url": "http://${ROBOT_HOST}:8080",
+      "actions": [
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_31/estop"},
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_32/estop"},
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_33/estop"},
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_34/estop"},
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_41/estop"},
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_42/estop"},
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_43/estop"},
+        {"topic": "estop_status", "trigger_value": "1", "method": "POST", "endpoint": "/odrive_44/estop"}
+      ]
+    },
+    {
+      "type": "http_action",
+      "name": "goto",
+      "base_url": "http://${ROBOT_HOST}:8088",
+      "actions": [
+        {
+          "topic":        "map.goto",
+          "method":       "POST",
+          "endpoint":     "/api/v1/goto",
+          "body":         {"lat": "$lat", "lon": "$lng"},
+          "log_response": true
+        },
+        {
+          "topic":        "path.goto_step",
+          "method":       "POST",
+          "endpoint":     "/api/v1/goto",
+          "body":         {"lat": "$lat", "lon": "$lng"},
+          "log_response": true
+        }
+      ]
+    }
+  ],
+
+  "recording_clients": [
+    {
+      "name":              "sensors",
+      "start_url":         "ENDPOINT_URL",
+      "stop_url":          "ENDPOINT_URL",
+      "start_topic":       "recording.start",
+      "stop_topic":        "recording.stop",
+      "status_topic":      "recording.status",
+      "config_profile_id": "perception_hd_30fps",
+      "sensor_ids":        ["cam_front_center", "cam_rear_left", "lidar_top_mid360"],
+      "session_metadata":  {"environment": "outdoor_daylight", "operator": "dev_node_01"},
+      "stop_reason":       "run_completed",
+      "timeout_s":         5.0
+    }
+  ],
+
+  "path_recorders": [
+    {
+      "name":                 "main",
+      "lat_topic":            "gnss.latitude",
+      "lng_topic":            "gnss.longitude",
+      "record_topic":         "path.record",
+      "play_topic":           "path.play",
+      "goto_dispatch_topic":  "path.goto_step",
+      "waypoints_topic":      "path.waypoints",
+      "sample_interval_s":    1.0,
+      "min_distance_m":       0.5,
+      "step_delay_ms":        0
+    }
+  ],
+
   "console": true,
+
+  "bottom_bar": [
+    {
+      "height": 40,
+      "align": "center",
+      "buttons": [
+        {"label": "REAR CAM",  "event": "camera.select", "value": "REAR_CAM",  "active_topic": "camera.select"},
+        {"label": "ARM CAM",   "event": "camera.select", "value": "ARM_CAM",   "active_topic": "camera.select"},
+        {"label": "LEFT CAM",  "event": "camera.select", "value": "LEFT_CAM",  "active_topic": "camera.select"},
+        {"label": "RIGHT CAM", "event": "camera.select", "value": "RIGHT_CAM", "active_topic": "camera.select"},
+        {"label": "BACK CAM",  "event": "camera.select", "value": "BACK_CAM",  "active_topic": "camera.select"},
+        {"label": "FRONT CAM", "event": "camera.select", "value": "FRONT_CAM", "active_topic": "camera.select"}
+      ]
+    },
+    {
+      "height": 40,
+      "buttons": [
+        {
+          "label": "E-STOP",
+          "event": "estop_status",
+          "value": "1",
+          "off_value": "0",
+          "toggle": true,
+          "color": "#ff3d3d"
+        },
+        {"label": "EXPORT MAP",    "event": "map.export",      "value": "1", "color": "#1a6fff"},
+        {"label": "START MAPPING", "event": "mapping.launch",  "value": "1", "color": "#00e676"},
+        {"label": "STOP MAPPING",   "event": "mapping.stop",    "value": "1", "color": "#c92b2b"},
+        {"label": "MAP START",     "event": "mapping.go",      "value": "1", "color": "#00875a"},
+        {"label": "MAP PAUSE",     "event": "mapping.pause",   "value": "1", "color": "#ffae00"},
+        {"label": "RESTART MAP",   "event": "mapping.restart", "value": "1", "color": "#ff3d3d"},
+        {"label": "START REC",     "event": "recording.start", "value": "1", "color": "#00e676"},
+        {"label": "STOP REC",      "event": "recording.stop",  "value": "1", "color": "#c92b2b"}
+        
+      ]
+    }
+  ],
+
   "views": {
-    "dashboard": {
+
+    "CAMERA": {
       "type": "layout",
-      "diaposition": "grid",
-      "grid": {
-        "rows": 3,
-        "columns": 2,
-        "spacing": 8
-      },
+      "diaposition": "absolute",
       "content": [
         {
-          "type": "chart",
-          "name": "Position Moteurs",
+          "type": "camera",
+          "name": "Camera",
+          "style": { "x": 0, "y": 0, "width": "100%", "height": "100%", "z_index": 0 },
           "data": {
-              "chart_type": "lines",
-              "title": "Position Moteurs",
-              "series_name": "Position",
-              "label_key": "Parameter",
-              "value_key": "Value",
-              "data": [
-                {"Parameter": "FL", "Value": 0, "unit": "turns", "topic": "odrive.32.pos_estimate"},
-                {"Parameter": "RL", "Value": 0, "unit": "turns", "topic": "odrive.33.pos_estimate"},
-                {"Parameter": "FR", "Value": 0, "unit": "turns", "topic": "odrive.34.pos_estimate"},
-                {"Parameter": "RR", "Value": 0, "unit": "turns", "topic": "odrive.31.pos_estimate"}
-              ]
-          },
-          "grid": {
-            "row": 0,
-            "column": 0,
-            "row_span": 1,
-            "column_span": 1
+            "mode": "rtsp",
+            "hide_controls": true,
+            "select_topic": "camera.select",
+            "vtx_host": "${ROBOT_HOST}",
+            "vtx_port": 5540,
+            "cameras": [
+              {"name": "REAR_CAM",  "udp_vtx_id": 1, "rtsp_ip": "192.168.2.31"},
+              {"name": "LEFT_CAM",  "udp_vtx_id": 2, "rtsp_ip": "192.168.2.32"},
+              {"name": "RIGHT_CAM", "udp_vtx_id": 3, "rtsp_ip": "192.168.2.33"},
+              {"name": "BACK_CAM",  "udp_vtx_id": 4, "rtsp_ip": "192.168.2.34"},
+              {"name": "FRONT_CAM", "udp_vtx_id": 5, "rtsp_ip": "192.168.2.35"}
+            ],
+            "rtsp":      { "source": "rtsp://192.168.2.31", "source_type": "rtsp", "codec": "h265" },
+            "webcamera": {
+              "device_path": "/dev/video0",
+              "responsive":  { "aspect_ratio": "4:3", "overflow_anchor": "center" }
+            }
           }
         },
         {
-          "type": "chart",
-          "name": "Temp. Moteurs",
-          "data": {
-              "chart_type": "band",
-              "title": "Températures Moteurs",
-              "series_name": "Temperature",
-              "label_key": "Parameter",
-              "value_key": "Value",
-              "data": [
-                {"Parameter": "FL", "Value": 0, "unit": "°C", "topic": "odrive.32.motor_temp"},
-                {"Parameter": "RL", "Value": 0, "unit": "°C", "topic": "odrive.33.motor_temp"},
-                {"Parameter": "FR", "Value": 0, "unit": "°C", "topic": "odrive.34.motor_temp"},
-                {"Parameter": "RR", "Value": 0, "unit": "°C", "topic": "odrive.31.motor_temp"}
-              ]
+          "type": "bitmap",
+          "name": "costmap_overlay",
+          "style": {
+            "right": 14, "bottom": 14,
+            "width": 220, "height": 220,
+            "z_index": 2
           },
-          "grid": {
-            "row": 0,
-            "column": 1,
-            "row_span": 1,
-            "column_span": 1
-          }
-        },
-        {
-          "type": "chart",
-          "name": "Temp. Drivers",
           "data": {
-              "chart_type": "band",
-              "title": "Températures Drivers",
-              "series_name": "Temperature",
-              "label_key": "Parameter",
-              "value_key": "Value",
-              "data": [
-                {"Parameter": "FL", "Value": 0, "unit": "°C", "topic": "odrive.32.fet_temp"},
-                {"Parameter": "RL", "Value": 0, "unit": "°C", "topic": "odrive.33.fet_temp"},
-                {"Parameter": "FR", "Value": 0, "unit": "°C", "topic": "odrive.34.fet_temp"},
-                {"Parameter": "RR", "Value": 0, "unit": "°C", "topic": "odrive.31.fet_temp"}
-              ]
-          },
-          "grid": {
-            "row": 1,
-            "column": 0,
-            "row_span": 1,
-            "column_span": 1
+            "data_topic": "costmap.grid",
+            "round": true,
+            "cornerPositionWidth": 8,
+            "cornerPositionHeight": 8,
+            "gps_lat_topic": "gnss.latitude",
+            "gps_lng_topic": "gnss.longitude",
+            "gps_yaw_topic": "gnss.yaw"
           }
         },
         {
           "type": "robot",
-          "name": "Rove3D",
+          "name": "RobotOverlay",
+          "label": "ROBOT STATUS",
+          "style": {
+            "x": 14, "bottom": 14,
+            "width": 320, "height": 260,
+            "z_index": 1
+          },
           "data": {
             "urdf": "src/media/rove_urdf/rove.urdf",
+            "model_offset": [0, 0, 0],
+            "model_rotation": [-90, 0, 0],
+            "hide_joint_panel": true,
             "link_colors": {
-              "Core":              "#c8c8d0",
-              "FlipperFL":         "#72c572",
-              "FlipperBL":         "#6b6bc4",
-              "FlipperFR":         "#d56868",
-              "FlipperBR":         "#e1e17c",
-              "DrumFL":            "#5aab5a",
-              "DrumBL":            "#5a5aaa",
-              "DrumFR":            "#bb5555",
-              "DrumBR":            "#c4c45a",
-              "Base":              "#b0b8c8",
-              "ASection":          "#8fa0b8",
-              "BSection":          "#7890a8",
-              "JointA":            "#a0b0c0",
-              "JointB":            "#a0b0c0",
-              "JointGripper":      "#c8a070",
-              "dji_mid360":        "#303040",
-              "vn300_vectornav":   "#404050",
-              "chinese_camera":    "#202028",
-              "chinese_camera_2":  "#202028",
-              "chinese_camera_3":  "#202028"
+              "Core":            "#1e1e1e",
+              "FlipperFL":       "#2a2a2a",
+              "FlipperBL":       "#2a2a2a",
+              "FlipperFR":       "#2a2a2a",
+              "FlipperBR":       "#2a2a2a",
+              "Base":            "#1a1a1a",
+              "ASection":        "#1e1e1e",
+              "BSection":        "#1e1e1e",
+              "JointA":          "#222222",
+              "JointB":          "#222222",
+              "JointGripper":    "#2a2020",
+              "dji_mid360":      "#141414",
+              "vn300_vectornav": "#141414",
+              "chinese_camera":   "#101010",
+              "chinese_camera_2": "#101010",
+              "chinese_camera_3": "#101010"
             },
             "controls": {
+              "thermal_links": [
+                {"link": "DrumFL",    "topic": "odrive.32.fet_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "DrumBL",    "topic": "odrive.33.fet_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "DrumFR",    "topic": "odrive.34.fet_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "DrumBR",    "topic": "odrive.31.fet_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "FlipperFL", "topic": "odrive.41.fet_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "FlipperFR", "topic": "odrive.42.fet_temp", "min_temp": 20, "max_temp": 80}
+              ],
               "joint_angles": [
-               
-                {"joint": "joint_revolute_9",  "topic": "kinova_arm.joint_1_pos", "scale": 0.01745, "offset": 1.5708},
+                {"joint": "joint_revolute_9",  "topic": "kinova_arm.joint_1_pos", "scale": 0.01745,  "offset": 1.5708},
                 {"joint": "joint_revolute_10", "topic": "kinova_arm.joint_2_pos", "scale": -0.01745, "offset": 0},
-                {"joint": "joint_revolute_11", "topic": "kinova_arm.joint_3_pos", "scale": 0.01745, "offset": 1.5708},
-                {"joint": "joint_revolute_12", "topic": "kinova_arm.joint_4_pos", "scale": 0.01745, "offset": 0},
-                {"joint": "joint_revolute_13", "topic": "kinova_arm.joint_5_pos", "scale": 0.01745, "offset": 1.5708},
-                {"joint": "joint_revolute_14", "topic": "kinova_arm.joint_6_pos", "scale": 0.01745, "offset": 1.5708}
+                {"joint": "joint_revolute_11", "topic": "kinova_arm.joint_3_pos", "scale": 0.01745,  "offset": 1.5708},
+                {"joint": "joint_revolute_12", "topic": "kinova_arm.joint_4_pos", "scale": 0.01745,  "offset": 0},
+                {"joint": "joint_revolute_13", "topic": "kinova_arm.joint_5_pos", "scale": 0.01745,  "offset": 1.5708},
+                {"joint": "joint_revolute_14", "topic": "kinova_arm.joint_6_pos", "scale": 0.01745,  "offset": 1.5708}
+              ],
+              "robot_pose": {
+                "roll_topic":  "gnss.roll",
+                "pitch_topic": "gnss.pitch",
+                "yaw_topic":   "gnss.yaw"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "MISSION": {
+      "type": "layout",
+      "diaposition": "absolute",
+      "content": [
+        {
+          "type": "map",
+          "name": "Carte GPS",
+          "style": { "x": 0, "y": 0, "width": "100%", "height": "100%", "z_index": 0 },
+          "data": {
+            "initial_lat": 46.759,
+            "initial_lng": 7.616,
+            "initial_zoom": 15,
+            "tile_source_topic": "map.tile_source",
+            "robot_position_lat_topic": "gnss.latitude",
+            "robot_position_lng_topic": "gnss.longitude",
+            "robot_position_yaw_topic": "gnss.yaw",
+            "robot_yaw_offset": -90,
+            "click_topic":       "map.click",
+            "poi_topic":         "map.poi",
+            "poi_remove_topic":  "map.poi_remove",
+            "add_poi_at_topic":  "costmap.poi",
+            "map_export_topic":  "map.export",
+            "goto_topic":        "map.goto"
+          }
+        }
+      ]
+    },
 
+    "TELEMETRY": {
+      "type": "layout",
+      "diaposition": "grid",
+      "grid": { "rows": 2, "columns": 2, "spacing": 6 },
+      "content": [
+        {
+          "type": "chart",
+          "name": "Position Moteurs",
+          "label": "POSITION MOTEURS",
+          "data": {
+            "chart_type": "lines",
+            "title": "Position Moteurs",
+            "series_name": "Position",
+            "label_key": "Parameter",
+            "value_key": "Value",
+            "data": [
+              {"Parameter": "DrumFL", "Value": 0, "unit": "turns", "topic": "odrive.32.pos_estimate"},
+              {"Parameter": "DrumBL", "Value": 0, "unit": "turns", "topic": "odrive.33.pos_estimate"},
+              {"Parameter": "DrumFR", "Value": 0, "unit": "turns", "topic": "odrive.34.pos_estimate"},
+              {"Parameter": "DrumBR", "Value": 0, "unit": "turns", "topic": "odrive.31.pos_estimate"},
+              {"Parameter": "FlipFL", "Value": 0, "unit": "turns", "topic": "odrive.41.pos_estimate"},
+              {"Parameter": "FlipBL", "Value": 0, "unit": "turns", "topic": "odrive.42.pos_estimate"},
+              {"Parameter": "FlipFR", "Value": 0, "unit": "turns", "topic": "odrive.43.pos_estimate"},
+              {"Parameter": "FlipBR", "Value": 0, "unit": "turns", "topic": "odrive.44.pos_estimate"}
+            ]
+          },
+          "grid": { "row": 0, "column": 0 }
+        },
+        {
+          "type": "chart",
+          "name": "Temp. Moteurs",
+          "label": "TEMP. MOTEURS",
+          "data": {
+            "chart_type": "band",
+            "title": "Températures Moteurs",
+            "series_name": "Temperature",
+            "label_key": "Parameter",
+            "value_key": "Value",
+            "data": [
+              {"Parameter": "DrumFL", "Value": 0, "unit": "°C", "topic": "odrive.32.motor_temp"},
+              {"Parameter": "DrumBL", "Value": 0, "unit": "°C", "topic": "odrive.33.motor_temp"},
+              {"Parameter": "DrumFR", "Value": 0, "unit": "°C", "topic": "odrive.34.motor_temp"},
+              {"Parameter": "DrumBR", "Value": 0, "unit": "°C", "topic": "odrive.31.motor_temp"},
+              {"Parameter": "FlipFL", "Value": 0, "unit": "°C", "topic": "odrive.41.motor_temp"},
+              {"Parameter": "FlipBL", "Value": 0, "unit": "°C", "topic": "odrive.42.motor_temp"},
+              {"Parameter": "FlipFR", "Value": 0, "unit": "°C", "topic": "odrive.43.motor_temp"},
+              {"Parameter": "FlipBR", "Value": 0, "unit": "°C", "topic": "odrive.44.motor_temp"}
+            ]
+          },
+          "grid": { "row": 0, "column": 1 }
+        },
+        {
+          "type": "chart",
+          "name": "Temp. Drivers",
+          "label": "TEMP. DRIVERS",
+          "data": {
+            "chart_type": "band",
+            "title": "Températures Drivers",
+            "series_name": "Temperature",
+            "label_key": "Parameter",
+            "value_key": "Value",
+            "data": [
+              {"Parameter": "DrumFL", "Value": 0, "unit": "°C", "topic": "odrive.32.fet_temp"},
+              {"Parameter": "DrumBL", "Value": 0, "unit": "°C", "topic": "odrive.33.fet_temp"},
+              {"Parameter": "DrumFR", "Value": 0, "unit": "°C", "topic": "odrive.34.fet_temp"},
+              {"Parameter": "DrumBR", "Value": 0, "unit": "°C", "topic": "odrive.31.fet_temp"},
+              {"Parameter": "FlipFL", "Value": 0, "unit": "°C", "topic": "odrive.41.fet_temp"},
+              {"Parameter": "FlipBL", "Value": 0, "unit": "°C", "topic": "odrive.42.fet_temp"},
+              {"Parameter": "FlipFR", "Value": 0, "unit": "°C", "topic": "odrive.43.fet_temp"},
+              {"Parameter": "FlipBR", "Value": 0, "unit": "°C", "topic": "odrive.44.fet_temp"}
+            ]
+          },
+          "grid": { "row": 1, "column": 0 }
+        },
+        {
+          "type": "robot",
+          "name": "Rove3D",
+          "label": "3D VIEWER",
+           "model_rotation": [-90, 0, 0],
+          "data": {
+            "urdf": "src/media/rove_urdf/rove.urdf",
+            "model_offset": [0, 0, 0],
+            "model_rotation": [-90, 0, 0],
+            "link_colors": {
+              "Core": "#c8c8d0", "FlipperFL": "#72c572", "FlipperBL": "#6b6bc4",
+              "FlipperFR": "#d56868", "FlipperBR": "#e1e17c",
+              "DrumFL": "#5aab5a", "DrumBL": "#5a5aaa", "DrumFR": "#bb5555", "DrumBR": "#c4c45a",
+              "Base": "#b0b8c8", "ASection": "#8fa0b8", "BSection": "#7890a8",
+              "JointA": "#a0b0c0", "JointB": "#a0b0c0", "JointGripper": "#c8a070",
+              "dji_mid360": "#303040", "vn300_vectornav": "#404050",
+              "chinese_camera": "#202028", "chinese_camera_2": "#202028", "chinese_camera_3": "#202028"
+            },
+            "controls": {
+              "thermal_links": [
+                {"link": "DrumFL",    "topic": "odrive.32.fet_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "DrumBL",    "topic": "odrive.33.fet_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "DrumFR",    "topic": "odrive.34.fet_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "DrumBR",    "topic": "odrive.31.fet_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "FlipperFL", "topic": "odrive.41.fet_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "FlipperBL", "topic": "odrive.43.fet_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "FlipperFR", "topic": "odrive.42.fet_temp", "min_temp": 20, "max_temp": 80},
+                {"link": "FlipperBR", "topic": "odrive.44.fet_temp", "min_temp": 20, "max_temp": 80}
+              ],
+              "joint_angles": [
+                {"joint": "joint_revolute_9",  "topic": "kinova_arm.joint_1_pos", "scale": 0.01745,  "offset": 1.5708},
+                {"joint": "joint_revolute_10", "topic": "kinova_arm.joint_2_pos", "scale": -0.01745, "offset": 0},
+                {"joint": "joint_revolute_11", "topic": "kinova_arm.joint_3_pos", "scale": 0.01745,  "offset": 1.5708},
+                {"joint": "joint_revolute_12", "topic": "kinova_arm.joint_4_pos", "scale": 0.01745,  "offset": 0},
+                {"joint": "joint_revolute_13", "topic": "kinova_arm.joint_5_pos", "scale": 0.01745,  "offset": 1.5708},
+                {"joint": "joint_revolute_14", "topic": "kinova_arm.joint_6_pos", "scale": 0.01745,  "offset": 1.5708}
               ],
               "robot_pose": {
                 "roll_topic":  "gnss.roll",
@@ -235,84 +552,99 @@
               }
             }
           },
-          "grid": {
-            "row": 2,
-            "column": 0,
-            "row_span": 1,
-            "column_span": 1
-          }
-        },
+          "grid": { "row": 1, "column": 1 }
+        }
+      ]
+    },
+
+    "COSTMAP": {
+      "type": "layout",
+      "diaposition": "grid",
+      "grid": { "rows": 1, "columns": 1, "spacing": 0 },
+      "content": [
         {
           "type": "bitmap",
           "name": "Costmap",
+          "label": "COSTMAP",
           "data": {
-            "source": "http://localhost:8080/map_feed",
+            "data_topic":        "costmap.grid",
             "cornerPositionWidth": 8,
             "cornerPositionHeight": 8,
-            "click_topic": "costmap.click",
-            "poi_topic": "costmap.poi",
-            "gps_lat_topic": "gnss.latitude",
-            "gps_lng_topic": "gnss.longitude",
-            "gps_yaw_topic": "gnss.yaw",
+            "click_topic":       "costmap.click",
+            "poi_topic":         "costmap.poi",
+            "add_poi_gps_topic": "map.poi",
+            "gps_lat_topic":     "gnss.latitude",
+            "gps_lng_topic":     "gnss.longitude",
+            "gps_yaw_topic":     "gnss.yaw"
+          },
+          "grid": { "row": 0, "column": 0 }
+        }
+      ]
+    },
 
-            "robot_cursor_image": "src/media/icons/robot_icons.png",
-            "robot_cursor_size": [40, 40],
-            "poi_image": "src/media/icons/poi_icons.png",
-            "poi_size": [24, 32]
-          },
-          "grid": {
-            "row": 1,
-            "column": 1,
-            "row_span": 2,
-            "column_span": 1
-          }
-        }
-      ]
-    },
-    "Map": {
-      "type": "layout",
-      "diaposition": "grid",
-      "grid": {
-        "rows": 1,
-        "columns": 1,
-        "spacing": 8
-      },
-      "content": [
-        {
-          "type": "map",
-          "name": "Carte",
-          "data": {
-            "initial_lat": 0,
-            "initial_lng": 0,
-            "initial_zoom": 17,
-            "robot_position_lat_topic": "gnss.latitude",
-            "robot_position_lng_topic": "gnss.longitude",
-            "robot_position_yaw_topic": "gnss.yaw",
-            "add_poi_at_topic": "costmap.poi",
-            "robot_cursor_image": "src/media/icons/robot_icons.png",
-            "robot_cursor_size": [40, 40],
-            "poi_image": "src/media/icons/poi_icons.png",
-            "poi_size": [24, 32]
-          },
-          "grid": {
-            "row": 0,
-            "column": 0,
-            "row_span": 1,
-            "column_span": 1
-          }
-        }
-      ]
-    },
-    "logs": {
+    "MISSION BUILDER": {
       "type": "layout",
       "diaposition": "vertical",
       "content": [
         {
-          "type": "console",
-          "name": "event_log"
+          "type": "mission_builder",
+          "name": "mission_builder",
+          "data": {
+            "manifest_path": "src/media/mission_manifest.json",
+            "send_topic": "mission.send"
+          }
         }
       ]
-    }
-  }
+    },
 
+    "INPUT MANAGER": {
+      "type": "layout",
+      "diaposition": "vertical",
+      "content": [
+        {
+          "type": "input_manager",
+          "name": "teleop",
+          "data": {
+            "host": "${ROBOT_HOST}",
+            "port": 5050,
+            "device": "xbox",
+            "strategy": "arcade_drive",
+            "rate": 100,
+            "no_haptics": false
+          }
+        }
+      ]
+    },
+
+    "TILES": {
+      "type": "layout",
+      "diaposition": "vertical",
+      "content": [{
+        "type": "tile_downloader",
+        "name": "tile_downloader",
+        "data": {
+          "server_port": 8181,
+          "tiles_dir": "tiles",
+          "tile_source_topic": "map.tile_source"
+        }
+      }]
+    },
+
+    "LOGS": {
+      "type": "layout",
+      "diaposition": "vertical",
+      "content": [
+        { "type": "console", "name": "event_log" }
+      ]
+    },
+
+    "EXIT": {
+      "type": "layout",
+      "diaposition": "vertical",
+      "content": [
+        { "type": "quit_app", "name": "quit" }
+      ]
+    }
+
+  }
 }

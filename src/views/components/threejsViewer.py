@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from src.controller.event_bus import EventBus
+from .offline_assets import local_viewer_imports
 
 
 FALLBACK_HTML = """<!DOCTYPE html><html><head><meta charset='utf-8'/><title>Three.js Viewer</title></head><body>Missing template: src/views/components/html/threejsViewer.html</body></html>"""
@@ -44,7 +45,7 @@ class ThreejsViewer(QWidget):
 
     def _load_html_template(self) -> str:
         try:
-            return self._html_template_file.read_text(encoding="utf-8")
+            return local_viewer_imports(self._html_template_file.read_text(encoding="utf-8"))
         except OSError:
             self._event_bus.publish_sync("log", "ThreejsViewer: template file missing, using fallback HTML")
             return FALLBACK_HTML

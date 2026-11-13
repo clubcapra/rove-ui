@@ -1,32 +1,56 @@
 from __future__ import annotations
 
+import base64
+import datetime
 import json
-import tempfile
+import math
+import queue
+import time
+import utm
 from pathlib import Path
 
-from PySide6.QtCore import QUrl, Signal, Slot
-from PySide6.QtWidgets import QWidget, QVBoxLayout
+import json as _json
+from PySide6.QtCore import QUrl, QTimer
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QDialog
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from src.controller.event_bus import EventBus
 
 
-FALLBACK_HTML = """<!DOCTYPE html><html><body>Missing template: src/views/components/html/map.html</body></html>"""
+FALLBACK_HTML = """<!DOCTYPE html><html><body style="background:#f0f2f5;color:#606870;font-family:monospace">Missing template: src/views/components/html/map.html</body></html>"""
+
+
+def _center_dialog(dialog, parent: QWidget) -> None:
+    """Center a dialog over its parent widget."""
+    dialog.adjustSize()
+    center = parent.mapToGlobal(parent.rect().center())
+    dialog.move(center.x() - dialog.width() // 2, center.y() - dialog.height() // 2)
+
+_CB_PREFIX = "__mapcb__:"
 
 
 class _MapPage(QWebEnginePage):
-    def __init__(self, event_bus: EventBus, parent=None):
+    """Custom page that intercepts __mapcb__: console messages for JS→Python bridge."""
+
+    def __init__(self, event_bus: EventBus, on_action, parent=None):
         super().__init__(parent)
         self._event_bus = event_bus
+        self._on_action = on_action
 
     def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):  # noqa: N802
+        if message and message.startswith(_CB_PREFIX):
+            try:
+                data = _json.loads(message[len(_CB_PREFIX):])
+                self._on_action(data)
+            except Exception:
+                pass
+            return
         if message:
             self._event_bus.publish_sync("log", f"MapWidget JS[{lineNumber}] {message}")
         super().javaScriptConsoleMessage(level, message, lineNumber, sourceID)
 
 
 class MapWidget(QWidget):
-    _js_queue: Signal = Signal(str)
 
     def __init__(self, config: dict | None = None, event_bus: EventBus | None = None):
         super().__init__()
@@ -34,14 +58,20 @@ class MapWidget(QWidget):
         self._view: QWebEngineView | None = None
         self._config = config or {}
         self._event_bus = event_bus or EventBus()
-        self._html_file = Path(tempfile.gettempdir()) / "map_widget.html"
         self._html_template = Path(__file__).resolve().parent / "html" / "map.html"
         self._is_ready = False
         self._pending_scripts: list[str] = []
         self._robot_lat: float | None = None
         self._robot_lng: float | None = None
+        self._last_position_push: float = 0.0
         self._first_center_done = False
-        self._js_queue.connect(self._exec_js)
+        self._poi_seq = 0
+        self._mission_seq = 0
+        self._pois: dict[str, dict] = {}  # poi_id → {label, lat, lng, alt, photo, ts}
+        self._robot_path: list[dict] = []   # [{ts, lat, lng}] — GPS trail for SAR export
+        self._last_path_sample_t: float = 0.0
+        self._path_sample_interval: float = float(self._config.get("path_sample_interval_s", 1.0))
+        self._js_q: queue.SimpleQueue[str] = queue.SimpleQueue()
 
     def _load_html(self) -> str:
         try:
@@ -51,21 +81,29 @@ class MapWidget(QWidget):
 
     def build(self) -> None:
         self._view = QWebEngineView()
-        self._view.setPage(_MapPage(self._event_bus, self._view))
+        page = _MapPage(self._event_bus, self._handle_map_action, self._view)
+        self._view.setPage(page)
         self._view.settings().setAttribute(
             QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True
         )
         self._view.loadFinished.connect(self._on_load_finished)
 
-        self._html_file.write_text(self._load_html(), encoding="utf-8")
-        self._view.load(QUrl.fromLocalFile(str(self._html_file)))
+        # Load directly from source so relative paths (leaflet.min.js/css) resolve correctly
+        self._view.load(QUrl.fromLocalFile(str(self._html_template)))
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._view)
 
+        self._flush_timer = QTimer(self)
+        self._flush_timer.setInterval(20)
+        self._flush_timer.timeout.connect(self._flush_js_queue)
+        self._flush_timer.start()
+
         self._register_position_tracking()
         self._register_poi_button()
+        self._register_tile_source()
+        self._register_export()
 
     def _on_load_finished(self, ok: bool) -> None:
         self._is_ready = bool(ok)
@@ -114,6 +152,14 @@ class MapWidget(QWidget):
                 w, h = (size[0], size[1]) if isinstance(size, list) and len(size) >= 2 else (24, 32)
                 self.run_js(f"window.mapSetPOIIcon({json.dumps(url)}, {w}, {h});")
 
+    def _register_tile_source(self) -> None:
+        topic = str(self._config.get("tile_source_topic", "")).strip()
+        if not topic:
+            return
+        def _on_tile_source(url: str) -> None:
+            self.run_js(f"window.mapSetTileLayer({json.dumps(str(url))});")
+        self._event_bus.subscribe(topic, _on_tile_source)
+
     def _register_position_tracking(self) -> None:
         lat_topic = str(self._config.get("robot_position_lat_topic", "")).strip()
         lng_topic = str(self._config.get("robot_position_lng_topic", "")).strip()
@@ -122,18 +168,31 @@ class MapWidget(QWidget):
             return
 
         def _push():
-            if self._robot_lat is not None and self._robot_lng is not None:
-                self.run_js(f"window.mapSetRobotPosition({self._robot_lat}, {self._robot_lng});")
-                if not self._first_center_done:
-                    self._first_center_done = True
-                    self.run_js(f"window.mapSetView({self._robot_lat}, {self._robot_lng});")
+            if self._robot_lat is None or self._robot_lng is None:
+                return
+            now = time.monotonic()
+            if now - self._last_position_push < 0.05:  # throttle to ~20 fps
+                return
+            self._last_position_push = now
+            wall = time.time()
+            if wall - self._last_path_sample_t >= self._path_sample_interval:
+                self._robot_path.append({"ts": wall, "lat": self._robot_lat, "lng": self._robot_lng})
+                self._last_path_sample_t = wall
+            self.run_js(f"window.mapSetRobotPosition({self._robot_lat}, {self._robot_lng});")
+            if not self._first_center_done:
+                self._first_center_done = True
+                self.run_js(f"window.mapSetView({self._robot_lat}, {self._robot_lng});")
 
         if lat_topic:
+            _lat_logged = [False]
             def _on_lat(v):
                 try:
                     self._robot_lat = float(v)
                 except (TypeError, ValueError):
                     return
+                if not _lat_logged[0]:
+                    _lat_logged[0] = True
+                    self._event_bus.publish_sync("log", f"MapWidget: first GPS lat={self._robot_lat:.6f}")
                 _push()
             self._event_bus.subscribe(lat_topic, _on_lat)
 
@@ -147,9 +206,10 @@ class MapWidget(QWidget):
             self._event_bus.subscribe(lng_topic, _on_lng)
 
         if yaw_topic:
+            yaw_offset = float(self._config.get("robot_yaw_offset", 0.0))
             def _on_yaw(v):
                 try:
-                    yaw = float(v)
+                    yaw = float(v) + yaw_offset
                 except (TypeError, ValueError):
                     return
                 self.run_js(f"window.mapSetRobotYaw({yaw:.4f});")
@@ -194,14 +254,244 @@ class MapWidget(QWidget):
                     self.run_js(
                         f"window.mapAttachPhoto({json.dumps(poi_id)}, {json.dumps(photo)});"
                     )
+                if poi_id:
+                    self._pois[poi_id] = {
+                        "label": label, "lat": lat, "lng": lng,
+                        "alt": float(payload.get("alt", 0.0)), "photo": photo,
+                        "ts": float(payload.get("ts", time.time())),
+                    }
 
             self._event_bus.subscribe(at_topic, _on_poi_at)
             self._event_bus.publish_sync("log", f"MapWidget: add-POI-at bound to '{at_topic}'")
 
-    @Slot(str)
-    def _exec_js(self, script: str) -> None:
-        if self._view:
-            self._view.page().runJavaScript(script)
+        def _on_marker_remove(payload):
+            marker_id = str(payload.get("id", "")) if isinstance(payload, dict) else str(payload)
+            if marker_id:
+                self.run_js(f"window.mapRemoveMissionStep({json.dumps(marker_id)});")
+
+        self._event_bus.subscribe("mission.marker_remove", _on_marker_remove)
+
+    def _handle_map_action(self, data: dict) -> None:
+        """Dispatches action-wheel selections from JS."""
+        action = str(data.get("action", "poi"))
+
+        if action == "remove_poi":
+            poi_id = str(data.get("poi_id", ""))
+            if poi_id:
+                self.run_js(f"window.mapRemovePOI({json.dumps(poi_id)});")
+                self._pois.pop(poi_id, None)
+                poi_topic = str(self._config.get("poi_remove_topic", "")).strip()
+                if poi_topic:
+                    self._event_bus.publish_sync(poi_topic, {"poi_id": poi_id})
+            return
+
+        try:
+            lat = float(data["lat"])
+            lng = float(data["lng"])
+        except (KeyError, TypeError, ValueError):
+            return
+
+        if action == "poi":
+            QTimer.singleShot(0, lambda: self._show_poi_dialog(lat, lng))
+        elif action == "goto":
+            QTimer.singleShot(0, lambda: self._handle_goto(lat, lng))
+        elif action == "mission_goto":
+            sid = self._next_step_id()
+            self._publish_step("GoTo", {"a": {"lat": lat, "lng": lng, "alt": 0.0}}, sid)
+            self._add_mission_marker("goto", lat, lng, sid)
+        elif action == "mission_relay":
+            sid = self._next_step_id()
+            self._publish_step("RelayPosition", {"position": {"lat": lat, "lng": lng, "alt": 0.0}}, sid)
+            self._add_mission_marker("relay", lat, lng, sid)
+        elif action == "mission_sentinel_a":
+            self._event_bus.publish_sync(
+                "log", f"[Map] Sentinel A ({lat:.6f},{lng:.6f}) — tap map for point B"
+            )
+        elif action == "mission_sentinel_b":
+            try:
+                lat_a = float(data["lat_a"])
+                lng_a = float(data["lng_a"])
+            except (KeyError, TypeError, ValueError):
+                return
+            sid = self._next_step_id()
+            self._publish_step("Sentinel", {
+                "a": {"lat": lat_a, "lng": lng_a, "alt": 0.0},
+                "b": {"lat": lat,   "lng": lng,   "alt": 0.0},
+            }, sid)
+            self._add_mission_marker("sentinel", lat_a, lng_a, sid, extra={"lat_b": lat, "lng_b": lng})
+        elif action == "mission_orbit":
+            QTimer.singleShot(0, lambda: self._handle_orbit(lat, lng))
+        elif action == "mission_pathway":
+            points = data.get("points", [])
+            if len(points) >= 2:
+                sid = self._next_step_id()
+                self._publish_step("Pathway", {"points": [
+                    {"lat": float(p["lat"]), "lon": float(p["lng"]), "alt": 0.0}
+                    for p in points
+                ]}, sid)
+                self._add_mission_marker("pathway", lat, lng, sid, extra={"points": [
+                    {"lat": float(p["lat"]), "lng": float(p["lng"])} for p in points
+                ]})
+
+    def _show_poi_dialog(self, lat: float, lng: float) -> None:
+        from src.views.components.bitmap import _AltitudePicker, _NamePicker
+
+        ocr_url = str(self._config.get("ocr_url", "")).strip()
+        picker = _AltitudePicker(self._event_bus, ocr_url, self)
+        _center_dialog(picker, self)
+        if picker.exec() != QDialog.DialogCode.Accepted:
+            return
+        altitude  = picker.altitude()
+        photo_url = picker.photo_data_url()
+
+        self._poi_seq += 1
+        default_name = f"WP{self._poi_seq:03d}"
+        name_picker = _NamePicker(default_name, self)
+        _center_dialog(name_picker, self)
+        if name_picker.exec() != QDialog.DialogCode.Accepted:
+            self._poi_seq -= 1
+            return
+
+        label  = name_picker.name() or default_name
+        poi_id = f"poi_{self._poi_seq}"
+
+        self.run_js(f"window.mapAddPOI({lat}, {lng}, {json.dumps(label)}, {json.dumps(poi_id)});")
+        if photo_url:
+            self.run_js(f"window.mapAttachPhoto({json.dumps(poi_id)}, {json.dumps(photo_url)});")
+
+        self._pois[poi_id] = {
+            "label": label, "lat": lat, "lng": lng,
+            "alt": altitude, "photo": photo_url or "",
+            "ts": time.time(),
+        }
+
+        poi_topic = str(self._config.get("poi_topic", "")).strip()
+        if poi_topic:
+            payload: dict = {"lat": lat, "lng": lng, "label": label, "alt": altitude, "poi_id": poi_id}
+            if photo_url:
+                payload["photo"] = photo_url
+            self._event_bus.publish_sync(poi_topic, payload)
+
+        self._event_bus.publish_sync(
+            "log",
+            f"[Map] POI {self._poi_seq} «{label}» → GPS=({lat:.6f},{lng:.6f}) alt={altitude:.2f}m",
+        )
+
+    def _register_export(self) -> None:
+        topic = str(self._config.get("map_export_topic", "")).strip()
+        if not topic:
+            return
+        self._event_bus.subscribe(topic, lambda _: QTimer.singleShot(0, self._do_export))
+        self._event_bus.publish_sync("log", f"MapWidget: export bound to '{topic}'")
+
+    def _do_export(self) -> None:
+        stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        folder = Path("exports") / f"run_{stamp}"
+        folder.mkdir(parents=True, exist_ok=True)
+
+        def _to_utm(lat: float, lng: float):
+            return utm.from_latlon(lat, lng, force_zone_number=32, force_zone_letter='U')
+
+        def _utm_line(ts: float, lat: float, lng: float) -> str:
+            e, n, zn, zl = _to_utm(lat, lng)
+            return f"{ts:.6f} {zn}{zl} {e:.2f} {n:.2f}"
+
+        # ── path.txt — robot GPS trail ────────────────────────────────────
+        with open(folder / "path.txt", "w", encoding="utf-8") as f:
+            f.write("# UTM (WGS84)\n")
+            for pt in self._robot_path:
+                f.write(_utm_line(pt["ts"], pt["lat"], pt["lng"]) + "\n")
+
+        # ── pois.txt — OPI list ───────────────────────────────────────────
+        with open(folder / "pois.txt", "w", encoding="utf-8") as f:
+            f.write("# UTM (WGS84)\n")
+            for poi in self._pois.values():
+                ts = poi.get("ts", time.time())
+                f.write(_utm_line(ts, poi["lat"], poi["lng"]) + "\n")
+
+        # ── OPI photos — named timestamp_ZONEeasting_northing.jpg ─────────
+        for poi in self._pois.values():
+            photo = poi.get("photo", "")
+            if not photo or not photo.startswith("data:image"):
+                continue
+            try:
+                _, b64 = photo.split(",", 1)
+                img_bytes = base64.b64decode(b64)
+            except Exception:
+                continue
+            ts = poi.get("ts", time.time())
+            e, n, zn, zl = _to_utm(poi["lat"], poi["lng"])
+            fname = f"{ts:.6f}_{zn}{zl}{e:.2f}_{n:.2f}.jpg"
+            (folder / fname).write_bytes(img_bytes)
+
+        self._event_bus.publish_sync(
+            "log",
+            f"[Map] Export → {folder.resolve()}  ({len(self._pois)} POI(s), {len(self._robot_path)} path pts)",
+        )
+
+    def _latlon_to_en(self, lat: float, lng: float) -> tuple[float, float]:
+        """Convert GPS lat/lng to local East/North metres relative to goto_origin."""
+        lat0 = float(self._config.get("goto_origin_lat", self._robot_lat or lat))
+        lng0 = float(self._config.get("goto_origin_lng", self._robot_lng or lng))
+        north = (lat - lat0) * 111_320.0
+        east  = (lng - lng0) * 111_320.0 * math.cos(math.radians(lat0))
+        return round(east, 4), round(north, 4)
+
+    def _handle_goto(self, lat: float, lng: float) -> None:
+        goto_topic = str(self._config.get("goto_topic", "")).strip()
+        if goto_topic:
+            east, north = self._latlon_to_en(lat, lng)
+            self._event_bus.publish_sync(
+                goto_topic,
+                {"lat": lat, "lng": lng, "east": east, "north": north},
+            )
+        self._event_bus.publish_sync("log", f"[Map] GOTO → ({lat:.6f},{lng:.6f})")
+
+    def _handle_orbit(self, lat: float, lng: float) -> None:
+        from src.views.components.bitmap import _RadiusPicker
+        picker = _RadiusPicker(10.0, self)
+        _center_dialog(picker, self)
+        if picker.exec() != QDialog.DialogCode.Accepted:
+            return
+        radius = picker.radius()
+        sid = self._next_step_id()
+        self._publish_step("Orbit", {
+            "center": {"lat": lat, "lng": lng, "alt": 0.0},
+            "radius": radius,
+        }, sid)
+        self._add_mission_marker("orbit", lat, lng, sid, extra={"radius": radius})
+
+    def _next_step_id(self) -> str:
+        self._mission_seq += 1
+        return f"ms_{self._mission_seq}"
+
+    def _add_mission_marker(
+        self, mtype: str, lat: float, lng: float, step_id: str, extra: dict | None = None
+    ) -> None:
+        label = f"{mtype.upper()} #{self._mission_seq}"
+        extra_js = json.dumps(extra or {})
+        self.run_js(
+            f"window.mapAddMissionStep("
+            f"{json.dumps(mtype)},{json.dumps(step_id)},{lat},{lng},"
+            f"{json.dumps(label)},{extra_js});"
+        )
+
+    def _publish_step(self, command: str, params: dict, map_marker_id: str = "") -> None:
+        topic = str(self._config.get("mission_step_topic", "mission.step_request")).strip()
+        self._event_bus.publish_sync(topic, {
+            "command": command, "params": params, "map_marker_id": map_marker_id,
+        })
+        self._event_bus.publish_sync("log", f"[Map] → mission queue: {command}")
+
+    def _flush_js_queue(self) -> None:
+        if not self._view or not self._is_ready:
+            return
+        page = self._view.page()
+        while True:
+            try:
+                page.runJavaScript(self._js_q.get_nowait())
+            except queue.Empty:
+                break
 
     def run_js(self, script: str) -> None:
         if not self._view:
@@ -209,7 +499,9 @@ class MapWidget(QWidget):
         if not self._is_ready:
             self._pending_scripts.append(script)
             return
-        self._js_queue.emit(script)
+        self._js_q.put(script)
+
+    def recenter(self) -> None: self.run_js("window.mapRecenter();")
 
     # Navigation
     def pan_left(self)  -> None: self.run_js("window.mapPanLeft();")

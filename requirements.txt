@@ -1,2 +1,5 @@
 PySide6
 PySide6-Addons
+pygame
+utm
+protobuf>=7.35.1

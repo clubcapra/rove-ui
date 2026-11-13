@@ -1,0 +1,74 @@
+// DRAFT — derived from the example JSON responses of the robot recording API.
+// Replace with the robot team's official .proto when it exists.
+syntax = "proto3";
+package recording;
+import "google/protobuf/timestamp.proto";
+
+enum SessionStatus {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_ACTIVE = 1;
+    STATUS_STOPPED = 2;
+}
+
+enum SensorType {
+    SENSOR_TYPE_UNSPECIFIED = 0;
+    SENSOR_TYPE_CAMERA = 1;
+    SENSOR_TYPE_LIDAR = 2;
+}
+
+// ── Start ────────────────────────────────────────────────────────────────
+
+message TargetSensors {
+    repeated string sensor_ids = 1;
+}
+
+message StartRecordingRequest {
+    string session_id = 1;
+    string config_profile_id = 2;
+    TargetSensors target_sensors = 3;
+    map<string, string> session_metadata = 4;
+}
+
+message SensorResult {
+    string sensor_id = 1;
+    SensorType sensor_type = 2;
+    bool success = 3;
+}
+
+message StartRecordingResponse {
+    string session_id = 1;
+    SessionStatus status = 2;
+    google.protobuf.Timestamp started_at = 3;
+    repeated SensorResult sensor_results = 4;
+}
+
+// ── Stop ─────────────────────────────────────────────────────────────────
+
+message StopRecordingRequest {
+    string session_id = 1;
+    string reason = 2;
+}
+
+message CameraArtifact {
+    string sensor_id = 1;
+    int64 total_frames_captured = 2;
+    int64 dropped_frames = 3;
+    double average_fps = 4;
+    string video_uri = 5;
+}
+
+message LidarArtifact {
+    string sensor_id = 1;
+    int64 total_sweeps_captured = 2;
+    int64 total_points_recorded = 3;
+    string pcd_uri = 4;
+}
+
+message StopRecordingResponse {
+    string session_id = 1;
+    SessionStatus status = 2;
+    google.protobuf.Timestamp stopped_at = 3;
+    int64 total_duration_ms = 4;
+    repeated CameraArtifact camera_artifacts = 5;
+    repeated LidarArtifact lidar_artifacts = 6;
+}

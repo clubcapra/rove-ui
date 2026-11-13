@@ -1,33 +1,41 @@
 syntax = "proto3";
 package telemetry;
 
-import "proto/core/JointState.proto";
+import "proto/core/Orientation.proto";
+import "proto/core/Vector3.proto";
+
+// Mirror of capra_jetson_stack/protos/RoveControl.proto. The Ovis arm is
+// driven as a 6-DOF twist (normalized scalars in [-1, 1]) so the IK engine
+// can resolve joint commands from operator intent rather than per-actuator
+// setpoints.
 
 message RoveControl {
     Tracks tracks = 1;
     Flippers flippers = 2;
     Ovis ovis = 3;
-    uint64 timestamp_us = 4;
+    Gripper gripper = 4;
+
+    uint64 timestamp_us = 5;
 }
 
-// normalized value vectorial value for tracks ( -1.0 to 1.0 )
 message Tracks {
     float left_vel = 1;
     float right_vel = 2;
 }
 
+// Per-flipper {-1, 0, +1} step direction.
 message Flippers {
-    JointState fl = 1;
-    JointState fr = 2;
-    JointState rl = 3;
-    JointState rr = 4;
+    sint32 fl = 1;
+    sint32 fr = 2;
+    sint32 rl = 3;
+    sint32 rr = 4;
 }
 
 message Ovis {
-    JointState act_1 = 1;
-    JointState act_2 = 2;
-    JointState act_3 = 3;
-    JointState act_4 = 4;
-    JointState act_5 = 5;
-    JointState act_6 = 6;
+    Orientation orientation = 1; // [-1, 1]
+    Vector3 position = 2;        // [-1, 1]
+}
+
+message Gripper {
+    uint32 position = 1;  // 0 = fully open, 255 = fully closed
 }

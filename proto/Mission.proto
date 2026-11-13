@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package rove.mission.v1;
+
+// ============================================================================
+// ROVE mission wire format.
+//
+// Design intent: the schema is GENERIC — a step is a command id plus a typed
+// param map — so the .proto does NOT change when commands are added or removed.
+// The set of valid commands, their params, and gating live in the JSON manifest
+// the robot exports (mission_manifest.template.json). The UI validates a mission
+// against that manifest, then serializes to this proto for the wire.
+//
+// firmware_hash ties a mission to the manifest it was composed against; the
+// robot rejects a mission whose hash doesn't match its current node registry.
+// ============================================================================
+
+// ----- typed parameter value (mirrors manifest param "type"/"accepts") -----
+message Value {
+  oneof kind {
+    string   enum_value    = 1; // manifest "enum"           -> one of values[]
+    Coord    coordinate    = 2; // manifest "map_coordinate"
+    string   variable_ref  = 3; // "$human" / "$point_a"     (accepts "variable:*")
+    string   vision_object = 4; // "PERSON-01"               (manifest "vision_object")
+    double   number        = 5; // manifest "number" (radius / distance / duration)
+    bool     flag          = 6;
+    string   text          = 7; // manifest "string" (e.g. MarkPOI tag)
+    Route    route         = 8; // manifest "route"
+    Geometry geometry      = 9; // manifest "geometry"
+  }
+}
+
+message Coord {
+  double lat = 1;
+  double lon = 2;
+  double alt = 3; // optional, meters; 0 if unused
+}
+
+message Route {
+  repeated Coord points = 1; // ordered
+}
+
+message Geometry {
+  repeated Coord ring = 1; // closed polygon perimeter
+}
+
+message Param {
+  string name  = 1; // matches manifest param name, e.g. "target", "radius"
+  Value  value = 2;
+}
+
+// ----- transitions (mirror manifest "transitions") -----
+enum TransitionType {
+  TRANSITION_TYPE_UNSPECIFIED = 0;
+  UNTIL_DONE_NEXT             = 1; // run to success, advance to next step
+  UNTIL_DONE_END             = 2; // run to success, end the mission
+  UNTIL_STOPPED              = 3; // run until operator preempt
+  LOOP_N                     = 4; // repeat loop_count times, then advance
+}
+
+message Transition {
+  TransitionType type       = 1;
+  uint32         loop_count = 2; // used iff type == LOOP_N
+}
+
+// ----- mission-scoped variables (the behavior-tree blackboard) -----
+enum VariableType {
+  VARIABLE_TYPE_UNSPECIFIED = 0;
+  ENTITY   = 1; // a tracked vision object bound at runtime (Await)
+  POINT    = 2; // a coordinate captured at runtime (MarkPOI)
+  GEOMETRY = 3;
+}
+
+message Variable {
+  string       name = 1; // "$human"
+  VariableType type = 2;
+}
+
+// ----- a single step = one behavior-tree leaf node invocation -----
+message Step {
+  string              command    = 1; // command id from the manifest, e.g. "Follow"
+  repeated Param      params     = 2;
+  string              binds      = 3; // optional: variable this step produces ("$point_a")
+  Transition          transition = 4;
+}
+
+// ----- the composed mission -----
+message Mission {
+  uint32            schema_version = 1; // must equal manifest.schema_version
+  string            firmware_hash  = 2; // must equal manifest.firmware_hash
+  string            name           = 3;
+  repeated Variable variables      = 4; // declared up front; bound during execution
+  repeated Step     sequence       = 5; // executed in order, gated by each transition
+}
+
+// ----- robot's response when a mission is uploaded -----
+message MissionResult {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    ACCEPTED           = 1;
+    REJECTED           = 2;
+  }
+  Status status         = 1;
+  string detail         = 2; // reason on REJECTED (unknown command, bad var type, hash mismatch, gated by loadout, ...)
+  uint32 rejected_step  = 3; // index into sequence, when applicable
+}

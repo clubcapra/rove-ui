@@ -1,5 +1,51 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QGridLayout, QVBoxLayout, QLabel
+from PySide6.QtCore import QRect, Qt
 from typing import List
+from src.views import theme
+
+
+def _tac_wrap(widget: QWidget, label: str) -> QWidget:
+    """Wrap a widget in a tactical label bar container."""
+    container = QWidget()
+    container.setObjectName("tac-panel")
+    container.setStyleSheet(
+        f"QWidget#tac-panel {{ background: {theme.BG_PANEL}; border: 1px solid {theme.BORDER_DIM}; }}"
+    )
+    outer = QVBoxLayout(container)
+    outer.setContentsMargins(0, 0, 0, 0)
+    outer.setSpacing(0)
+
+    bar = QWidget()
+    bar.setObjectName("tac-bar")
+    bar.setFixedHeight(22)
+    bar.setStyleSheet(
+        f"QWidget#tac-bar {{ background: {theme.BG_DARK}; "
+        f"border-bottom: 1px solid {theme.BORDER_DIM}; }}"
+    )
+    bar_layout = QHBoxLayout(bar)
+    bar_layout.setContentsMargins(8, 0, 8, 0)
+    bar_layout.setSpacing(6)
+
+    dot = QLabel("◆")
+    dot.setStyleSheet(
+        f"color: {theme.CYAN}; font-size: 8px; background: transparent; border: none;"
+    )
+    dot.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
+    title = QLabel(label.upper())
+    title.setStyleSheet(
+        f"color: {theme.TEXT_DIM}; font-size: 10px; font-family: 'Courier New'; "
+        f"letter-spacing: 1px; background: transparent; border: none;"
+    )
+    title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
+    bar_layout.addWidget(dot)
+    bar_layout.addWidget(title)
+    bar_layout.addStretch()
+
+    outer.addWidget(bar)
+    outer.addWidget(widget, 1)
+    return container
 
 from .web_camera_view import WebCameraView
 from .camera_widget import CameraWidget
@@ -9,6 +55,84 @@ from src.controller.event_bus import EventBus
 # Import known view wrappers for high-level composition
 from .rtsp_view import RTSPView
 from .console_view import DebugConsole
+
+
+class AbsoluteContainer(QWidget):
+    """Container that positions children with absolute coordinates.
+
+    Each layer is defined by (widget, style) where style supports:
+      x, y        — position in px or "N%" relative to container
+      width, height — size in px or "N%" (default: "100%")
+      z_index     — stacking order (higher = on top)
+      margin      — uniform outer inset applied to all four sides
+      padding     — inner content margin applied inside the widget area
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._layers: list[tuple[QWidget, dict]] = []
+
+    def add_layer(self, widget: QWidget, style: dict) -> None:
+        widget.setParent(self)
+        self._layers.append((widget, style))
+        # Re-sort by z_index so lower indices are raised first (higher z ends on top)
+        self._layers.sort(key=lambda x: x[1].get("z_index", 0))
+        for w, _ in self._layers:
+            w.raise_()
+        widget.show()
+        self._relayout()
+
+    @staticmethod
+    def _resolve(value, parent_dim: int) -> int:
+        if value == "auto":
+            return -1  # sentinel: use widget sizeHint
+        if isinstance(value, str) and value.endswith("%"):
+            return int(parent_dim * float(value[:-1]) / 100)
+        return int(value)
+
+    def _relayout(self) -> None:
+        pw, ph = self.width(), self.height()
+        for widget, style in self._layers:
+            margin = int(style.get("margin", 0))
+
+            raw_w = self._resolve(style.get("width",  "100%"), pw)
+            raw_h = self._resolve(style.get("height", "100%"), ph)
+            hint  = widget.sizeHint()
+            w = (hint.width()  if raw_w < 0 else raw_w) - 2 * margin
+            h = (hint.height() if raw_h < 0 else raw_h) - 2 * margin
+
+            if "right" in style:
+                x = pw - self._resolve(style["right"], pw) - w - margin
+            elif style.get("x") == "center":
+                x = (pw - w) // 2
+            else:
+                x = self._resolve(style.get("x", 0), pw) + margin
+
+            if "bottom" in style:
+                y = ph - self._resolve(style["bottom"], ph) - h - margin
+            elif style.get("y") == "center":
+                y = (ph - h) // 2
+            else:
+                y = self._resolve(style.get("y", 0), ph) + margin
+
+            # Clear any fixed-size constraints so setGeometry always takes effect
+            widget.setMinimumSize(0, 0)
+            widget.setMaximumSize(16_777_215, 16_777_215)
+
+            padding = int(style.get("padding", 0))
+            if padding:
+                child_layout = widget.layout()
+                if child_layout is not None:
+                    child_layout.setContentsMargins(padding, padding, padding, padding)
+            widget.setGeometry(QRect(x, y, max(1, w), max(1, h)))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._relayout()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._relayout()
 
 
 class LayoutPanel:
@@ -36,6 +160,15 @@ class LayoutPanel:
             self._widget = QWidget()
 
             pos = self.config.get("diaposition", "horizontal")
+
+            if pos == "absolute":
+                container = AbsoluteContainer()
+                for child_cfg in self.config.get("content", []):
+                    style = child_cfg.get("style", {})
+                    child_widget = self._make_child_widget(child_cfg)
+                    container.add_layer(child_widget, style)
+                self._widget = container
+                return
 
             if pos == "grid":
                 grid_cfg = self.config.get("grid", {})
@@ -107,10 +240,23 @@ class LayoutPanel:
         return self._merge_dicts(parent_data, child_data)
 
     def _make_child_widget(self, child_cfg: dict) -> QWidget:
-        """Create a lightweight widget for a child view config."""
+        """Create widget for a child config, optionally wrapped with a label bar."""
+        w = self._create_child(child_cfg)
+        label = str(child_cfg.get("label", "")).strip()
+        if label:
+            w = _tac_wrap(w, label)
+        return w
+
+    def _create_child(self, child_cfg: dict) -> QWidget:
         vtype = str(child_cfg.get("type", "")).strip().lower()
         name = child_cfg.get("name", "unnamed")
         data = self._resolve_child_data(child_cfg)
+
+        if vtype == "layout":
+            nested = LayoutPanel(name, child_cfg, [], event_bus=self.event_bus)
+            nested.build()
+            self._register_child(name, nested)
+            return nested.get_widget()
 
         if vtype == "rtsp":
             rtsp = RTSPView(name, data, event_bus=self.event_bus)
@@ -163,11 +309,31 @@ class LayoutPanel:
             self._register_child(name, widget)
             return widget
 
+        if vtype == "button_bar":
+            from .components.button_bar import ButtonBar
+            bar = ButtonBar(data, event_bus=self.event_bus)
+            self._register_child(name, bar)
+            return bar
+
         if vtype == "bitmap":
             bitmap = Bitmap(name, data, event_bus=self.event_bus)
             bitmap.build()
             self._register_child(name, bitmap)
             return bitmap.get_widget()
+
+        if vtype == "tile_downloader":
+            from .components.tile_downloader import TileDownloader
+            dl = TileDownloader(name, data, event_bus=self.event_bus)
+            dl.build()
+            self._register_child(name, dl)
+            return dl.get_widget()
+
+        if vtype == "mission_builder":
+            from .components.mission_builder import MissionBuilder
+            builder = MissionBuilder(name, data, event_bus=self.event_bus)
+            builder.build()
+            self._register_child(name, builder)
+            return builder.get_widget()
 
         if vtype == "robot":
             from .components.urdf_viewer import URDFViewer
@@ -179,6 +345,18 @@ class LayoutPanel:
             viewer.build()
             self._register_child(name, viewer)
             return viewer
+
+        if vtype == "input_manager":
+            from .components.input_manager_widget import InputManagerWidget
+            widget = InputManagerWidget(data, event_bus=self.event_bus)
+            self._register_child(name, widget)
+            return widget
+
+        if vtype == "quit_app":
+            from .components.quit_widget import QuitWidget
+            widget = QuitWidget(name, data, event_bus=self.event_bus)
+            self._register_child(name, widget)
+            return widget
 
         # Placeholder for other view types (table, map, point_cloud, etc.)
         lbl = QLabel(f"Placeholder {vtype}: {name}")
